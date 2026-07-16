@@ -1,0 +1,16 @@
+services:
+  webclient:
+    build:
+      context: ../webclient
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
+  service:
+    build:
+      context: ../service
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
