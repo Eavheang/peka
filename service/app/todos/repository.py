@@ -1,37 +1,62 @@
-from datetime import UTC, datetime
+from app.database import get_connection
 
 
 class TodoRepository:
-    def __init__(self) -> None:
-        self._todos: dict[int, dict] = {}
-        self._next_id = 1
-
     def list(self) -> list[dict]:
-        return list(self._todos.values())
+        with get_connection() as connection:
+            return list(
+                connection.execute(
+                    "SELECT id, title, completed, created_at FROM todos ORDER BY id"
+                ).fetchall()
+            )
 
     def get(self, todo_id: int) -> dict | None:
-        return self._todos.get(todo_id)
+        with get_connection() as connection:
+            return connection.execute(
+                "SELECT id, title, completed, created_at FROM todos WHERE id = %s",
+                (todo_id,),
+            ).fetchone()
 
     def create(self, title: str) -> dict:
-        todo = {
-            "id": self._next_id,
-            "title": title,
-            "completed": False,
-            "created_at": datetime.now(UTC),
-        }
-        self._todos[self._next_id] = todo
-        self._next_id += 1
-        return todo
+        with get_connection() as connection:
+            return connection.execute(
+                """
+                INSERT INTO todos (title)
+                VALUES (%s)
+                RETURNING id, title, completed, created_at
+                """,
+                (title,),
+            ).fetchone()
 
     def update(self, todo_id: int, values: dict) -> dict | None:
-        todo = self.get(todo_id)
-        if todo is None:
-            return None
-        todo.update(values)
-        return todo
+        if not values:
+            return self.get(todo_id)
+
+        assignments = []
+        parameters = []
+        for field in ("title", "completed"):
+            if field in values:
+                assignments.append(f"{field} = %s")
+                parameters.append(values[field])
+
+        parameters.append(todo_id)
+        with get_connection() as connection:
+            return connection.execute(
+                f"""
+                UPDATE todos
+                SET {", ".join(assignments)}
+                WHERE id = %s
+                RETURNING id, title, completed, created_at
+                """,
+                parameters,
+            ).fetchone()
 
     def delete(self, todo_id: int) -> bool:
-        return self._todos.pop(todo_id, None) is not None
+        with get_connection() as connection:
+            result = connection.execute(
+                "DELETE FROM todos WHERE id = %s", (todo_id,)
+            )
+            return result.rowcount > 0
 
 
 todo_repository = TodoRepository()
