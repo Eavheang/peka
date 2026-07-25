@@ -9,7 +9,7 @@
     "lint": "eslint",
     "lint-fix": "eslint . --fix",
     "tsc": "tsc --noEmit",
-    "prepare": "cd .. && husky webclient/.husky"
+    "prepare": "cd .. && husky .husky"
   },
   "dependencies": {
     "next": "16.2.10",

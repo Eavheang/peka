@@ -1,0 +1,21 @@
+#!/usr/bin/env sh
+
+files=$(git diff --cached --name-only --diff-filter=ACMR)
+
+case "$files" in
+  *service/*)
+    echo "Running service checks..."
+    cd service || exit 1
+    python -m pytest
+    cd .. || exit 1
+    ;;
+esac
+
+case "$files" in
+  *webclient/*)
+    echo "Running webclient checks..."
+    cd webclient || exit 1
+    bun run lint-fix
+    bun run tsc
+    ;;
+esac

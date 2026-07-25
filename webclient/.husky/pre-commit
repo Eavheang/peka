@@ -1,5 +1,0 @@
-#!/usr/bin/env sh
-
-cd webclient
-bun run lint-fix
-bun run tsc
