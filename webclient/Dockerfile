@@ -1,9 +1,10 @@
 FROM oven/bun:1 AS builder
 
 WORKDIR /app
+USER root
 
 COPY package.json bun.lock ./
-RUN bun install --frozen-lockfile
+RUN bun install --frozen-lockfile --force
 
 COPY . .
 RUN bun run build

@@ -1,7 +1,7 @@
 .PHONY: up down migrate
 
 up:
-	@if [ ! -f .env ]; then cp .env.example .env; fi
+	@if not exist ".env" copy /Y ".env.example" ".env"
 	docker compose -f compose.yaml -f compose.dev.yaml up -d --build
 	$(MAKE) migrate
 

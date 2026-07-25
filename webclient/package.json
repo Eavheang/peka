@@ -8,8 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "lint-fix": "eslint . --fix",
-    "tsc": "tsc --noEmit",
-    "prepare": "cd .. && husky .husky"
+    "tsc": "tsc --noEmit"
   },
   "dependencies": {
     "next": "16.2.10",
