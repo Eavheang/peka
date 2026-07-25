@@ -1,4 +1,4 @@
-# PEKA Docker Compose
+# PEKA Development Commands
 
 Run commands from this directory.
 
@@ -7,18 +7,12 @@ Run commands from this directory.
 Starts both apps with hot reload and source-code mounts:
 
 ```bash
-docker compose -f compose.dev.yaml up --build
+make up
 ```
 
-Use `--build` after changing `service/requirements.txt`, either Dockerfile,
-`webclient/package.json`, `webclient/bun.lock`, or Compose build settings.
-For normal code changes, start without rebuilding:
+`make up` rebuilds images before starting containers. Development containers
+hot reload normal source-code changes automatically.
 
-```bash
-docker compose -f compose.dev.yaml up -d
-```
-
-Development containers hot reload source-code changes automatically.
 
 Open:
 
@@ -29,7 +23,7 @@ Open:
 Stop development containers:
 
 ```bash
-docker compose -f compose.dev.yaml down
+make down
 ```
 
 ## Deployment-style run
