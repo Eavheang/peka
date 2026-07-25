@@ -1,38 +1,25 @@
 # FastAPI Project Setup
 
-General project structure for a maintainable FastAPI backend. This is a practical convention, not a framework requirement. Add directories only when the project needs them.
+Feature-based FastAPI structure used by this service. Each feature keeps its routes, schemas, business logic, and data access together.
 
-## Recommended structure
+## Project structure
 
 ```text
 project-root/
 ├── app/
-│   ├── main.py                 # Creates FastAPI application and registers routers
-│   ├── routes/
-│   │   ├── __init__.py         # Combines and exports feature routers
-│   │   └── <feature>.py        # HTTP endpoints grouped by feature
-│   ├── schemas/
-│   │   └── <feature>.py        # Pydantic request and response models
-│   ├── services/
-│   │   └── <feature>.py        # Business logic and use cases
-│   ├── repositories/
-│   │   └── <feature>.py        # Database or external data access
-│   ├── models/
-│   │   └── <feature>.py        # Database models, when needed
-│   ├── db/
-│   │   ├── __init__.py
-│   │   └── session.py          # Database connection/session setup
-│   ├── core/
-│   │   ├── security.py         # Authentication/security helpers
-│   │   └── errors.py           # Shared application errors
-│   ├── utils/                  # Small reusable helpers
-│   ├── middleware/             # Custom middleware, when needed
-│   └── scripts/                # Maintenance and import scripts
-├── storage/                    # Runtime files, generated files, or local assets
+│   ├── __init__.py             # Central router registry
+│   ├── config.py               # Environment configuration
+│   ├── main.py                 # Creates FastAPI application
+│   └── todos/                  # Todo feature
+│       ├── repository.py       # Data access
+│       ├── routes.py           # HTTP endpoints
+│       ├── schemas.py          # Pydantic request/response models
+│       └── service.py          # Business logic
+├── storage/                    # Runtime-generated files
 ├── tests/
 │   ├── conftest.py
 │   ├── test_health.py
-│   └── test_<feature>.py
+│   └── test_todos_api.py
 ├── .env.example
 ├── .gitignore
 ├── Dockerfile
@@ -40,31 +27,52 @@ project-root/
 └── README.md
 ```
 
-## Responsibilities
+Feature folders do not need `__init__.py`. Python can import their modules directly through namespace packages.
 
-### `app/main.py`
+## Router registry
 
-Application entrypoint. It should:
+`app/__init__.py` imports every feature router and exposes one list:
 
-1. Load configuration.
-2. Create the `FastAPI` instance.
-3. Register middleware and exception handlers.
-4. Include all routers from `app.routes`.
-5. Register startup/shutdown hooks only when required.
+```python
+from app.todos.routes import router as todos_router
+
+routers = [
+    todos_router,
+]
+```
+
+For another feature:
+
+```python
+from app.todos.routes import router as todos_router
+from app.users.routes import router as users_router
+
+routers = [
+    todos_router,
+    users_router,
+]
+```
+
+Every new feature router must be added here. Avoid dynamic router discovery; explicit imports are easier to trace and debug.
+
+## Application entrypoint
+
+`app/main.py` creates the application and registers routers from `app`:
 
 ```python
 from fastapi import FastAPI
 
-from app.routes import routers
+from app import routers
+from app.config import settings
 
-app = FastAPI(title="Service name", version="1.0.0")
+app = FastAPI(title=settings.app_name, debug=settings.debug)
 
 for router in routers:
     app.include_router(router)
 
 
 @app.get("/health", tags=["health"])
-async def healthcheck():
+async def healthcheck() -> dict[str, str]:
     return {"status": "ok"}
 ```
 
@@ -74,49 +82,51 @@ Run it with:
 uvicorn app.main:app --reload --port 8000
 ```
 
-### `app/routes/`
+## Feature structure
 
-Contains HTTP-specific code:
+Each feature owns its code:
 
-- URL paths and HTTP methods
-- Query, path, and body parameters
-- Dependency injection
-- Authentication checks
-- HTTP status codes and response models
+```text
+app/<feature>/
+├── repository.py       # Persistence or external data access
+├── routes.py           # FastAPI router and endpoint handlers
+├── schemas.py          # Pydantic input/output models
+└── service.py          # Business rules and use cases
+```
 
-Keep business rules and database queries outside route handlers.
+Add `model.py` only when the feature has a database/ORM model. Add other files only when the feature needs them.
+
+Normal dependency direction:
+
+```text
+routes -> service -> repository -> database/external system
+```
+
+`schemas.py` may be used by routes and services. Repository code must not import routes.
+
+### `routes.py`
+
+Contains HTTP-specific code: paths, methods, request parameters, dependencies, status codes, and response models.
 
 ```python
-from fastapi import APIRouter
+from fastapi import APIRouter, status
 
-from app.schemas.items import ItemCreate, ItemResponse
-from app.services.items import create_item
+from app.items.schemas import ItemCreate, ItemResponse
+from app.items.service import create_item
 
 router = APIRouter(prefix="/items", tags=["items"])
 
 
-@router.post("", response_model=ItemResponse, status_code=201)
+@router.post("", response_model=ItemResponse, status_code=status.HTTP_201_CREATED)
 async def create(data: ItemCreate):
-    return await create_item(data)
+    return create_item(data)
 ```
 
-`app/routes/__init__.py` is the central router registry:
+Keep route handlers short. Put business rules and persistence outside route handlers.
 
-```python
-from app.routes.items import router as items_router
-from app.routes.users import router as users_router
+### `schemas.py`
 
-routers = [
-    items_router,
-    users_router,
-]
-```
-
-Every new feature router must be included in this list. `app/main.py` includes each router in `routers`.
-
-### `app/schemas/`
-
-Pydantic models for input validation and output serialization. Keep API models separate from database models when their responsibilities differ.
+Pydantic models validate input and serialize output:
 
 ```python
 from pydantic import BaseModel, Field
@@ -127,32 +137,52 @@ class ItemCreate(BaseModel):
 
 
 class ItemResponse(BaseModel):
-    id: str
+    id: int
     name: str
 ```
 
-### `app/services/`
+Keep API schemas separate from ORM models when their responsibilities differ.
 
-Business logic and use cases. Services coordinate repositories, validation, and other services. They should not depend on FastAPI request objects.
+### `service.py`
+
+Coordinates business rules and repositories. It must not depend on FastAPI request objects.
 
 ```python
-from app.repositories.items import item_repository
+from app.items.repository import item_repository
+from app.items.schemas import ItemCreate
 
 
-async def create_item(data):
-    item_id = await item_repository.create(data.model_dump())
-    return await item_repository.get(item_id)
+def create_item(data: ItemCreate) -> dict:
+    return item_repository.create(data.name)
 ```
 
-### `app/repositories/`
+### `repository.py`
 
-Data access layer. Repositories contain database queries or calls to external persistence systems. Keep this layer independent from HTTP concepts.
+Contains database queries or calls to external persistence systems. Keep HTTP concepts out of this file.
 
-If the project does not need a database, omit `repositories/`, `models/`, and `db/`.
+Omit `repository.py` when the feature has no persistence or external data access.
 
-### `app/config.py`
+## Adding a feature
 
-Centralize environment configuration. Use `.env.example` to document required variable names without committing secrets.
+For a `users` feature:
+
+1. Create `app/users/routes.py`.
+2. Add `schemas.py`, `service.py`, and `repository.py` only as needed.
+3. Import its router in `app/__init__.py`.
+4. Add its router to `routers`.
+5. Add behavior tests under `tests/`.
+
+```text
+app/users/
+├── repository.py
+├── routes.py
+├── schemas.py
+└── service.py
+```
+
+## Configuration
+
+Keep environment configuration in `app/config.py` and document variables in `.env.example`:
 
 ```python
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -168,100 +198,23 @@ class Settings(BaseSettings):
 settings = Settings()
 ```
 
-Do not read environment variables throughout the application when one settings object can provide them.
-
-## Feature structure
-
-For a feature named `items`, use:
-
-```text
-app/
-├── routes/items.py
-├── schemas/items.py
-├── services/items.py
-├── repositories/items.py       # Only if persistence is needed
-└── models/items.py             # Only if database models are needed
-```
-
-The normal dependency direction is:
-
-```text
-route -> service -> repository -> database/external system
-```
-
-Schemas can be used by routes and services. Shared utilities should not import route modules.
-
-## Authentication and dependencies
-
-Put reusable dependencies in `app/dependencies.py` or `app/core/security.py`:
-
-- Current-user resolution
-- Role or permission checks
-- Database sessions
-- Request-scoped services
-- Common pagination or filtering
-
-Use FastAPI's `Depends()` rather than manually creating shared resources inside each route.
-
-## Storage
-
-Use `storage/` for runtime-generated files. Keep uploaded or generated files out of source control.
-
-```text
-storage/
-├── uploads/
-├── exports/
-└── .gitkeep
-```
-
-For production, prefer external or persistent storage when files must survive deployment. Keep the storage path configurable through environment variables.
+Do not read environment variables throughout feature modules when the settings object can provide them.
 
 ## Tests
 
-Tests should mirror application behavior, not necessarily application folders.
+Tests verify behavior rather than mirror source folders:
 
 ```text
 tests/
-├── conftest.py             # Shared fixtures and test application setup
-├── test_health.py          # Basic application smoke test
-├── test_items_api.py       # HTTP/API behavior
-└── test_items_service.py   # Business logic behavior
+├── conftest.py
+├── test_health.py
+├── test_todos_api.py
+└── test_users_api.py
 ```
 
-Use `TestClient` for simple synchronous endpoint tests or `httpx.AsyncClient` for async tests. At minimum, test:
+At minimum, test successful requests, validation failures, not-found responses, and authentication rules when applicable.
 
-- Health endpoint
-- Successful request
-- Validation failure
-- Not-found/error response
-- Authentication/authorization behavior when applicable
-
-Example smoke test:
-
-```python
-from fastapi.testclient import TestClient
-
-from app.main import app
-
-client = TestClient(app)
-
-
-def test_healthcheck():
-    response = client.get("/health")
-    assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
-```
-
-## Dependencies and local setup
-
-Keep runtime dependencies in `requirements.txt` or the project's chosen dependency file. A minimal FastAPI setup normally includes:
-
-```text
-fastapi
-uvicorn[standard]
-```
-
-Add only dependencies required by the project, such as a database driver, authentication library, multipart upload support, or test tools.
+## Local setup
 
 ```bash
 python -m venv .venv
@@ -271,11 +224,9 @@ cp .env.example .env
 uvicorn app.main:app --reload
 ```
 
-API documentation is automatically available at `/docs` and `/redoc` unless disabled.
+API documentation is available at `/docs` and `/redoc`.
 
 ## Docker
-
-A basic Dockerfile should install dependencies, copy application code, expose the application port, and run Uvicorn:
 
 ```dockerfile
 FROM python:3.12-slim
@@ -293,32 +244,14 @@ EXPOSE 8000
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
-Do not use `--reload` in production containers.
+Do not use `--reload` in production.
 
-## General conventions
+## Conventions
 
-- Use async route handlers and async libraries when the operation is I/O-bound.
+- Group code by feature, not technical layer.
+- Register every feature router in `app/__init__.py`.
 - Keep route handlers short and explicit.
 - Validate external input at the API boundary.
-- Return consistent response shapes and status codes.
-- Use type hints throughout the application.
 - Keep configuration and secrets outside source code.
-- Add a router to the central registry whenever a new feature is created.
-- Avoid global mutable state unless it is intentionally application-wide.
-- Add a small test whenever adding non-trivial business logic.
-- Prefer the existing project pattern over introducing a new abstraction.
-
-## Instructions for generating a new project
-
-When using this document as an AI generation reference:
-
-1. Create `app/main.py` as the FastAPI entrypoint.
-2. Create `app/routes/__init__.py` as the central router registry.
-3. Group endpoints by feature under `app/routes`.
-4. Put Pydantic models under `app/schemas`.
-5. Put business logic under `app/services`.
-6. Add repositories, models, and database setup only when persistence is required.
-7. Add `config.py`, `.env.example`, `storage/`, and `tests/`.
-8. Add a health endpoint and one basic test.
-9. Add a Dockerfile and dependency file.
-10. Keep optional integrations out of the core structure until the feature needs them.
+- Add files and abstractions only when a feature needs them.
+- Prefer existing project patterns over new conventions.

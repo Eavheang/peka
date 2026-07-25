@@ -1,7 +1,7 @@
 from fastapi import APIRouter, status
 
-from app.schemas.todos import TodoCreate, TodoResponse, TodoUpdate
-from app.services.todos import create_todo, delete_todo, list_todos, update_todo
+from app.todos.schemas import TodoCreate, TodoResponse, TodoUpdate
+from app.todos.service import create_todo, delete_todo, list_todos, update_todo
 
 
 router = APIRouter(prefix="/todos", tags=["todos"])

@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 
+from app import routers
 from app.config import settings
-from app.routes import routers
 
 
 app = FastAPI(title=settings.app_name, debug=settings.debug)
