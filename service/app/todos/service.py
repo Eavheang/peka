@@ -1,7 +1,7 @@
 from fastapi import HTTPException, status
 
-from app.repositories.todos import todo_repository
-from app.schemas.todos import TodoCreate, TodoUpdate
+from app.todos.repository import todo_repository
+from app.todos.schemas import TodoCreate, TodoUpdate
 
 
 def list_todos() -> list[dict]:
