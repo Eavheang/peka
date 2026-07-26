@@ -31,7 +31,7 @@ def test_settings_validate_auth_configuration() -> None:
     with pytest.raises(ValidationError):
         Settings(jwt_secret_key=SecretStr("short"))
     with pytest.raises(ValidationError):
-        Settings(jwt_secret_key=secret, admin_email="admin@example.com")
+        Settings(jwt_secret_key=secret, admin_email="admin@example.com", admin_password=None)
     with pytest.raises(ValidationError):
         Settings(jwt_secret_key=secret, jwt_access_token_expire_minutes=61)
     with pytest.raises(ValidationError):
