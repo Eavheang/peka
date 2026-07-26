@@ -1,14 +1,17 @@
 from app.database import Base
-from app.todos.model import Todo
+from app.auth.model import User
 
 
-def test_todo_model_describes_todos_table() -> None:
-    table = Base.metadata.tables[Todo.__tablename__]
+def test_user_model_describes_users_table() -> None:
+    table = Base.metadata.tables[User.__tablename__]
 
-    assert table.name == "todos"
+    assert table.name == "users"
     assert {column.name for column in table.columns} == {
         "id",
-        "title",
-        "completed",
+        "email",
+        "password_hash",
+        "role",
+        "token_version",
         "created_at",
+        "updated_at",
     }
