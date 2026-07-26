@@ -4,15 +4,15 @@ Run commands from this directory.
 
 ## Quick start
 
-Run one command to create local environment configuration and start the full
-development stack:
+Run one-time setup to create local environment configuration, build images,
+install webclient dependencies, and apply migrations:
 
 ```bash
-make up
+make setup
 ```
 
-This starts the API, webclient, PostgreSQL, and pgAdmin. No manual `.env` or
-Docker commands are required.
+After setup, start the development stack with `make up`. No packages are
+installed and no images are rebuilt during normal starts.
 
 ## Development
 
@@ -26,8 +26,9 @@ This runs `compose.yaml` together with `compose.dev.yaml`; PostgreSQL and
 pgAdmin are included through the base Compose file. It also creates `.env`
 from `.env.example` when `.env` does not exist.
 
-`make up` rebuilds images before starting containers. Development containers
-hot reload normal source-code changes automatically.
+`make setup` rebuilds images and installs dependencies. Run it again when
+Dockerfiles or dependency lockfiles change. Development containers hot reload
+normal source-code changes automatically.
 
 
 Open:

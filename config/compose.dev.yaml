@@ -10,7 +10,7 @@ services:
       - "3000:3000"
     environment:
       NODE_ENV: development
-    command: sh -c "bun install --frozen-lockfile && (test -x node_modules/.bin/next || bun install --frozen-lockfile --force) && bun run dev --hostname 0.0.0.0"
+    command: bun run dev --hostname 0.0.0.0
 
   service:
     build:
