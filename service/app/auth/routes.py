@@ -1,0 +1,66 @@
+from uuid import UUID
+
+import jwt
+from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+
+from app.auth.repository import auth_repository
+from app.auth.schemas import LoginRequest, TokenResponse, UserCreate, UserResponse
+from app.auth.security import create_access_token, decode_access_token
+from app.auth.service import authenticate, create_user, current_user
+from app.config import settings
+
+router = APIRouter(prefix="/auth", tags=["auth"])
+bearer = HTTPBearer(auto_error=False)
+
+
+def unauthorized() -> HTTPException:
+    return HTTPException(status_code=401, detail="Invalid authentication credentials",
+                         headers={"WWW-Authenticate": "Bearer"})
+
+
+def authenticated(credentials: HTTPAuthorizationCredentials | None = Depends(bearer)) -> dict:
+    if credentials is None or credentials.scheme.lower() != "bearer":
+        raise unauthorized()
+    try:
+        claims = decode_access_token(credentials.credentials)
+        user = current_user(UUID(claims["sub"]))
+    except (jwt.PyJWTError, ValueError):
+        raise unauthorized() from None
+    if user is None or user["token_version"] != claims["ver"] or user["role"] != claims["role"]:
+        raise unauthorized()
+    return user
+
+
+def admin_only(user: dict = Depends(authenticated)) -> dict:
+    if user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin role required")
+    return user
+
+
+@router.post("/login", response_model=TokenResponse)
+def login(data: LoginRequest) -> dict:
+    user = authenticate(data.email, data.password)
+    if user is None:
+        raise unauthorized()
+    return {"access_token": create_access_token(str(user["id"]), user["role"], user["token_version"]),
+            "token_type": "bearer", "expires_in": settings.jwt_access_token_expire_minutes * 60}
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+def logout(user: dict = Depends(authenticated)) -> Response:
+    auth_repository.revoke(user["id"])
+    return Response(status_code=204)
+
+
+@router.get("/me", response_model=UserResponse)
+def me(user: dict = Depends(authenticated)) -> dict:
+    return user
+
+
+@router.post("/users", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+def users(data: UserCreate, _: dict = Depends(admin_only)) -> dict:
+    try:
+        return create_user(data)
+    except ValueError:
+        raise HTTPException(status_code=409, detail="Email already exists") from None

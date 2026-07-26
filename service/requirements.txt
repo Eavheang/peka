@@ -6,3 +6,5 @@ httpx
 psycopg[binary]
 SQLAlchemy
 alembic
+PyJWT
+pwdlib[argon2]
