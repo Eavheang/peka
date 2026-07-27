@@ -1,3 +1,5 @@
+from typing import Literal
+
 from uuid import UUID
 
 import psycopg
@@ -8,18 +10,24 @@ from app.database import get_connection
 class AuthRepository:
     def find_by_email(self, email: str) -> dict | None:
         with get_connection() as connection:
-            return connection.execute("SELECT * FROM users WHERE email = %s", (email,)).fetchone()
+            return connection.execute(
+                "SELECT id, email, role, password_hash, token_version, is_active FROM users WHERE email = %s",
+                (email,),
+            ).fetchone()
 
     def find_by_id(self, user_id: UUID) -> dict | None:
         with get_connection() as connection:
-            return connection.execute("SELECT * FROM users WHERE id = %s", (user_id,)).fetchone()
+            return connection.execute(
+                "SELECT id, email, role, token_version, is_active FROM users WHERE id = %s",
+                (user_id,),
+            ).fetchone()
 
     def create(self, email: str, password_hash: str, role: str) -> dict:
         try:
             with get_connection() as connection:
                 return connection.execute(
                     "INSERT INTO users (email, password_hash, role) VALUES (%s, %s, %s) "
-                    "RETURNING id, email, role", (email, password_hash, role),
+                    "RETURNING id, email, role, is_active", (email, password_hash, role),
                 ).fetchone()
         except psycopg.errors.UniqueViolation:
             raise ValueError("duplicate email") from None
@@ -30,6 +38,34 @@ class AuthRepository:
                 "UPDATE users SET token_version = token_version + 1, updated_at = CURRENT_TIMESTAMP "
                 "WHERE id = %s", (user_id,)
             )
+
+    def set_active(self, user_id: UUID, is_active: bool) -> dict | None:
+        with get_connection() as connection:
+            return connection.execute(
+                "UPDATE users SET is_active = %s, "
+                "token_version = token_version + "
+                "CASE WHEN is_active IS DISTINCT FROM %s THEN 1 ELSE 0 END, "
+                "updated_at = CURRENT_TIMESTAMP WHERE id = %s "
+                "RETURNING id, email, role, token_version, is_active",
+                (is_active, is_active, user_id),
+            ).fetchone()
+
+    def delete_deactivated(
+        self, user_id: UUID
+    ) -> Literal["deleted", "active", "not_found", "related"]:
+        try:
+            with get_connection() as connection:
+                user = connection.execute(
+                    "SELECT is_active FROM users WHERE id = %s FOR UPDATE", (user_id,)
+                ).fetchone()
+                if user is None:
+                    return "not_found"
+                if user["is_active"]:
+                    return "active"
+                connection.execute("DELETE FROM users WHERE id = %s", (user_id,))
+                return "deleted"
+        except psycopg.errors.ForeignKeyViolation:
+            return "related"
 
     def bootstrap_admin(self, email: str, password_hash: str) -> None:
         with get_connection() as connection:

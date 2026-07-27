@@ -5,9 +5,18 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.auth.repository import auth_repository
-from app.auth.schemas import LoginRequest, TokenResponse, UserCreate, UserResponse
+from app.auth.schemas import LoginRequest, TokenResponse, UserActivationUpdate, UserCreate, UserResponse
 from app.auth.security import create_access_token, decode_access_token
-from app.auth.service import authenticate, create_user, current_user
+from app.auth.service import (
+    UserHasRelatedRecordsError,
+    UserMustBeInactiveError,
+    UserNotFoundError,
+    authenticate,
+    create_user,
+    current_user,
+    delete_user,
+    set_user_active,
+)
 from app.config import settings
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -27,7 +36,8 @@ def authenticated(credentials: HTTPAuthorizationCredentials | None = Depends(bea
         user = current_user(UUID(claims["sub"]))
     except (jwt.PyJWTError, ValueError):
         raise unauthorized() from None
-    if user is None or user["token_version"] != claims["ver"] or user["role"] != claims["role"]:
+    if (user is None or not user["is_active"] or user["token_version"] != claims["ver"]
+            or user["role"] != claims["role"]):
         raise unauthorized()
     return user
 
@@ -64,3 +74,26 @@ def users(data: UserCreate, _: dict = Depends(admin_only)) -> dict:
         return create_user(data)
     except ValueError:
         raise HTTPException(status_code=409, detail="Email already exists") from None
+
+
+@router.patch("/users/{user_id}", response_model=UserResponse)
+def update_user_activation(
+    user_id: UUID, data: UserActivationUpdate, _: dict = Depends(admin_only)
+) -> dict:
+    try:
+        return set_user_active(user_id, data.is_active)
+    except UserNotFoundError:
+        raise HTTPException(status_code=404, detail="User not found") from None
+
+
+@router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_user_account(user_id: UUID, _: dict = Depends(admin_only)) -> Response:
+    try:
+        delete_user(user_id)
+    except UserNotFoundError:
+        raise HTTPException(status_code=404, detail="User not found") from None
+    except UserMustBeInactiveError:
+        raise HTTPException(status_code=409, detail="User must be deactivated before deletion") from None
+    except UserHasRelatedRecordsError:
+        raise HTTPException(status_code=409, detail="User has related records") from None
+    return Response(status_code=204)

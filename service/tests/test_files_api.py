@@ -9,10 +9,12 @@ def test_files_require_login_and_support_upload_list_download(client, monkeypatc
     assert client.get("/files").status_code == 401
     assert client.post("/files", files={"files": ("report.pdf", b"data", "application/pdf")}).status_code == 401
 
-    account = {"id": uuid4(), "email": "user@example.com", "role": "member", "token_version": 0}
+    account = {"id": uuid4(), "email": "user@example.com", "role": "member",
+               "token_version": 0, "is_active": True}
     token = auth_routes.create_access_token(str(account["id"]), account["role"], account["token_version"])
     headers = {"Authorization": f"Bearer {token}"}
-    intruder = {"id": uuid4(), "email": "other@example.com", "role": "member", "token_version": 0}
+    intruder = {"id": uuid4(), "email": "other@example.com", "role": "member",
+                "token_version": 0, "is_active": True}
     accounts = {account["id"]: account, intruder["id"]: intruder}
     records = []
 
@@ -70,7 +72,8 @@ def test_files_require_login_and_support_upload_list_download(client, monkeypatc
 
 
 def test_upload_rejects_unsupported_files_without_saving(client, monkeypatch, tmp_path):
-    account = {"id": uuid4(), "email": "user@example.com", "role": "member", "token_version": 0}
+    account = {"id": uuid4(), "email": "user@example.com", "role": "member",
+               "token_version": 0, "is_active": True}
     token = auth_routes.create_access_token(str(account["id"]), account["role"], account["token_version"])
     monkeypatch.setattr(auth_routes, "current_user", lambda user_id: account)
     monkeypatch.setattr(service.settings, "file_storage_dir", tmp_path)

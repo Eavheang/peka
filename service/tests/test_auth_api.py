@@ -2,13 +2,13 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from app.auth import routes
+from app.auth import routes, service
 from app.auth.security import hash_password
 
 
 def user(role="member", password="correct password"):
     return {"id": uuid4(), "email": "user@example.com", "role": role,
-            "password_hash": hash_password(password), "token_version": 0}
+            "password_hash": hash_password(password), "token_version": 0, "is_active": True}
 
 
 def test_login_and_me_assert_role_claim(client, monkeypatch):
@@ -57,7 +57,7 @@ def test_create_users_role_access_duplicate_and_logout(client, monkeypatch):
                        json={"email": "new@example.com", "password": "long enough password"}).status_code == 403
     monkeypatch.setattr(routes, "current_user", lambda user_id: admin)
     admin_token = routes.create_access_token(str(admin["id"]), "admin", 0)
-    created = {"id": uuid4(), "email": "new@example.com", "role": "member"}
+    created = {"id": uuid4(), "email": "new@example.com", "role": "member", "is_active": True}
     monkeypatch.setattr(routes, "create_user", lambda data: created)
     response = client.post("/auth/users", headers={"Authorization": f"Bearer {admin_token}"},
                            json={"email": created["email"], "password": "long enough password"})
@@ -76,7 +76,7 @@ def test_create_users_role_access_duplicate_and_logout(client, monkeypatch):
 def test_admin_can_create_each_user_role(client, monkeypatch, role):
     admin = user("admin")
     token = routes.create_access_token(str(admin["id"]), "admin", 0)
-    created = {"id": uuid4(), "email": f"{role}@example.com", "role": role}
+    created = {"id": uuid4(), "email": f"{role}@example.com", "role": role, "is_active": True}
     captured = {}
 
     monkeypatch.setattr(routes, "current_user", lambda user_id: admin)
@@ -89,5 +89,66 @@ def test_admin_can_create_each_user_role(client, monkeypatch, role):
     )
 
     assert response.status_code == 201
-    assert response.json() == {"id": str(created["id"]), "email": created["email"], "role": role}
+    assert response.json() == {
+        "id": str(created["id"]), "email": created["email"], "role": role, "is_active": True
+    }
     assert captured["data"].role == role
+
+
+def test_inactive_user_cannot_login(monkeypatch):
+    account = user(password="correct password")
+    account["is_active"] = False
+    monkeypatch.setattr(service.auth_repository, "find_by_email", lambda email: account)
+
+    assert service.authenticate(account["email"], "correct password") is None
+
+
+def test_admin_can_change_activation_and_delete_only_inactive(client, monkeypatch):
+    admin = user("admin")
+    target = user()
+    accounts = {admin["id"]: admin, target["id"]: target}
+    admin_token = routes.create_access_token(str(admin["id"]), "admin", 0)
+    target_token = routes.create_access_token(str(target["id"]), "member", 0)
+    headers = {"Authorization": f"Bearer {admin_token}"}
+
+    monkeypatch.setattr(routes, "current_user", lambda user_id: accounts.get(user_id))
+
+    def set_active(user_id, is_active):
+        account = accounts.get(user_id)
+        if account is None:
+            raise service.UserNotFoundError
+        if account["is_active"] != is_active:
+            account["token_version"] += 1
+        account["is_active"] = is_active
+        return account
+
+    def delete(user_id):
+        account = accounts.get(user_id)
+        if account is None:
+            raise service.UserNotFoundError
+        if account["is_active"]:
+            raise service.UserMustBeInactiveError
+        del accounts[user_id]
+
+    monkeypatch.setattr(routes, "set_user_active", set_active)
+    monkeypatch.setattr(routes, "delete_user", delete)
+
+    response = client.patch(
+        f"/auth/users/{target['id']}", headers=headers, json={"is_active": False}
+    )
+    assert response.status_code == 200
+    assert response.json()["is_active"] is False
+    assert client.get(
+        "/auth/me", headers={"Authorization": f"Bearer {target_token}"}
+    ).status_code == 401
+
+    response = client.patch(
+        f"/auth/users/{target['id']}", headers=headers, json={"is_active": True}
+    )
+    assert response.status_code == 200
+    assert response.json()["is_active"] is True
+    assert client.delete(f"/auth/users/{target['id']}", headers=headers).status_code == 409
+
+    client.patch(f"/auth/users/{target['id']}", headers=headers, json={"is_active": False})
+    assert client.delete(f"/auth/users/{target['id']}", headers=headers).status_code == 204
+    assert client.delete(f"/auth/users/{target['id']}", headers=headers).status_code == 404
