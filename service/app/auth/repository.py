@@ -8,7 +8,7 @@ from app.database import get_connection
 class AuthRepository:
     def find_by_email(self, email: str) -> dict | None:
         with get_connection() as connection:
-            return connection.execute("SELECT * FROM users WHERE email = %s", (email,)).fetchone()
+            return connection.execute("SELECT * FROM users WHERE lower(email) = lower(%s)", (email,)).fetchone()
 
     def find_by_id(self, user_id: UUID) -> dict | None:
         with get_connection() as connection:
