@@ -34,7 +34,12 @@ class UserCreate(LoginRequest):
         return value
 
 
+class UserActivationUpdate(BaseModel):
+    is_active: bool
+
+
 class UserResponse(BaseModel):
     id: UUID
     email: str
     role: str
+    is_active: bool

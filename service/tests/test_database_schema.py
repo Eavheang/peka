@@ -13,6 +13,7 @@ def test_user_model_describes_users_table() -> None:
         "password_hash",
         "role",
         "token_version",
+        "is_active",
         "created_at",
         "updated_at",
     }
