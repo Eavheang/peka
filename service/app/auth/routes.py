@@ -4,6 +4,7 @@ import jwt
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from app.auth.rate_limit import login_rate_limiter
 from app.auth.repository import auth_repository
 from app.auth.schemas import LoginRequest, TokenResponse, UserCreate, UserResponse
 from app.auth.security import create_access_token, decode_access_token
@@ -38,7 +39,7 @@ def admin_only(user: dict = Depends(authenticated)) -> dict:
     return user
 
 
-@router.post("/login", response_model=TokenResponse)
+@router.post("/login", response_model=TokenResponse, dependencies=[Depends(login_rate_limiter)])
 def login(data: LoginRequest) -> dict:
     user = authenticate(data.email, data.password)
     if user is None:

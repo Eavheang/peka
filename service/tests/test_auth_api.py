@@ -72,6 +72,22 @@ def test_create_users_role_access_duplicate_and_logout(client, monkeypatch):
     assert client.get("/auth/me", headers={"Authorization": f"Bearer {admin_token}"}).status_code == 401
 
 
+def test_login_rate_limited_after_too_many_attempts(client, monkeypatch):
+    from app.auth import rate_limit
+
+    rate_limit.reset()
+    monkeypatch.setattr(routes, "authenticate", lambda email, password: None)
+    payload = {"email": "user@example.com", "password": "wrong"}
+
+    responses = [client.post("/auth/login", json=payload) for _ in range(rate_limit.LOGIN_ATTEMPT_LIMIT)]
+    limited = client.post("/auth/login", json=payload)
+    rate_limit.reset()
+
+    assert all(response.status_code == 401 for response in responses)
+    assert limited.status_code == 429
+    assert limited.headers["Retry-After"] == "60"
+
+
 @pytest.mark.parametrize("role", ["member", "admin"])
 def test_admin_can_create_each_user_role(client, monkeypatch, role):
     admin = user("admin")
