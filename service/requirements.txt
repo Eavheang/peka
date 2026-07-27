@@ -1,4 +1,4 @@
-fastapi
+fastapi==0.115.4
 pydantic-settings
 uvicorn[standard]
 pytest
@@ -8,3 +8,4 @@ SQLAlchemy
 alembic
 PyJWT
 pwdlib[argon2]
+python-multipart
