@@ -34,6 +34,15 @@ class Connection:
         return Result()
 
 
+def test_bootstrap_admin_survives_existing_email_with_other_role(monkeypatch):
+    connection = Connection(error=psycopg.errors.UniqueViolation())
+    monkeypatch.setattr(repository, "get_connection", lambda: connection)
+
+    repository.auth_repository.bootstrap_admin("admin@example.com", "hashed password")
+
+    assert any(query.startswith("INSERT") for query, _ in connection.queries)
+
+
 def test_find_by_email_compares_lowercased_email(monkeypatch):
     connection = Connection()
     monkeypatch.setattr(repository, "get_connection", lambda: connection)

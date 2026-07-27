@@ -1,8 +1,11 @@
+import logging
 from uuid import UUID
 
 import psycopg
 
 from app.database import get_connection
+
+logger = logging.getLogger(__name__)
 
 
 class AuthRepository:
@@ -32,13 +35,16 @@ class AuthRepository:
             )
 
     def bootstrap_admin(self, email: str, password_hash: str) -> None:
-        with get_connection() as connection:
-            connection.execute("SELECT pg_advisory_xact_lock(hashtextextended('peka-admin-bootstrap', 0))")
-            if connection.execute("SELECT 1 FROM users WHERE role = 'admin' LIMIT 1").fetchone() is None:
-                connection.execute(
-                    "INSERT INTO users (email, password_hash, role) VALUES (%s, %s, 'admin')",
-                    (email, password_hash),
-                )
+        try:
+            with get_connection() as connection:
+                connection.execute("SELECT pg_advisory_xact_lock(hashtextextended('peka-admin-bootstrap', 0))")
+                if connection.execute("SELECT 1 FROM users WHERE role = 'admin' LIMIT 1").fetchone() is None:
+                    connection.execute(
+                        "INSERT INTO users (email, password_hash, role) VALUES (%s, %s, 'admin')",
+                        (email, password_hash),
+                    )
+        except psycopg.errors.UniqueViolation:
+            logger.warning("Admin bootstrap skipped: ADMIN_EMAIL already belongs to an existing user")
 
 
 auth_repository = AuthRepository()
