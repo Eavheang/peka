@@ -13,7 +13,7 @@ from app.database import close_pool
 async def lifespan(_: FastAPI):
     if settings.admin_email and settings.admin_password:
         auth_repository.bootstrap_admin(
-            settings.admin_email.lower().strip(),
+            settings.admin_email,
             hash_password(settings.admin_password.get_secret_value()),
         )
     try:

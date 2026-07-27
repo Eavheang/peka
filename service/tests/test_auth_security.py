@@ -26,6 +26,15 @@ def test_jwt_rejects_tampering() -> None:
         decode_access_token(".".join(parts))
 
 
+def test_settings_normalize_admin_email() -> None:
+    settings = Settings(
+        jwt_secret_key=SecretStr("test-only-secret-that-is-at-least-32-chars"),
+        admin_email=" Admin@Example.COM ",
+        admin_password=SecretStr("bootstrap password"),
+    )
+    assert settings.admin_email == "admin@example.com"
+
+
 def test_settings_validate_auth_configuration() -> None:
     secret = SecretStr("test-only-secret-that-is-at-least-32-chars")
     with pytest.raises(ValidationError):

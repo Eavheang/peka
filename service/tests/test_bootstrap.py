@@ -8,13 +8,15 @@ from app.auth import repository
 from app.auth.security import verify_password
 
 
-def test_lifespan_bootstraps_normalized_hashed_admin(monkeypatch):
+def test_lifespan_bootstraps_admin_with_hashed_password(monkeypatch):
+    # Settings normalizes admin_email at load time (see test_auth_security),
+    # so lifespan passes it through untouched.
     calls = []
     monkeypatch.setattr(
         main,
         "settings",
         SimpleNamespace(
-            admin_email=" Admin@Example.COM ",
+            admin_email="admin@example.com",
             admin_password=SecretStr("bootstrap password"),
         ),
     )
