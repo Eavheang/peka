@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from pydantic import SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -6,6 +8,7 @@ class Settings(BaseSettings):
     app_name: str = "PEKA Service"
     debug: bool = False
     database_url: str = "postgresql://peka:peka_dev_password@localhost:5432/peka"
+    file_storage_dir: Path = Path("storage")
     jwt_secret_key: SecretStr
     jwt_access_token_expire_minutes: int = 30
     jwt_issuer: str = "peka-service"
