@@ -3,7 +3,7 @@ pydantic-settings
 uvicorn[standard]
 pytest
 httpx
-psycopg[binary]
+psycopg[binary,pool]
 SQLAlchemy
 alembic
 PyJWT

@@ -6,6 +6,7 @@ from app import routers
 from app.config import settings
 from app.auth.repository import auth_repository
 from app.auth.security import hash_password
+from app.database import close_pool
 
 
 @asynccontextmanager
@@ -15,7 +16,10 @@ async def lifespan(_: FastAPI):
             settings.admin_email.lower().strip(),
             hash_password(settings.admin_password.get_secret_value()),
         )
-    yield
+    try:
+        yield
+    finally:
+        close_pool()
 
 
 app = FastAPI(title=settings.app_name, debug=settings.debug, lifespan=lifespan)
