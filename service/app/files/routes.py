@@ -6,7 +6,7 @@ from fastapi.responses import FileResponse as DownloadResponse
 
 from app.auth.routes import authenticated
 from app.files.schemas import FileResponse
-from app.files.service import delete_file, find_file, list_files, store_files
+from app.files.service import DuplicateFileError, delete_file, find_file, list_files, store_files
 
 router = APIRouter(prefix="/files", tags=["files"])
 
@@ -18,6 +18,8 @@ def upload_files(
 ) -> list[dict]:
     try:
         return store_files(files, user["id"])
+    except DuplicateFileError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from None
     except ValueError as error:
         raise HTTPException(status_code=415, detail=str(error)) from None
 

@@ -4,28 +4,35 @@ from app.database import get_connection
 
 
 class FilesRepository:
-    def create_many(self, records: list[tuple[str, str | None]], author_id: UUID) -> list[dict]:
+    def create_many(self, records: list[tuple[str, str | None, str]], author_id: UUID) -> list[dict]:
         created = []
         with get_connection() as connection:
-            for path, content_type in records:
+            for path, content_type, sha256 in records:
                 created.append(connection.execute(
-                    "INSERT INTO files (path, content_type, author_id) VALUES (%s, %s, %s) "
-                    "RETURNING id, path, content_type, author_id, created_at",
-                    (path, content_type, author_id),
+                    "INSERT INTO files (path, content_type, sha256, author_id) VALUES (%s, %s, %s, %s) "
+                    "RETURNING id, path, content_type, sha256, author_id, created_at",
+                    (path, content_type, sha256, author_id),
                 ).fetchone())
         return created
 
     def list_all(self) -> list[dict]:
         with get_connection() as connection:
             return connection.execute(
-                "SELECT id, path, content_type, author_id, created_at "
+                "SELECT id, path, content_type, sha256, author_id, created_at "
                 "FROM files ORDER BY created_at DESC"
             ).fetchall()
+
+    def exists_by_sha256(self, sha256: str) -> bool:
+        with get_connection() as connection:
+            return connection.execute(
+                "SELECT EXISTS (SELECT 1 FROM files WHERE sha256 = %s)",
+                (sha256,),
+            ).fetchone()["exists"]
 
     def find_by_id(self, file_id: UUID) -> dict | None:
         with get_connection() as connection:
             return connection.execute(
-                "SELECT id, path, content_type, author_id, created_at FROM files WHERE id = %s",
+                "SELECT id, path, content_type, sha256, author_id, created_at FROM files WHERE id = %s",
                 (file_id,),
             ).fetchone()
 
