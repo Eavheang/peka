@@ -26,6 +26,7 @@ def test_file_model_keeps_minimal_metadata() -> None:
         "id",
         "path",
         "content_type",
+        "sha256",
         "author_id",
         "created_at",
     }

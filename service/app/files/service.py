@@ -1,12 +1,18 @@
 from itertools import count
+from hashlib import sha256
 from pathlib import Path
-from shutil import copyfileobj
+from typing import BinaryIO
 from uuid import UUID
 
 from fastapi import UploadFile
+from psycopg.errors import UniqueViolation
 
 from app.config import settings
 from app.files.repository import files_repository
+
+
+class DuplicateFileError(ValueError):
+    pass
 
 FILE_CATEGORIES = {
     ".pdf": "pdf",
@@ -21,7 +27,8 @@ FILE_CATEGORIES = {
 def store_files(uploads: list[UploadFile], author_id: UUID) -> list[dict]:
     storage_root = settings.file_storage_dir.resolve()
     saved_paths: list[Path] = []
-    records: list[tuple[str, str | None]] = []
+    records: list[tuple[str, str | None, str]] = []
+    seen_hashes: set[str] = set()
 
     try:
         for upload in uploads:
@@ -35,10 +42,22 @@ def store_files(uploads: list[UploadFile], author_id: UUID) -> list[dict]:
             destination, output = _create_destination(directory, name)
             saved_paths.append(destination)
             with output:
-                copyfileobj(upload.file, output)
-            records.append((destination.relative_to(storage_root).as_posix(), upload.content_type))
+                digest = sha256()
+                chunk = upload.file.read(1024 * 1024)
+                while chunk:
+                    digest.update(chunk)
+                    output.write(chunk)
+                    chunk = upload.file.read(1024 * 1024)
+            file_sha256 = digest.hexdigest()
+            if file_sha256 in seen_hashes or files_repository.exists_by_sha256(file_sha256):
+                raise DuplicateFileError("A file with identical content already exists")
+            seen_hashes.add(file_sha256)
+            records.append((destination.relative_to(storage_root).as_posix(), upload.content_type, file_sha256))
 
-        return files_repository.create_many(records, author_id)
+        try:
+            return files_repository.create_many(records, author_id)
+        except UniqueViolation as error:
+            raise DuplicateFileError("A file with identical content already exists") from error
     except Exception:
         for path in saved_paths:
             path.unlink(missing_ok=True)
@@ -75,7 +94,7 @@ def delete_file(file_id: UUID, user_id: UUID, is_admin: bool = False) -> bool:
     return True
 
 
-def _create_destination(directory: Path, name: str):
+def _create_destination(directory: Path, name: str) -> tuple[Path, BinaryIO]:
     source = Path(name)
     for suffix in count():
         candidate = directory / (name if suffix == 0 else f"{source.stem}_{suffix}{source.suffix}")
@@ -83,3 +102,4 @@ def _create_destination(directory: Path, name: str):
             return candidate, candidate.open("xb")
         except FileExistsError:
             continue
+    raise RuntimeError("Unable to create file destination")
