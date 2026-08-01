@@ -1,6 +1,9 @@
 from datetime import datetime, timezone
 import hashlib
+import json
 from uuid import uuid4
+
+import pymupdf
 
 from app.auth import routes as auth_routes
 from app.files import service
@@ -44,24 +47,41 @@ def test_files_require_login_and_support_upload_list_download(client, monkeypatc
         lambda file_id: records.__setitem__(slice(None), [record for record in records if record["id"] != file_id]),
     )
 
+    with pymupdf.open() as pdf:
+        page = pdf.new_page()
+        page.insert_text((72, 72), "Study material")
+        pdf_data = pdf.tobytes()
+
     response = client.post(
         "/files",
         headers=headers,
         files=[
-            ("files", ("report.pdf", b"pdf-data", "application/pdf")),
+            ("files", ("report.pdf", pdf_data, "application/pdf")),
             ("files", ("notes.txt", b"notes", "text/plain")),
         ],
     )
 
     assert response.status_code == 201
     assert [item["path"] for item in response.json()] == ["pdf/report.pdf", "others/notes.txt"]
-    assert response.json()[0]["sha256"] == hashlib.sha256(b"pdf-data").hexdigest()
+    assert response.json()[0]["sha256"] == hashlib.sha256(pdf_data).hexdigest()
     assert response.json()[1]["sha256"] == hashlib.sha256(b"notes").hexdigest()
-    assert (tmp_path / "pdf" / "report.pdf").read_bytes() == b"pdf-data"
+    assert (tmp_path / "pdf" / "report.pdf").read_bytes() == pdf_data
+    extracted_files = list((tmp_path / "extracted").glob("*.json"))
+    assert len(extracted_files) == 2
+    extractions = {
+        record["source_filename"]: (path, record)
+        for path in extracted_files
+        for record in [json.loads(path.read_text(encoding="utf-8"))]
+    }
+    extracted_path, extraction = extractions["report.pdf"]
+    assert extraction["source_path"] == str((tmp_path / "pdf" / "report.pdf").resolve())
+    assert extraction["source_sha256"] == hashlib.sha256(pdf_data).hexdigest()
+    assert extraction["sections"] == [{"page": 1, "text": "Study material"}]
+    assert extractions["notes.txt"][1]["sections"] == [{"text": "notes"}]
     assert client.get("/files", headers=headers).json() == response.json()
     download = client.get(f"/files/{records[0]['id']}", headers=headers)
     assert download.status_code == 200
-    assert download.content == b"pdf-data"
+    assert download.content == pdf_data
     assert 'filename="report.pdf"' in download.headers["content-disposition"]
 
     intruder_token = auth_routes.create_access_token(
@@ -73,6 +93,7 @@ def test_files_require_login_and_support_upload_list_download(client, monkeypatc
     ).status_code == 403
     assert client.delete(f"/files/{records[0]['id']}", headers=headers).status_code == 204
     assert not (tmp_path / "pdf" / "report.pdf").exists()
+    assert not extracted_path.exists()
 
 
 def test_upload_rejects_unsupported_files_without_saving(client, monkeypatch, tmp_path):

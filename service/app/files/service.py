@@ -1,3 +1,4 @@
+import json
 from itertools import count
 from hashlib import sha256
 from pathlib import Path
@@ -8,6 +9,7 @@ from fastapi import UploadFile
 from psycopg.errors import UniqueViolation
 
 from app.config import settings
+from app.engine.extractor import extract_file, source_id_for
 from app.files.repository import files_repository
 
 
@@ -52,7 +54,16 @@ def store_files(uploads: list[UploadFile], author_id: UUID) -> list[dict]:
             if file_sha256 in seen_hashes or files_repository.exists_by_sha256(file_sha256):
                 raise DuplicateFileError("A file with identical content already exists")
             seen_hashes.add(file_sha256)
-            records.append((destination.relative_to(storage_root).as_posix(), upload.content_type, file_sha256))
+            relative_path = destination.relative_to(storage_root).as_posix()
+            try:
+                extraction = extract_file(destination, content_hash=file_sha256)
+            except Exception as error:
+                raise ValueError(f"Unable to extract file: {name}") from error
+            extracted = storage_root / "extracted" / f"{extraction['source_id']}.json"
+            saved_paths.append(extracted)
+            extracted.parent.mkdir(parents=True, exist_ok=True)
+            extracted.write_text(json.dumps(extraction, indent=2) + "\n", encoding="utf-8")
+            records.append((relative_path, upload.content_type, file_sha256))
 
         try:
             return files_repository.create_many(records, author_id)
@@ -91,6 +102,7 @@ def delete_file(file_id: UUID, user_id: UUID, is_admin: bool = False) -> bool:
     files_repository.delete(file_id)
     if path.is_relative_to(storage_root):
         path.unlink(missing_ok=True)
+        (storage_root / "extracted" / f"{source_id_for(path)}.json").unlink(missing_ok=True)
     return True
 
 
