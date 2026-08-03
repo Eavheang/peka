@@ -36,6 +36,7 @@ Open:
 - Webclient: http://localhost:3000
 - API: http://localhost:8000
 - API docs: http://localhost:8000/docs
+- llama.cpp API: http://localhost:8080
 - pgAdmin: http://localhost:5050
 
 Default database connection in pgAdmin:
@@ -55,6 +56,44 @@ Stop development containers:
 ```bash
 make down
 ```
+
+## llama.cpp
+
+The GGUF file in `config/model` is mounted read-only into the official CUDA
+llama.cpp server image. Settings are in `config/llama/config.yaml`. `make
+setup` and `make up` start it on port 8080 with all model layers offloaded to
+the GPU. Set `LLAMA_API_KEY` in `.env` before starting it. The OpenAI-compatible
+endpoint is:
+
+```text
+http://localhost:8080/v1/chat/completions
+```
+
+Set `model` in `config/llama/config.yaml` to use another filename. Test it from
+PowerShell:
+
+```powershell
+$headers = @{ Authorization = "Bearer $env:LLAMA_API_KEY" }
+Invoke-RestMethod http://localhost:8080/v1/chat/completions -Headers $headers -Method Post -ContentType 'application/json' -Body (@{
+  model = 'local'
+  messages = @(@{ role = 'user'; content = 'Hello' })
+  max_tokens = 64
+} | ConvertTo-Json -Depth 5)
+```
+
+Authenticated requests must include the key:
+
+```powershell
+$headers = @{ Authorization = "Bearer $env:LLAMA_API_KEY" }
+Invoke-RestMethod http://localhost:8080/v1/models -Headers $headers
+```
+
+Use a secret manager instead of `.env` for deployment. Remove the llama `ports`
+mapping when only the backend should access it.
+
+Generation defaults can be changed in `config/llama/config.yaml`. Individual
+API requests can override these values. Keep `config/model` for model files;
+it is gitignored.
 
 ## Deployment-style run
 

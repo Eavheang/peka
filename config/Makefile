@@ -2,7 +2,7 @@
 
 setup:
 	@if not exist ".env" copy /Y ".env.example" ".env"
-	docker compose -f compose.yaml -f compose.dev.yaml up -d --build postgres pgadmin service
+	docker compose -f compose.yaml -f compose.dev.yaml up -d --build postgres pgadmin service llama
 	docker compose -f compose.yaml -f compose.dev.yaml run --rm webclient bun install --frozen-lockfile
 	docker compose -f compose.yaml -f compose.dev.yaml up -d webclient
 	$(MAKE) migrate
