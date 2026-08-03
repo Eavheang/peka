@@ -1,6 +1,7 @@
 from app.database import Base
 from app.auth.model import User
 from app.files.model import StoredFile
+from app.engine.OKFExtractor.model import OKFJob
 
 
 def test_user_model_describes_users_table() -> None:
@@ -29,4 +30,16 @@ def test_file_model_keeps_minimal_metadata() -> None:
         "sha256",
         "author_id",
         "created_at",
+    }
+
+
+def test_okf_job_model_keeps_minimal_queue_state() -> None:
+    table = Base.metadata.tables[OKFJob.__tablename__]
+
+    assert {column.name for column in table.columns} == {
+        "file_id",
+        "status",
+        "attempts",
+        "last_error",
+        "updated_at",
     }

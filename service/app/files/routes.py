@@ -6,7 +6,15 @@ from fastapi.responses import FileResponse as DownloadResponse
 
 from app.auth.routes import authenticated
 from app.files.schemas import FileResponse
-from app.files.service import DuplicateFileError, delete_file, find_file, list_files, store_files
+from app.files.service import (
+    DuplicateFileError,
+    OKFJobStateError,
+    delete_file,
+    find_file,
+    list_files,
+    retry_okf,
+    store_files,
+)
 
 router = APIRouter(prefix="/files", tags=["files"])
 
@@ -27,6 +35,19 @@ def upload_files(
 @router.get("", response_model=list[FileResponse])
 def get_files(_: dict = Depends(authenticated)) -> list[dict]:
     return list_files()
+
+
+@router.post("/{file_id}/retry-okf", response_model=FileResponse)
+def retry_file_okf(file_id: UUID, user: dict = Depends(authenticated)) -> dict:
+    try:
+        record = retry_okf(file_id, user["id"], user["role"] == "admin")
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="Only file author or admin can retry this job") from None
+    except OKFJobStateError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from None
+    if record is None:
+        raise HTTPException(status_code=404, detail="File not found")
+    return record
 
 
 @router.get("/{file_id}")

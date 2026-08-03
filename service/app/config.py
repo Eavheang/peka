@@ -9,6 +9,9 @@ class Settings(BaseSettings):
     debug: bool = False
     database_url: str = "postgresql://peka:peka_dev_password@localhost:5432/peka"
     file_storage_dir: Path = Path("storage")
+    llama_base_url: str = "http://localhost:8080/v1"
+    llama_api_key: SecretStr | None = None
+    llama_model: str = "local"
     jwt_secret_key: SecretStr
     jwt_access_token_expire_minutes: int = 30
     jwt_issuer: str = "peka-service"
