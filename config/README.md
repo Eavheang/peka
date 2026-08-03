@@ -30,6 +30,9 @@ from `.env.example` when `.env` does not exist.
 Dockerfiles or dependency lockfiles change. Development containers hot reload
 normal source-code changes automatically.
 
+Uploaded documents are extracted immediately. The `okf-worker` processes queued
+OKF conversions one at a time and retries failed conversions up to three times.
+
 
 Open:
 
@@ -68,6 +71,9 @@ endpoint is:
 ```text
 http://localhost:8080/v1/chat/completions
 ```
+
+The OKF worker container uses `http://llama:8080/v1`; a worker started directly
+on the host uses `http://localhost:8080/v1`.
 
 Set `model` in `config/llama/config.yaml` to use another filename. Test it from
 PowerShell:

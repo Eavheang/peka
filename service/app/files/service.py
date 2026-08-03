@@ -9,11 +9,16 @@ from fastapi import UploadFile
 from psycopg.errors import UniqueViolation
 
 from app.config import settings
+from app.engine.OKFExtractor.repository import okf_jobs_repository
 from app.engine.extractor import extract_file, source_id_for
 from app.files.repository import files_repository
 
 
 class DuplicateFileError(ValueError):
+    pass
+
+
+class OKFJobStateError(ValueError):
     pass
 
 FILE_CATEGORIES = {
@@ -77,6 +82,17 @@ def store_files(uploads: list[UploadFile], author_id: UUID) -> list[dict]:
 
 def list_files() -> list[dict]:
     return files_repository.list_all()
+
+
+def retry_okf(file_id: UUID, user_id: UUID, is_admin: bool = False) -> dict | None:
+    record = files_repository.find_by_id(file_id)
+    if record is None:
+        return None
+    if record["author_id"] != user_id and not is_admin:
+        raise PermissionError
+    if not okf_jobs_repository.retry_failed(file_id):
+        raise OKFJobStateError("Only failed OKF jobs can be retried")
+    return files_repository.find_by_id(file_id)
 
 
 def find_file(file_id: UUID) -> tuple[dict, Path] | None:

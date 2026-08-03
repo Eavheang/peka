@@ -25,7 +25,8 @@ def test_files_require_login_and_support_upload_list_download(client, monkeypatc
     def create_many(files, author_id):
         created = [
             {"id": uuid4(), "path": path, "content_type": content_type, "sha256": sha256,
-             "author_id": author_id, "created_at": datetime.now(timezone.utc)}
+             "author_id": author_id, "created_at": datetime.now(timezone.utc),
+             "okf_status": "queued", "okf_attempts": 0, "okf_error": None}
             for path, content_type, sha256 in files
         ]
         records.extend(created)
@@ -46,6 +47,14 @@ def test_files_require_login_and_support_upload_list_download(client, monkeypatc
         "delete",
         lambda file_id: records.__setitem__(slice(None), [record for record in records if record["id"] != file_id]),
     )
+    def retry_failed(file_id):
+        record = next(record for record in records if record["id"] == file_id)
+        if record["okf_status"] != "failed":
+            return False
+        record.update(okf_status="queued", okf_attempts=0, okf_error=None)
+        return True
+
+    monkeypatch.setattr(service.okf_jobs_repository, "retry_failed", retry_failed)
 
     with pymupdf.open() as pdf:
         page = pdf.new_page()
@@ -87,6 +96,12 @@ def test_files_require_login_and_support_upload_list_download(client, monkeypatc
     intruder_token = auth_routes.create_access_token(
         str(intruder["id"]), intruder["role"], intruder["token_version"]
     )
+    records[0].update(okf_status="failed", okf_attempts=3, okf_error="llama unavailable")
+    retry = client.post(f"/files/{records[0]['id']}/retry-okf", headers=headers)
+    assert retry.status_code == 200
+    assert retry.json()["okf_status"] == "queued"
+    assert retry.json()["okf_attempts"] == 0
+    assert client.post(f"/files/{records[0]['id']}/retry-okf", headers=headers).status_code == 409
     assert client.delete(
         f"/files/{records[0]['id']}",
         headers={"Authorization": f"Bearer {intruder_token}"},

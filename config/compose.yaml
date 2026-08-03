@@ -45,8 +45,31 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    volumes:
+      - file_storage:/app/storage
     ports:
       - "8000:8000"
+    restart: unless-stopped
+
+  okf-worker:
+    build:
+      context: ../service
+      dockerfile: Dockerfile
+    command: python -m app.engine.OKFExtractor.worker
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-peka}:${POSTGRES_PASSWORD:-peka_dev_password}@postgres:5432/${POSTGRES_DB:-peka}
+      FILE_STORAGE_DIR: /app/storage
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-worker-only-secret-that-is-at-least-32-characters}
+      LLAMA_BASE_URL: http://llama:8080/v1
+      LLAMA_API_KEY: ${LLAMA_API_KEY:?Set LLAMA_API_KEY in config/.env}
+      LLAMA_MODEL: local
+    depends_on:
+      postgres:
+        condition: service_healthy
+      llama:
+        condition: service_started
+    volumes:
+      - file_storage:/app/storage
     restart: unless-stopped
 
   llama:
@@ -66,3 +89,4 @@ services:
 volumes:
   postgres_data:
   pgadmin_data:
+  file_storage:

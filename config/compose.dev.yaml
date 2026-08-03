@@ -18,12 +18,18 @@ services:
       dockerfile: Dockerfile
     volumes:
       - ../service:/app
+      - ../service/storage:/app/storage
     ports:
       - "8000:8000"
     environment:
       APP_NAME: PEKA Service
       DEBUG: "true"
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  okf-worker:
+    volumes:
+      - ../service:/app
+      - ../service/storage:/app/storage
 
 volumes:
   webclient_node_modules:
