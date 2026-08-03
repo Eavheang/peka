@@ -49,6 +49,20 @@ services:
       - "8000:8000"
     restart: unless-stopped
 
+  llama:
+    image: ghcr.io/ggml-org/llama.cpp:server-cuda
+    gpus: all
+    environment:
+      LLAMA_API_KEY: ${LLAMA_API_KEY:?Set LLAMA_API_KEY in config/.env}
+    volumes:
+      - ./model:/models:ro
+      - ./llama/config.yaml:/config/config.yaml:ro
+      - ./llama/entrypoint.sh:/entrypoint.sh:ro
+    entrypoint: ["/bin/sh", "/entrypoint.sh"]
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   pgadmin_data:
