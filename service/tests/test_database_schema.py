@@ -2,6 +2,7 @@ from app.database import Base
 from app.auth.model import User
 from app.files.model import StoredFile
 from app.engine.OKFExtractor.model import OKFJob
+from app.engine.chunked.model import KnowledgeChunk
 
 
 def test_user_model_describes_users_table() -> None:
@@ -42,4 +43,17 @@ def test_okf_job_model_keeps_minimal_queue_state() -> None:
         "attempts",
         "last_error",
         "updated_at",
+    }
+
+
+def test_knowledge_chunk_model_describes_pgvector_storage() -> None:
+    table = Base.metadata.tables[KnowledgeChunk.__tablename__]
+
+    assert {column.name for column in table.columns} == {
+        "id",
+        "file_id",
+        "heading",
+        "content",
+        "source_locations",
+        "embedding",
     }
