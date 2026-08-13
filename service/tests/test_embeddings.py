@@ -1,5 +1,5 @@
-from app.engine.chunked import embeddings
-from app.engine.chunked.chunker import OKFChunk
+from app.engine.chunks import embeddings
+from app.engine.chunks.chunker import OKFChunk
 
 
 def test_embed_chunks_batches_and_preserves_response_order(monkeypatch):

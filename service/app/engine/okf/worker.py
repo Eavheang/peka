@@ -3,12 +3,12 @@ import logging
 import time
 
 from app.config import settings
-from app.engine.extractor import source_id_for
-from app.engine.chunked.chunker import parse_okf_chunks
-from app.engine.chunked.embeddings import embed_chunks
-from app.engine.chunked.repository import knowledge_chunks_repository
-from app.engine.OKFExtractor.main import convert_to_okf
-from app.engine.OKFExtractor.repository import okf_jobs_repository
+from app.engine.source_extractor import source_id_for
+from app.engine.chunks.chunker import parse_okf_chunks
+from app.engine.chunks.embeddings import embed_chunks
+from app.engine.chunks.repository import knowledge_chunks_repository
+from app.engine.okf.converter import convert_to_okf
+from app.engine.okf.job_repository import okf_jobs_repository
 
 
 logger = logging.getLogger(__name__)

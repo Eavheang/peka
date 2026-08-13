@@ -9,8 +9,8 @@ from fastapi import UploadFile
 from psycopg.errors import UniqueViolation
 
 from app.config import settings
-from app.engine.OKFExtractor.repository import okf_jobs_repository
-from app.engine.extractor import extract_file, source_id_for
+from app.engine.okf.job_repository import okf_jobs_repository
+from app.engine.source_extractor import extract_file, source_id_for
 from app.files.repository import files_repository
 
 

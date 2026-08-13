@@ -1,7 +1,7 @@
 import json
 
-from app.engine import extractor
-from app.engine.OKFExtractor import worker
+from app.engine import source_extractor as extractor
+from app.engine.okf import worker
 
 
 class FakeJobsRepository:

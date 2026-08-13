@@ -1,4 +1,4 @@
-from app.engine.chunked.chunker import parse_okf_chunks
+from app.engine.chunks.chunker import parse_okf_chunks
 
 
 def test_parser_builds_summary_and_heading_chunks():

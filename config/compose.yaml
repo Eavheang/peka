@@ -55,7 +55,7 @@ services:
     build:
       context: ../service
       dockerfile: Dockerfile
-    command: python -m app.engine.OKFExtractor.worker
+    command: python -m app.engine.okf.worker
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-peka}:${POSTGRES_PASSWORD:-peka_dev_password}@postgres:5432/${POSTGRES_DB:-peka}
       FILE_STORAGE_DIR: /app/storage

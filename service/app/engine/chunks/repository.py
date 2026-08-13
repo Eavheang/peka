@@ -2,9 +2,10 @@ from uuid import UUID
 
 from pgvector import Vector
 from pgvector.psycopg import register_vector
+from psycopg.types.json import Jsonb
 
 from app.database import get_connection
-from app.engine.chunked.chunker import OKFChunk
+from app.engine.chunks.chunker import OKFChunk
 
 
 class KnowledgeChunksRepository:
@@ -28,7 +29,7 @@ class KnowledgeChunksRepository:
                         file_id,
                         chunk.heading,
                         chunk.content,
-                        list(chunk.source_locations),
+                        Jsonb(list(chunk.source_locations)),
                         Vector(vector),
                     ),
                 )

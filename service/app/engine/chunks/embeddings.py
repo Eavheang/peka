@@ -1,7 +1,7 @@
 import httpx
 
 from app.config import settings
-from app.engine.chunked.chunker import OKFChunk
+from app.engine.chunks.chunker import OKFChunk
 
 
 class EmbeddingError(RuntimeError):

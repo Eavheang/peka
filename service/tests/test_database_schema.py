@@ -1,8 +1,8 @@
 from app.database import Base
 from app.auth.model import User
 from app.files.model import StoredFile
-from app.engine.OKFExtractor.model import OKFJob
-from app.engine.chunked.model import KnowledgeChunk
+from app.engine.okf.job_model import OKFJob
+from app.engine.chunks.chunk_model import KnowledgeChunk
 
 
 def test_user_model_describes_users_table() -> None:
