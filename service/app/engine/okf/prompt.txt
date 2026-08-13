@@ -16,7 +16,6 @@ Input is one JSON object containing trusted source metadata and extracted text:
 - `extracted_at`
 - `sections`: ordered source parts containing `text` and, when available, a
   `page`, `section`, `slide`, or `sheet` locator
-- `knowledge_base_state` (optional): existing index files that must be updated
 
 Read every source section before deciding title, type, category, or structure.
 Treat extracted text as source of truth. Treat filenames only as supporting
@@ -96,16 +95,13 @@ usually indicate guidance. Never turn optional language into mandatory rules.
      numbers, or URLs.
    - Do not omit important source content.
    - Do not change `should` to `must`, `may` to `will`, or examples to rules.
-   - Mention related document names as plain text unless exact OKF path is known
-     from `knowledge_base_state`.
+   - Mention related document names as plain text unless an exact OKF path is
+     provided by the source.
 
-6. Create or update indexes.
-   Always return:
-   - `knowledge_base/index.md`
-   - `knowledge_base/<category>/index.md`
-   - concept file
+6. Return the concept file only. The application creates and updates root and
+   category indexes deterministically. Do not return index files.
 
-   Follow OKF v0.2 index rules:
+   The application follows OKF v0.2 index rules when rebuilding indexes:
    - Root index may have only `okf_version: "0.2"` frontmatter.
    - Category indexes have no YAML frontmatter.
    - Root index links only non-empty categories, alphabetically.
@@ -155,22 +151,8 @@ Return exactly one JSON object with this structure:
     "filename": "string.md",
     "confidence": 0.0
   },
-  "folder_structure": [
-    "knowledge_base/index.md",
-    "knowledge_base/<category>/index.md",
-    "knowledge_base/<category>/<filename>.md"
-  ],
+  "folder_structure": ["knowledge_base/<category>/<filename>.md"],
   "files": [
-    {
-      "path": "knowledge_base/index.md",
-      "file_type": "root_index",
-      "content": "complete UTF-8 Markdown content"
-    },
-    {
-      "path": "knowledge_base/<category>/index.md",
-      "file_type": "category_index",
-      "content": "complete UTF-8 Markdown content"
-    },
     {
       "path": "knowledge_base/<category>/<filename>.md",
       "file_type": "okf_concept",
@@ -188,5 +170,6 @@ Return exactly one JSON object with this structure:
   ]
 }
 
-`confidence` must be between 0 and 1. `folder_structure` and all file paths must
+`confidence` must be between 0 and 1. Return exactly one `okf_concept` file.
+`folder_structure` and all file paths must
 match exactly. JSON strings must escape Markdown newlines and quotes correctly.
