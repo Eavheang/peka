@@ -4,6 +4,9 @@ import time
 
 from app.config import settings
 from app.engine.extractor import source_id_for
+from app.engine.chunked.chunker import parse_okf_chunks
+from app.engine.chunked.embeddings import embed_chunks
+from app.engine.chunked.repository import knowledge_chunks_repository
 from app.engine.OKFExtractor.main import convert_to_okf
 from app.engine.OKFExtractor.repository import okf_jobs_repository
 
@@ -23,7 +26,10 @@ def process_next_job() -> bool:
             raise ValueError("Unsafe source path")
         extracted = storage_root / "extracted" / f"{source_id_for(source)}.json"
         extraction = json.loads(extracted.read_text(encoding="utf-8"))
-        convert_to_okf(extraction, storage_root)
+        result = convert_to_okf(extraction, storage_root)
+        chunks = parse_okf_chunks(result)
+        vectors = embed_chunks(chunks)
+        knowledge_chunks_repository.replace_for_file(job["file_id"], chunks, vectors)
     except Exception as error:
         logger.exception("OKF conversion failed for file %s", job["file_id"])
         okf_jobs_repository.fail(job["file_id"], str(error) or type(error).__name__)

@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-peka}
       POSTGRES_USER: ${POSTGRES_USER:-peka}
@@ -63,13 +63,34 @@ services:
       LLAMA_BASE_URL: http://llama:8080/v1
       LLAMA_API_KEY: ${LLAMA_API_KEY:?Set LLAMA_API_KEY in config/.env}
       LLAMA_MODEL: local
+      EMBEDDING_BASE_URL: http://embeddings:80/v1
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-BAAI/bge-large-en-v1.5}
+      EMBEDDING_DIMENSIONS: 1024
+      EMBEDDING_BATCH_SIZE: 16
     depends_on:
       postgres:
         condition: service_healthy
       llama:
         condition: service_started
+      embeddings:
+        condition: service_healthy
     volumes:
       - file_storage:/app/storage
+    restart: unless-stopped
+
+  embeddings:
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.9
+    command: ["--model-id", "${EMBEDDING_MODEL:-BAAI/bge-large-en-v1.5}", "--max-client-batch-size", "16"]
+    ports:
+      - "127.0.0.1:8081:80"
+    volumes:
+      - embedding_models:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10m
     restart: unless-stopped
 
   llama:
@@ -81,7 +102,7 @@ services:
       - ./model:/models:ro
       - ./llama/config.yaml:/config/config.yaml:ro
       - ./llama/entrypoint.sh:/entrypoint.sh:ro
-    entrypoint: ["/bin/sh", "/entrypoint.sh"]
+    entrypoint: ["/bin/sh", "-c", "tr -d '\r' < /entrypoint.sh > /tmp/entrypoint.sh && exec /bin/sh /tmp/entrypoint.sh"]
     ports:
       - "8080:8080"
     restart: unless-stopped
@@ -90,3 +111,4 @@ volumes:
   postgres_data:
   pgadmin_data:
   file_storage:
+  embedding_models:
