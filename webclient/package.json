@@ -6,8 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
-    "lint-fix": "eslint . --fix",
+    "lint": "oxlint",
+    "lint-fix": "oxlint --fix",
+    "format": "oxfmt",
+    "format-check": "oxfmt --check",
     "tsc": "tsc --noEmit"
   },
   "dependencies": {
@@ -20,9 +22,9 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "16.2.10",
     "husky": "^9.1.7",
+    "oxfmt": "^0.64.0",
+    "oxlint": "^1.79.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   },
