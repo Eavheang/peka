@@ -17,5 +17,6 @@ case "$files" in
     cd webclient || exit 1
     bun run lint-fix
     bun run tsc
+    bun run format
     ;;
 esac
