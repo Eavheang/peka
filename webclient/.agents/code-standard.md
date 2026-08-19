@@ -76,7 +76,7 @@ project needs both. Components must not create ad-hoc request clients.
 ### Imports and formatting
 
 - Use the `@/*` alias for project imports instead of long relative paths.
-- Keep type imports separate when it improves clarity; let ESLint/Prettier be
+- Keep type imports separate when it improves clarity; let Oxlint/Oxfmt be
   the final authority on ordering and formatting.
 - Do not disable lint rules inline without a reason in the same comment.
 
