@@ -31,22 +31,12 @@ def test_convert_to_okf_calls_llm_and_writes_files(monkeypatch, tmp_path):
         "retrieval_sections": [],
     }
     request = {}
-    index = tmp_path / "knowledge_base" / "index.md"
-    index.parent.mkdir()
-    index.write_text("# Existing knowledge\n", encoding="utf-8")
 
-    class Response:
-        def raise_for_status(self):
-            pass
+    def fake_chat_completion(messages, *, json_mode=False, timeout=600):
+        request.update(messages=messages, json_mode=json_mode)
+        return json.dumps(result)
 
-        def json(self):
-            return {"choices": [{"message": {"content": json.dumps(result)}}]}
-
-    def post(url, **kwargs):
-        request.update(url=url, **kwargs)
-        return Response()
-
-    monkeypatch.setattr(main.httpx, "post", post)
+    monkeypatch.setattr(main, "chat_completion", fake_chat_completion)
     monkeypatch.setattr(main.settings, "llm_base_url", "http://llama:8080/v1")
     monkeypatch.setattr(main.settings, "llm_api_key", SecretStr("secret"))
     monkeypatch.setattr(main.settings, "llm_model", "local")
@@ -54,11 +44,8 @@ def test_convert_to_okf_calls_llm_and_writes_files(monkeypatch, tmp_path):
     converted = main.convert_to_okf(extraction, tmp_path)
 
     assert converted == result
-    assert request["url"] == "http://llama:8080/v1/chat/completions"
-    assert request["headers"] == {"Authorization": "Bearer secret"}
-    assert request["json"]["model"] == "local"
-    assert request["json"]["response_format"] == {"type": "json_object"}
-    payload = json.loads(request["json"]["messages"][1]["content"])
+    assert request["json_mode"] is True
+    payload = json.loads(request["messages"][1]["content"])
     assert payload["source_id"] == "abc123"
     assert "knowledge_base_state" not in payload
     assert (tmp_path / "knowledge_base" / "policies" / "sign-in-policy.md").is_file()
@@ -109,8 +96,7 @@ def test_convert_to_okf_rejects_invalid_llm_json(monkeypatch, tmp_path):
         def json(self):
             return {"choices": [{"message": {"content": "not json"}}]}
 
-    monkeypatch.setattr(main.httpx, "post", lambda *args, **kwargs: Response())
-    monkeypatch.setattr(main.settings, "llm_api_key", SecretStr("secret"))
+    monkeypatch.setattr(main, "chat_completion", lambda *a, **k: "not json")
 
     with pytest.raises(main.OKFConversionError, match="invalid JSON"):
         main.convert_to_okf({"source_id": "abc123", "sections": []}, tmp_path)
