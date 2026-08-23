@@ -9,9 +9,9 @@ class Settings(BaseSettings):
     debug: bool = False
     database_url: str = "postgresql://peka:peka_dev_password@localhost:5432/peka"
     file_storage_dir: Path = Path("storage")
-    llama_base_url: str = "http://localhost:8080/v1"
-    llama_api_key: SecretStr | None = None
-    llama_model: str = "local"
+    llm_base_url: str = "http://localhost:8080/v1"
+    llm_api_key: SecretStr | None = None
+    llm_model: str = "local"
     embedding_base_url: str = "http://localhost:8081/v1"
     embedding_model: str = "BAAI/bge-m3"
     embedding_dimensions: int = 1024
