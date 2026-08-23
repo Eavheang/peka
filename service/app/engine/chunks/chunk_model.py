@@ -18,6 +18,10 @@ class KnowledgeChunk(Base):
         ForeignKey("files.id", ondelete="CASCADE"),
         nullable=False,
     )
+    chunk_set_id: Mapped[UUID | None] = mapped_column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("chunk_sets.id", ondelete="CASCADE"),
+    )
     heading: Mapped[str] = mapped_column(Text, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     source_locations: Mapped[list[dict]] = mapped_column(
