@@ -5,9 +5,10 @@ from app.files.model import StoredFile  # noqa: F401 - register table in shared 
 from app.engine.okf.job_model import OKFJob  # noqa: F401 - register table in shared metadata
 from app.engine.chunks.chunk_model import KnowledgeChunk  # noqa: F401 - register table in shared metadata
 from app.engine.chunks.chunk_set_model import ChunkSet  # noqa: F401 - register table in shared metadata
+from app.engine.search.routes import router as search_router
 
 routers = [
     auth_router,
     files_router,
+    search_router,
 ]
-
