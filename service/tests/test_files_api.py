@@ -13,11 +13,11 @@ def test_files_require_login_and_support_upload_list_download(client, monkeypatc
     assert client.get("/files").status_code == 401
     assert client.post("/files", files={"files": ("report.pdf", b"data", "application/pdf")}).status_code == 401
 
-    account = {"id": uuid4(), "email": "user@example.com", "role": "member",
+    account = {"id": uuid4(), "email": "user@example.com", "role": "staff",
                "token_version": 0, "is_active": True}
     token = auth_routes.create_access_token(str(account["id"]), account["role"], account["token_version"])
     headers = {"Authorization": f"Bearer {token}"}
-    intruder = {"id": uuid4(), "email": "other@example.com", "role": "member",
+    intruder = {"id": uuid4(), "email": "other@example.com", "role": "staff",
                 "token_version": 0, "is_active": True}
     accounts = {account["id"]: account, intruder["id"]: intruder}
     records = []
@@ -112,7 +112,7 @@ def test_files_require_login_and_support_upload_list_download(client, monkeypatc
 
 
 def test_upload_rejects_unsupported_files_without_saving(client, monkeypatch, tmp_path):
-    account = {"id": uuid4(), "email": "user@example.com", "role": "member",
+    account = {"id": uuid4(), "email": "user@example.com", "role": "staff",
                "token_version": 0, "is_active": True}
     token = auth_routes.create_access_token(str(account["id"]), account["role"], account["token_version"])
     monkeypatch.setattr(auth_routes, "current_user", lambda user_id: account)
@@ -129,7 +129,7 @@ def test_upload_rejects_unsupported_files_without_saving(client, monkeypatch, tm
 
 
 def test_upload_rejects_duplicate_content(client, monkeypatch, tmp_path):
-    account = {"id": uuid4(), "email": "user@example.com", "role": "member",
+    account = {"id": uuid4(), "email": "user@example.com", "role": "staff",
                "token_version": 0, "is_active": True}
     token = auth_routes.create_access_token(str(account["id"]), account["role"], account["token_version"])
     monkeypatch.setattr(auth_routes, "current_user", lambda user_id: account)

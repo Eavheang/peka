@@ -19,6 +19,10 @@ def test_user_model_describes_users_table() -> None:
         "created_at",
         "updated_at",
     }
+    assert str(next(constraint for constraint in table.constraints
+                    if constraint.name == "users_role_check").sqltext) == (
+        "role IN ('admin', 'senior', 'staff')"
+    )
 
 
 def test_file_model_keeps_minimal_metadata() -> None:

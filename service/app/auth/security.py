@@ -34,6 +34,8 @@ def decode_access_token(token: str) -> dict:
         issuer=settings.jwt_issuer, audience=settings.jwt_audience,
         options={"require": ["sub", "role", "ver", "iss", "aud", "iat", "nbf", "exp", "jti"]},
     )
-    if not isinstance(claims["sub"], str) or claims["role"] not in {"member", "admin"} or type(claims["ver"]) is not int:
+    if (not isinstance(claims["sub"], str) or not isinstance(claims["role"], str)
+            or claims["role"] not in {"admin", "senior", "staff"}
+            or type(claims["ver"]) is not int):
         raise jwt.InvalidTokenError("invalid token claims")
     return claims

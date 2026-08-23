@@ -6,7 +6,7 @@ from app.auth import routes, service
 from app.auth.security import hash_password
 
 
-def user(role="member", password="correct password"):
+def user(role="staff", password="correct password"):
     return {"id": uuid4(), "email": "user@example.com", "role": role,
             "password_hash": hash_password(password), "token_version": 0, "is_active": True}
 
@@ -42,22 +42,24 @@ def test_auth_rejects_missing_invalid_and_version_mismatch(client, monkeypatch):
     assert client.get("/auth/me").status_code == 401
     assert client.get("/auth/me", headers={"Authorization": "Bearer invalid"}).status_code == 401
     account = user()
-    token = routes.create_access_token(str(account["id"]), "member", 0)
+    token = routes.create_access_token(str(account["id"]), account["role"], 0)
     account["token_version"] = 1
     monkeypatch.setattr(routes, "current_user", lambda user_id: account)
     assert client.get("/auth/me", headers={"Authorization": f"Bearer {token}"}).status_code == 401
 
 
 def test_create_users_role_access_duplicate_and_logout(client, monkeypatch):
-    member = user()
+    staff = user()
+    senior = user("senior")
     admin = user("admin")
-    monkeypatch.setattr(routes, "current_user", lambda user_id: member)
-    member_token = routes.create_access_token(str(member["id"]), "member", 0)
-    assert client.post("/auth/users", headers={"Authorization": f"Bearer {member_token}"},
-                       json={"email": "new@example.com", "password": "long enough password"}).status_code == 403
+    for account in (staff, senior):
+        monkeypatch.setattr(routes, "current_user", lambda user_id, account=account: account)
+        token = routes.create_access_token(str(account["id"]), account["role"], 0)
+        assert client.post("/auth/users", headers={"Authorization": f"Bearer {token}"},
+                           json={"email": "new@example.com", "password": "long enough password"}).status_code == 403
     monkeypatch.setattr(routes, "current_user", lambda user_id: admin)
     admin_token = routes.create_access_token(str(admin["id"]), "admin", 0)
-    created = {"id": uuid4(), "email": "new@example.com", "role": "member", "is_active": True}
+    created = {"id": uuid4(), "email": "new@example.com", "role": "staff", "is_active": True}
     monkeypatch.setattr(routes, "create_user", lambda data: created)
     response = client.post("/auth/users", headers={"Authorization": f"Bearer {admin_token}"},
                            json={"email": created["email"], "password": "long enough password"})
@@ -72,7 +74,24 @@ def test_create_users_role_access_duplicate_and_logout(client, monkeypatch):
     assert client.get("/auth/me", headers={"Authorization": f"Bearer {admin_token}"}).status_code == 401
 
 
-@pytest.mark.parametrize("role", ["member", "admin"])
+def test_senior_cannot_use_admin_endpoints(client, monkeypatch):
+    senior = user("senior")
+    target = user()
+    token = routes.create_access_token(str(senior["id"]), "senior", 0)
+    monkeypatch.setattr(routes, "current_user", lambda user_id: senior)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    assert client.post(
+        "/auth/users", headers=headers,
+        json={"email": "new@example.com", "password": "long enough password"},
+    ).status_code == 403
+    assert client.patch(
+        f"/auth/users/{target['id']}", headers=headers, json={"is_active": False}
+    ).status_code == 403
+    assert client.delete(f"/auth/users/{target['id']}", headers=headers).status_code == 403
+
+
+@pytest.mark.parametrize("role", ["staff", "senior", "admin"])
 def test_admin_can_create_each_user_role(client, monkeypatch, role):
     admin = user("admin")
     token = routes.create_access_token(str(admin["id"]), "admin", 0)
@@ -108,7 +127,7 @@ def test_admin_can_change_activation_and_delete_only_inactive(client, monkeypatc
     target = user()
     accounts = {admin["id"]: admin, target["id"]: target}
     admin_token = routes.create_access_token(str(admin["id"]), "admin", 0)
-    target_token = routes.create_access_token(str(target["id"]), "member", 0)
+    target_token = routes.create_access_token(str(target["id"]), "staff", 0)
     headers = {"Authorization": f"Bearer {admin_token}"}
 
     monkeypatch.setattr(routes, "current_user", lambda user_id: accounts.get(user_id))

@@ -1,6 +1,10 @@
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
+
+
+Role = Literal["admin", "senior", "staff"]
 
 
 class LoginRequest(BaseModel):
@@ -24,14 +28,7 @@ class TokenResponse(BaseModel):
 
 class UserCreate(LoginRequest):
     password: str = Field(min_length=12, max_length=1024)
-    role: str = "member"
-
-    @field_validator("role")
-    @classmethod
-    def valid_role(cls, value: str) -> str:
-        if value not in {"member", "admin"}:
-            raise ValueError("role must be member or admin")
-        return value
+    role: Role = "staff"
 
 
 class UserActivationUpdate(BaseModel):
@@ -41,5 +38,5 @@ class UserActivationUpdate(BaseModel):
 class UserResponse(BaseModel):
     id: UUID
     email: str
-    role: str
+    role: Role
     is_active: bool
