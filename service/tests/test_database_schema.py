@@ -34,8 +34,13 @@ def test_file_model_keeps_minimal_metadata() -> None:
         "content_type",
         "sha256",
         "author_id",
+        "access_level",
         "created_at",
     }
+    assert str(next(constraint for constraint in table.constraints
+                    if constraint.name == "files_access_level_check").sqltext) == (
+        "access_level IN ('general', 'confidential')"
+    )
 
 
 def test_okf_job_model_keeps_minimal_queue_state() -> None:

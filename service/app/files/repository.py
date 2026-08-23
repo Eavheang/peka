@@ -11,7 +11,7 @@ class FilesRepository:
             for path, content_type, sha256 in records:
                 row = connection.execute(
                     "INSERT INTO files (path, content_type, sha256, author_id) VALUES (%s, %s, %s, %s) "
-                    "RETURNING id, path, content_type, sha256, author_id, created_at",
+                    "RETURNING id, path, content_type, sha256, author_id, access_level, created_at",
                     (path, content_type, sha256, author_id),
                 ).fetchone()
                 if row is None:
@@ -26,8 +26,8 @@ class FilesRepository:
         with get_connection() as connection:
             rows = connection.execute(
                 "SELECT files.id, files.path, files.content_type, files.sha256, files.author_id, "
-                "files.created_at, jobs.status AS okf_status, jobs.attempts AS okf_attempts, "
-                "jobs.last_error AS okf_error FROM files "
+                "files.access_level, files.created_at, jobs.status AS okf_status, "
+                "jobs.attempts AS okf_attempts, jobs.last_error AS okf_error FROM files "
                 "JOIN okf_jobs jobs ON jobs.file_id = files.id ORDER BY files.created_at DESC"
             ).fetchall()
             return cast(list[dict[str, Any]], rows)
@@ -44,12 +44,20 @@ class FilesRepository:
         with get_connection() as connection:
             row = connection.execute(
                 "SELECT files.id, files.path, files.content_type, files.sha256, files.author_id, "
-                "files.created_at, jobs.status AS okf_status, jobs.attempts AS okf_attempts, "
-                "jobs.last_error AS okf_error FROM files "
+                "files.access_level, files.created_at, jobs.status AS okf_status, "
+                "jobs.attempts AS okf_attempts, jobs.last_error AS okf_error FROM files "
                 "JOIN okf_jobs jobs ON jobs.file_id = files.id WHERE files.id = %s",
                 (file_id,),
             ).fetchone()
             return cast(dict[str, Any] | None, row)
+
+    def update_access_level(self, file_id: UUID, access_level: str) -> bool:
+        with get_connection() as connection:
+            updated = connection.execute(
+                "UPDATE files SET access_level = %s WHERE id = %s",
+                (access_level, file_id),
+            ).rowcount
+            return updated > 0
 
     def delete(self, file_id: UUID) -> None:
         with get_connection() as connection:
