@@ -14,19 +14,19 @@ class OKFConversionError(RuntimeError):
 
 
 def convert_to_okf(extraction: dict, base_dir: Path) -> dict:
-    if settings.llama_api_key is None:
-        raise OKFConversionError("LLAMA_API_KEY is not configured")
+    if settings.llm_api_key is None:
+        raise OKFConversionError("LLM_API_KEY is not configured")
 
     payload = dict(extraction)
 
     try:
         response = httpx.post(
-            f"{settings.llama_base_url.rstrip('/')}/chat/completions",
+            f"{settings.llm_base_url.rstrip('/')}/chat/completions",
             headers={
-                "Authorization": f"Bearer {settings.llama_api_key.get_secret_value()}"
+                "Authorization": f"Bearer {settings.llm_api_key.get_secret_value()}"
             },
             json={
-                "model": settings.llama_model,
+                "model": settings.llm_model,
                 "messages": [
                     {"role": "system", "content": _prompt()},
                     {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},

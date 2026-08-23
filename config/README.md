@@ -68,7 +68,7 @@ make down
 The GGUF file in `config/model` is mounted read-only into the official CUDA
 llama.cpp server image. Settings are in `config/llama/config.yaml`. `make
 setup` and `make up` start it on port 8080 with all model layers offloaded to
-the GPU. Set `LLAMA_API_KEY` in `.env` before starting it. The OpenAI-compatible
+the GPU. Set `LLM_API_KEY` in `.env` before starting it. The OpenAI-compatible
 endpoint is:
 
 ```text
@@ -82,7 +82,7 @@ Set `model` in `config/llama/config.yaml` to use another filename. Test it from
 PowerShell:
 
 ```powershell
-$headers = @{ Authorization = "Bearer $env:LLAMA_API_KEY" }
+$headers = @{ Authorization = "Bearer $env:LLM_API_KEY" }
 Invoke-RestMethod http://localhost:8080/v1/chat/completions -Headers $headers -Method Post -ContentType 'application/json' -Body (@{
   model = 'local'
   messages = @(@{ role = 'user'; content = 'Hello' })
@@ -93,7 +93,7 @@ Invoke-RestMethod http://localhost:8080/v1/chat/completions -Headers $headers -M
 Authenticated requests must include the key:
 
 ```powershell
-$headers = @{ Authorization = "Bearer $env:LLAMA_API_KEY" }
+$headers = @{ Authorization = "Bearer $env:LLM_API_KEY" }
 Invoke-RestMethod http://localhost:8080/v1/models -Headers $headers
 ```
 

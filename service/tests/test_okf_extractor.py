@@ -7,7 +7,7 @@ from app.engine.okf import converter as main
 from app.engine.okf.file_writer import write_okf_files
 
 
-def test_convert_to_okf_calls_llama_and_writes_files(monkeypatch, tmp_path):
+def test_convert_to_okf_calls_llm_and_writes_files(monkeypatch, tmp_path):
     extraction = {
         "source_id": "abc123",
         "source_filename": "policy.txt",
@@ -47,9 +47,9 @@ def test_convert_to_okf_calls_llama_and_writes_files(monkeypatch, tmp_path):
         return Response()
 
     monkeypatch.setattr(main.httpx, "post", post)
-    monkeypatch.setattr(main.settings, "llama_base_url", "http://llama:8080/v1")
-    monkeypatch.setattr(main.settings, "llama_api_key", SecretStr("secret"))
-    monkeypatch.setattr(main.settings, "llama_model", "local")
+    monkeypatch.setattr(main.settings, "llm_base_url", "http://llama:8080/v1")
+    monkeypatch.setattr(main.settings, "llm_api_key", SecretStr("secret"))
+    monkeypatch.setattr(main.settings, "llm_model", "local")
 
     converted = main.convert_to_okf(extraction, tmp_path)
 
@@ -110,7 +110,7 @@ def test_convert_to_okf_rejects_invalid_llm_json(monkeypatch, tmp_path):
             return {"choices": [{"message": {"content": "not json"}}]}
 
     monkeypatch.setattr(main.httpx, "post", lambda *args, **kwargs: Response())
-    monkeypatch.setattr(main.settings, "llama_api_key", SecretStr("secret"))
+    monkeypatch.setattr(main.settings, "llm_api_key", SecretStr("secret"))
 
     with pytest.raises(main.OKFConversionError, match="invalid JSON"):
         main.convert_to_okf({"source_id": "abc123", "sections": []}, tmp_path)

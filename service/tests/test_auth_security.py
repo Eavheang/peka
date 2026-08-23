@@ -26,6 +26,12 @@ def test_jwt_rejects_tampering() -> None:
         decode_access_token(".".join(parts))
 
 
+def test_jwt_rejects_legacy_member_role() -> None:
+    token = create_access_token("00000000-0000-0000-0000-000000000001", "member", 0)
+    with pytest.raises(Exception):
+        decode_access_token(token)
+
+
 def test_settings_validate_auth_configuration() -> None:
     secret = SecretStr("test-only-secret-that-is-at-least-32-chars")
     with pytest.raises(ValidationError):
