@@ -95,6 +95,10 @@ def retry_okf(file_id: UUID, user_id: UUID, is_admin: bool = False) -> dict | No
     return files_repository.find_by_id(file_id)
 
 
+def get_okf_status(file_id: UUID) -> dict | None:
+    return files_repository.find_by_id(file_id)
+
+
 def set_access_level(file_id: UUID, access_level: str) -> dict | None:
     if not files_repository.update_access_level(file_id, access_level):
         return None
