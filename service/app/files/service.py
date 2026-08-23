@@ -95,6 +95,12 @@ def retry_okf(file_id: UUID, user_id: UUID, is_admin: bool = False) -> dict | No
     return files_repository.find_by_id(file_id)
 
 
+def set_access_level(file_id: UUID, access_level: str) -> dict | None:
+    if not files_repository.update_access_level(file_id, access_level):
+        return None
+    return files_repository.find_by_id(file_id)
+
+
 def find_file(file_id: UUID) -> tuple[dict, Path] | None:
     record = files_repository.find_by_id(file_id)
     if record is None:

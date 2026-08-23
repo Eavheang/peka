@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFil
 from fastapi.responses import FileResponse as DownloadResponse
 
 from app.auth.routes import authenticated
-from app.files.schemas import FileResponse
+from app.files.schemas import AccessLevelUpdate, FileResponse
 from app.files.service import (
     DuplicateFileError,
     OKFJobStateError,
@@ -13,6 +13,7 @@ from app.files.service import (
     find_file,
     list_files,
     retry_okf,
+    set_access_level,
     store_files,
 )
 
@@ -57,6 +58,18 @@ def download_file(file_id: UUID, _: dict = Depends(authenticated)) -> DownloadRe
         raise HTTPException(status_code=404, detail="File not found")
     record, path = result
     return DownloadResponse(path, media_type=record["content_type"], filename=path.name)
+
+
+@router.patch("/{file_id}/access-level", response_model=FileResponse)
+def change_file_access_level(
+    file_id: UUID, payload: AccessLevelUpdate, user: dict = Depends(authenticated)
+) -> dict:
+    if user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can change file access level")
+    record = set_access_level(file_id, payload.access_level)
+    if record is None:
+        raise HTTPException(status_code=404, detail="File not found")
+    return record
 
 
 @router.delete("/{file_id}", status_code=status.HTTP_204_NO_CONTENT)

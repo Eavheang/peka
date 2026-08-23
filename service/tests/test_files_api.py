@@ -25,7 +25,8 @@ def test_files_require_login_and_support_upload_list_download(client, monkeypatc
     def create_many(files, author_id):
         created = [
             {"id": uuid4(), "path": path, "content_type": content_type, "sha256": sha256,
-             "author_id": author_id, "created_at": datetime.now(timezone.utc),
+             "author_id": author_id, "access_level": "general",
+             "created_at": datetime.now(timezone.utc),
              "okf_status": "queued", "okf_attempts": 0, "okf_error": None}
             for path, content_type, sha256 in files
         ]
@@ -74,6 +75,7 @@ def test_files_require_login_and_support_upload_list_download(client, monkeypatc
     assert [item["path"] for item in response.json()] == ["pdf/report.pdf", "others/notes.txt"]
     assert response.json()[0]["sha256"] == hashlib.sha256(pdf_data).hexdigest()
     assert response.json()[1]["sha256"] == hashlib.sha256(b"notes").hexdigest()
+    assert all(item["access_level"] == "general" for item in response.json())
     assert (tmp_path / "pdf" / "report.pdf").read_bytes() == pdf_data
     extracted_files = list((tmp_path / "extracted").glob("*.json"))
     assert len(extracted_files) == 2
@@ -109,6 +111,52 @@ def test_files_require_login_and_support_upload_list_download(client, monkeypatc
     assert client.delete(f"/files/{records[0]['id']}", headers=headers).status_code == 204
     assert not (tmp_path / "pdf" / "report.pdf").exists()
     assert not extracted_path.exists()
+
+
+def test_access_level_patch_requires_admin(client, monkeypatch):
+    file_id = uuid4()
+    staff = {"id": uuid4(), "email": "staff@example.com", "role": "staff",
+             "token_version": 0, "is_active": True}
+    admin = {"id": uuid4(), "email": "admin@example.com", "role": "admin",
+             "token_version": 0, "is_active": True}
+    accounts = {staff["id"]: staff, admin["id"]: admin}
+
+    def token_for(account):
+        return {"Authorization": f"Bearer {auth_routes.create_access_token(str(account['id']), account['role'], account['token_version'])}"}
+
+    record = {"id": file_id, "path": "pdf/report.pdf", "content_type": "application/pdf",
+              "sha256": None, "author_id": staff["id"], "access_level": "general",
+              "created_at": datetime.now(timezone.utc),
+              "okf_status": "completed", "okf_attempts": 1, "okf_error": None}
+
+    def update_access_level(target_id, level):
+        if target_id != file_id:
+            return False
+        record.update(access_level=level)
+        return True
+
+    monkeypatch.setattr(auth_routes, "current_user", lambda user_id: accounts[user_id])
+    monkeypatch.setattr(service.files_repository, "update_access_level", update_access_level)
+    monkeypatch.setattr(
+        service.files_repository,
+        "find_by_id",
+        lambda target_id: record if target_id == file_id else None,
+    )
+
+    assert client.patch(f"/files/{file_id}/access-level", headers=token_for(staff),
+                        json={"access_level": "confidential"}).status_code == 403
+    assert client.patch(f"/files/{file_id}/access-level", headers=token_for(staff),
+                        json={"access_level": "secret"}).status_code == 422
+
+    changed = client.patch(f"/files/{file_id}/access-level", headers=token_for(admin),
+                           json={"access_level": "confidential"})
+    assert changed.status_code == 200
+    assert changed.json()["access_level"] == "confidential"
+    assert record["access_level"] == "confidential"
+
+    missing = uuid4()
+    assert client.patch(f"/files/{missing}/access-level", headers=token_for(admin),
+                        json={"access_level": "general"}).status_code == 404
 
 
 def test_upload_rejects_unsupported_files_without_saving(client, monkeypatch, tmp_path):

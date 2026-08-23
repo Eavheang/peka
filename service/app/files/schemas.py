@@ -11,7 +11,12 @@ class FileResponse(BaseModel):
     content_type: str | None
     sha256: str | None
     author_id: UUID
+    access_level: Literal["general", "confidential"]
     created_at: datetime
     okf_status: Literal["queued", "processing", "completed", "failed"]
     okf_attempts: int
     okf_error: str | None
+
+
+class AccessLevelUpdate(BaseModel):
+    access_level: Literal["general", "confidential"]
