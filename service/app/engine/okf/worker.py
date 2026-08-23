@@ -29,7 +29,7 @@ def process_next_job() -> bool:
         result = convert_to_okf(extraction, storage_root)
         chunks = parse_okf_chunks(result)
         vectors = embed_chunks(chunks)
-        knowledge_chunks_repository.replace_for_file(job["file_id"], chunks, vectors)
+        knowledge_chunks_repository.swap_active_set(job["file_id"], chunks, vectors)
     except Exception as error:
         logger.exception("OKF conversion failed for file %s", job["file_id"])
         okf_jobs_repository.fail(job["file_id"], str(error) or type(error).__name__)
