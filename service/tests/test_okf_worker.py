@@ -47,7 +47,7 @@ def test_worker_completes_one_queued_job(monkeypatch, tmp_path):
     monkeypatch.setattr(
         worker,
         "knowledge_chunks_repository",
-        type("Chunks", (), {"replace_for_file": lambda self, file_id, chunks, vectors: stored.append((file_id, chunks, vectors))})(),
+        type("Chunks", (), {"swap_active_set": lambda self, file_id, chunks, vectors: stored.append((file_id, chunks, vectors))})(),
     )
     monkeypatch.setattr(worker.settings, "file_storage_dir", tmp_path)
     monkeypatch.setattr(
@@ -72,7 +72,7 @@ def test_worker_marks_job_failed_after_three_attempts(monkeypatch, tmp_path):
     monkeypatch.setattr(
         worker,
         "knowledge_chunks_repository",
-        type("Chunks", (), {"replace_for_file": lambda *args: None})(),
+        type("Chunks", (), {"swap_active_set": lambda *args: None})(),
     )
     monkeypatch.setattr(worker.settings, "file_storage_dir", tmp_path)
     monkeypatch.setattr(
@@ -86,3 +86,28 @@ def test_worker_marks_job_failed_after_three_attempts(monkeypatch, tmp_path):
     assert repository.status == "failed"
     assert repository.attempts == 3
     assert repository.error == "llama unavailable"
+
+
+def test_worker_embed_failure_leaves_old_chunks_intact(monkeypatch, tmp_path):
+    relative_source = "pdf/policy.pdf"
+    _write_extraction(tmp_path, relative_source)
+    repository = FakeJobsRepository(relative_source)
+
+    class Chunks:
+        def swap_active_set(self, file_id, chunks, vectors):
+            raise RuntimeError("embedding endpoint down")
+
+    monkeypatch.setattr(worker, "okf_jobs_repository", repository)
+    monkeypatch.setattr(worker, "knowledge_chunks_repository", Chunks())
+    monkeypatch.setattr(worker.settings, "file_storage_dir", tmp_path)
+    monkeypatch.setattr(
+        worker,
+        "convert_to_okf",
+        lambda extraction, storage: {"files": []},
+    )
+    monkeypatch.setattr(worker, "parse_okf_chunks", lambda result: ["chunk"])
+    monkeypatch.setattr(worker, "embed_chunks", lambda chunks: [[0.1]])
+
+    worker.process_next_job()
+    assert repository.status in ("queued", "failed")
+    assert repository.attempts == 1
