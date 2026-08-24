@@ -5,7 +5,9 @@ from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFil
 from fastapi.responses import FileResponse as DownloadResponse
 
 from app.auth.routes import authenticated
-from app.files.schemas import AccessLevelUpdate, FileResponse
+
+from app.files.schemas import AccessLevelUpdate, FileResponse, OKFStatusResponse
+from app.files import service as files_service
 from app.files.service import (
     DuplicateFileError,
     OKFJobStateError,
@@ -49,6 +51,19 @@ def retry_file_okf(file_id: UUID, user: dict = Depends(authenticated)) -> dict:
     if record is None:
         raise HTTPException(status_code=404, detail="File not found")
     return record
+
+
+@router.get("/{file_id}/okf-status", response_model=OKFStatusResponse)
+def get_okf_status(file_id: UUID, user: dict = Depends(authenticated)) -> dict:
+    record = files_service.get_okf_status(file_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="File not found")
+    return {
+        "file_id": str(record["id"]),
+        "okf_status": record["okf_status"],
+        "okf_attempts": record["okf_attempts"],
+        "okf_error": record["okf_error"],
+    }
 
 
 @router.get("/{file_id}")

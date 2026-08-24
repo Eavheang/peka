@@ -1,7 +1,7 @@
 import json
 import logging
+import threading
 import time
-
 from app.config import settings
 from app.engine.source_extractor import source_id_for
 from app.engine.chunks.chunker import parse_okf_chunks
@@ -38,12 +38,29 @@ def process_next_job() -> bool:
     return True
 
 
-def run_worker() -> None:
+def run_worker(stop: threading.Event | None = None) -> None:
     # ponytail: one worker serializes shared indexes; add per-organization locks before scaling.
     okf_jobs_repository.reset_processing()
-    while True:
+    while stop is None or not stop.is_set():
         if not process_next_job():
-            time.sleep(1)
+            if stop is None:
+                time.sleep(1)
+            else:
+                stop.wait(1)
+
+
+def run_worker_in_thread() -> tuple[threading.Thread, threading.Event]:
+    stop = threading.Event()
+    thread = threading.Thread(target=_guarded_run, args=(stop,), daemon=True, name="okf-worker")
+    thread.start()
+    return thread, stop
+
+
+def _guarded_run(stop: threading.Event) -> None:
+    try:
+        run_worker(stop)
+    except Exception:
+        logger.exception("OKF worker stopped unexpectedly")
 
 
 if __name__ == "__main__":

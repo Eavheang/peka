@@ -5,6 +5,13 @@ from uuid import UUID
 from pydantic import BaseModel
 
 
+class OKFStatusResponse(BaseModel):
+    file_id: str
+    okf_status: str
+    okf_attempts: int
+    okf_error: str | None
+
+
 class FileResponse(BaseModel):
     id: UUID
     path: str
