@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "astryx": {
+      "source": "akillness/jeo-skills",
+      "sourceType": "github",
+      "skillPath": ".agent-skills/astryx/SKILL.md",
+      "computedHash": "ab59ba4fb3be7146a9b23cac55b39523124d1c73838a994fa1c20b9867afbb19"
+    }
+  }
+}
