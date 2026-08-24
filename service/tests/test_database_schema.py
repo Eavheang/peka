@@ -3,7 +3,7 @@ from app.auth.model import User
 from app.files.model import StoredFile
 from app.engine.okf.job_model import OKFJob
 from app.engine.chunks.chunk_model import KnowledgeChunk
-
+from app.engine.chunks.chunk_set_model import ChunkSet
 
 def test_user_model_describes_users_table() -> None:
     table = Base.metadata.tables[User.__tablename__]
@@ -61,8 +61,25 @@ def test_knowledge_chunk_model_describes_pgvector_storage() -> None:
     assert {column.name for column in table.columns} == {
         "id",
         "file_id",
+        "chunk_set_id",
         "heading",
         "content",
         "source_locations",
         "embedding",
     }
+
+
+def test_chunk_set_model_describes_versioned_sets() -> None:
+    table = Base.metadata.tables[ChunkSet.__tablename__]
+
+    assert table.name == "chunk_sets"
+    assert {column.name for column in table.columns} == {
+        "id",
+        "file_id",
+        "status",
+        "created_at",
+    }
+    assert str(next(constraint for constraint in table.constraints
+                    if constraint.name == "chunk_sets_status_check").sqltext) == (
+        "status IN ('building', 'active', 'superseded')"
+    )
