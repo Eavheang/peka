@@ -1,26 +1,102 @@
-@import "tailwindcss";
-
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@import '@astryxdesign/core/reset.css';
+@import '@astryxdesign/core/astryx.css';
+@import 'tailwindcss';
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-paper: #f4f0e8;
+  --color-paper-muted: #ebe6dc;
+  --color-ink: #181a19;
+  --color-muted: #767872;
+  --color-copy: #5c605a;
+  --color-copy-secondary: #686c65;
+  --color-copy-tertiary: #6e726b;
+  --color-line: #d8d3c9;
+  --color-panel: #202523;
+  --color-panel-foreground: #f3f1ea;
+  --color-accent: #e96243;
+  --color-accent-foreground: #ffffff;
+  --color-accent-soft: #f5d2c6;
+  --color-success: #a9c4a0;
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  --radius-card: 0.875rem;
+  --radius-message: 0.625rem;
+  --radius-preview: 1.125rem;
+  --shadow-soft: 0 1.25rem 3.75rem rgb(29 30 27 / 11%);
+  --spacing-focus: 0.125rem;
+  --spacing-page: 5vw;
+  --spacing-hero: 8vh;
+  --spacing-section: 6.25rem;
+  --spacing-nav: 4.625rem;
+  --spacing-public-hero: calc(100dvh - var(--spacing-nav));
+  --spacing-preview: 1.125rem;
+  --spacing-preview-main: 1.625rem;
+  --spacing-flow-header: 2.625rem;
+  --spacing-card: 1.6875rem;
+  --spacing-chat: 23.75rem;
+  --spacing-chat-body: 22.8125rem;
+  --text-brand: 1.5625rem;
+  --text-hero: clamp(3rem, 6vw, 4.875rem);
+  --text-hero--line-height: 0.94;
+  --text-flow-title: clamp(2.125rem, 5vw, 3.875rem);
+  --text-flow-title--line-height: 0.98;
+  --text-privacy-title: clamp(2.375rem, 6vw, 4.6875rem);
+  --text-privacy-title--line-height: 0.92;
+  --text-chat-heading: 1.4375rem;
+  --text-step-title: 1.5625rem;
+  --text-micro: 0.625rem;
+  --text-micro--line-height: 1;
+  --text-caption: 0.6875rem;
+  --text-caption--line-height: 1.4;
+  --leading-copy: 1.5;
+  --leading-answer: 1.55;
+  --leading-step: 1.45;
+  --leading-message: 1.4;
+  --tracking-brand: -0.06em;
+  --tracking-hero: -0.075em;
+  --tracking-section: -0.07em;
+  --tracking-privacy: -0.08em;
+  --tracking-label: 0.15em;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    min-height: 100dvh;
+    background: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  :focus-visible {
+    outline: var(--spacing-focus) solid var(--color-accent);
+    outline-offset: var(--spacing-focus);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
