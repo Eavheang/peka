@@ -3,9 +3,8 @@ import re
 from functools import lru_cache
 from pathlib import Path
 
-import httpx
-
 from app.config import settings
+from app.engine.llm_client import chat_completion
 from app.engine.okf.file_writer import write_okf_files
 
 
@@ -14,30 +13,17 @@ class OKFConversionError(RuntimeError):
 
 
 def convert_to_okf(extraction: dict, base_dir: Path) -> dict:
-    if settings.llm_api_key is None:
-        raise OKFConversionError("LLM_API_KEY is not configured")
-
     payload = dict(extraction)
 
     try:
-        response = httpx.post(
-            f"{settings.llm_base_url.rstrip('/')}/chat/completions",
-            headers={
-                "Authorization": f"Bearer {settings.llm_api_key.get_secret_value()}"
-            },
-            json={
-                "model": settings.llm_model,
-                "messages": [
-                    {"role": "system", "content": _prompt()},
-                    {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
-                ],
-                "response_format": {"type": "json_object"},
-            },
-            timeout=600,
+        content = chat_completion(
+            [
+                {"role": "system", "content": _prompt()},
+                {"role": "user", "content": json.dumps(dict(extraction), ensure_ascii=False)},
+            ],
+            json_mode=True,
         )
-        response.raise_for_status()
-        content = response.json()["choices"][0]["message"]["content"]
-    except (httpx.HTTPError, KeyError, IndexError, TypeError, ValueError) as error:
+    except RuntimeError as error:
         raise OKFConversionError("Unable to generate OKF output") from error
 
     try:
