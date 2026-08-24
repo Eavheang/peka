@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     embedding_model: str = "BAAI/bge-m3"
     embedding_dimensions: int = 1024
     embedding_batch_size: int = 16
+    search_top_k: int = 5
+    search_similarity_floor: float = 0.3
     jwt_secret_key: SecretStr
     jwt_access_token_expire_minutes: int = 30
     jwt_issuer: str = "peka-service"
