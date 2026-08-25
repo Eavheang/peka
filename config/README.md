@@ -66,17 +66,16 @@ make down
 ## llama.cpp
 
 The GGUF file in `config/model` is mounted read-only into the official CUDA
-llama.cpp server image. Settings are in `config/llama/config.yaml`. `make
-setup` and `make up` start it on port 8080 with all model layers offloaded to
-the GPU. Set `LLM_API_KEY` in `.env` before starting it. The OpenAI-compatible
-endpoint is:
+llama.cpp server image. Settings are in `config/llama/config.yaml`. Llama is
+optional; start it with `docker compose --profile llama up -d llama`. Set
+`LLM_API_KEY` in `.env` before starting it. The OpenAI-compatible endpoint is:
 
 ```text
 http://localhost:8080/v1/chat/completions
 ```
 
-The OKF worker container uses `http://llama:8080/v1`; a worker started directly
-on the host uses `http://localhost:8080/v1`.
+The OKF worker uses `http://llama:8080/v1` when the llama profile is running; a
+worker started directly on the host uses `http://localhost:8080/v1`.
 
 Set `model` in `config/llama/config.yaml` to use another filename. Test it from
 PowerShell:
