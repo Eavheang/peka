@@ -61,7 +61,7 @@ services:
       FILE_STORAGE_DIR: /app/storage
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-worker-only-secret-that-is-at-least-32-characters}
       LLM_BASE_URL: http://llama:8080/v1
-      LLM_API_KEY: ${LLM_API_KEY:?Set LLM_API_KEY in config/.env}
+      LLM_API_KEY: ${LLM_API_KEY:-}
       LLM_MODEL: local
       EMBEDDING_BASE_URL: http://embeddings:80/v1
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-BAAI/bge-large-en-v1.5}
@@ -70,8 +70,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      llama:
-        condition: service_started
       embeddings:
         condition: service_healthy
     volumes:
@@ -94,10 +92,11 @@ services:
     restart: unless-stopped
 
   llama:
+    profiles: ["llama"]
     image: ghcr.io/ggml-org/llama.cpp:server-cuda
     gpus: all
     environment:
-      LLM_API_KEY: ${LLM_API_KEY:?Set LLM_API_KEY in config/.env}
+      LLM_API_KEY: ${LLM_API_KEY:-}
     volumes:
       - ./model:/models:ro
       - ./llama/config.yaml:/config/config.yaml:ro
