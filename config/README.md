@@ -32,9 +32,10 @@ normal source-code changes automatically.
 
 Uploaded documents are extracted immediately. The `okf-worker` processes queued
 OKF conversions one at a time and retries failed conversions up to three times.
-It parses OKF headings, sends sections to the local CPU-hosted BGE-M3 embedding
+It parses OKF headings, sends sections to the GPU-hosted BGE-M3 embedding
 service, and stores 1024-dimensional vectors in PostgreSQL with pgvector. BGE-M3
-runs on CPU because the configured 6 GB GPU is reserved for llama.cpp.
+runs on the GPU through the CUDA TEI image. Start Docker with NVIDIA Container
+Toolkit installed and a compatible NVIDIA driver.
 
 
 Open:
