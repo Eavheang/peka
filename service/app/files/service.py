@@ -18,6 +18,9 @@ class DuplicateFileError(ValueError):
     pass
 
 
+class FileTooLargeError(ValueError):
+    pass
+
 class OKFJobStateError(ValueError):
     pass
 
@@ -50,8 +53,14 @@ def store_files(uploads: list[UploadFile], author_id: UUID) -> list[dict]:
             saved_paths.append(destination)
             with output:
                 digest = sha256()
+                size = 0
                 chunk = upload.file.read(1024 * 1024)
                 while chunk:
+                    size += len(chunk)
+                    if size > settings.max_upload_bytes:
+                        raise FileTooLargeError(
+                            f"{name} exceeds the {settings.max_upload_bytes // (1024 * 1024)} MB limit"
+                        )
                     digest.update(chunk)
                     output.write(chunk)
                     chunk = upload.file.read(1024 * 1024)

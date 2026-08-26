@@ -16,6 +16,7 @@ const refreshClient = axios.create({
 axiosInstance.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const accessToken = getStoredToken("peka_access_token");
   if (accessToken) config.headers.Authorization = `Bearer ${accessToken}`;
+  if (config.data instanceof FormData) delete config.headers["Content-Type"];
   return config;
 });
 
