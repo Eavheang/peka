@@ -20,7 +20,10 @@ export function PublicNavigation() {
           peka
         </Link>
         <div className="flex items-center gap-4">
-          <Link className={cn(buttonVariants({ variant: "default", size: "sm" }))} href="/workspace">
+          <Link
+            className={cn(buttonVariants({ variant: "default", size: "lg" }))}
+            href="/workspace"
+          >
             Open workspace
           </Link>
         </div>

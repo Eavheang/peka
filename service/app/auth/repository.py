@@ -21,6 +21,11 @@ class AuthRepository:
                 "SELECT id, email, role, token_version, is_active FROM users WHERE id = %s",
                 (user_id,),
             ).fetchone()
+    def list(self) -> list[dict]:
+        with get_connection() as connection:
+            return connection.execute(
+                "SELECT id, email, role, is_active FROM users ORDER BY created_at",
+            ).fetchall()
 
     def create(self, email: str, password_hash: str, role: str) -> dict:
         try:

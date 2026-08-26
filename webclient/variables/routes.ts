@@ -1,13 +1,12 @@
 import type { LucideIcon } from "lucide-react";
-import { Files, FolderKanban, LayoutDashboard, Settings } from "lucide-react";
+import { Shield, SquarePen } from "lucide-react";
 
 import type { UserRole } from "@/interface/auth";
 
 export const ROUTE = {
   WORKSPACE: "/workspace",
-  DOCUMENTS: "/workspace/documents",
-  PROJECTS: "/workspace/projects",
   SETTINGS: "/workspace/settings",
+  ADMIN: "/workspace/admin",
 } as const;
 
 export type WorkspaceRoute = {
@@ -19,27 +18,15 @@ export type WorkspaceRoute = {
 
 export const Routes: WorkspaceRoute[] = [
   {
-    icon: LayoutDashboard,  
+    icon: SquarePen,
     path: ROUTE.WORKSPACE,
-    title: "Overview",
+    title: "New chat",
     roles: ["admin", "senior", "staff"],
   },
-  { icon: Files, path: ROUTE.DOCUMENTS, title: "Documents", roles: ["admin", "senior", "staff"] },
   {
-    icon: FolderKanban,
-    path: ROUTE.PROJECTS,
-    title: "Projects",
-    roles: ["admin", "senior", "staff"],
+    icon: Shield,
+    path: ROUTE.ADMIN,
+    title: "Admin",
+    roles: ["admin"],
   },
 ];
-
-export const ProxyProtectedRoutes: WorkspaceRoute[] = [
-  ...Routes,
-  { icon: Settings, path: ROUTE.SETTINGS, title: "Settings", roles: ["admin", "senior", "staff"] },
-];
-
-export function resolveRouteForPathname(pathname: string) {
-  return Routes.filter(
-    (route) => pathname === route.path || pathname.startsWith(`${route.path}/`),
-  ).sort((a, b) => b.path.length - a.path.length)[0];
-}

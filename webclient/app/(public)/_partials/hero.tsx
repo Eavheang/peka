@@ -33,7 +33,7 @@ function renderStepContent(step: (typeof STEPS)[number], index: number, isTrigge
       {step.cta ? (
         <nav aria-label="Landing actions" className="flex flex-wrap gap-3">
           <Link
-            className={cn(buttonVariants({ variant: "default", size: "default" }))}
+            className={cn(buttonVariants({ variant: "default", size: "lg" }), "rounded-lg")}
             href="/sign-in"
           >
             Start with Peka -&gt;

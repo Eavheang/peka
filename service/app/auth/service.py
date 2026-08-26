@@ -34,6 +34,9 @@ def create_user(data: UserCreate) -> dict:
 def current_user(user_id: UUID) -> dict | None:
     return auth_repository.find_by_id(user_id)
 
+def list_users() -> list[dict]:
+    return auth_repository.list()
+
 
 def set_user_active(user_id: UUID, is_active: bool) -> dict:
     user = auth_repository.set_active(user_id, is_active)
