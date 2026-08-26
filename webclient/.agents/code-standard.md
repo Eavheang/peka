@@ -29,6 +29,13 @@ avoid_when:
 * Reuse shared primitives for repeated page concerns such as headings.
 * Use repository-provided wrappers for lint/typecheck when available.
 
+### Styling
+
+* Prefer Tailwind's standard spacing, sizing, typography, and radius utilities.
+* Avoid arbitrary pixel values such as `rounded-[9px]`; use `rounded-lg`, `px-4`,
+  or the closest standard utility. Use arbitrary values only for intentional
+  responsive or brand-specific values with no suitable scale utility.
+
 ## Details
 
 ### File and directory naming

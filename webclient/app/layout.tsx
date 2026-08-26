@@ -1,22 +1,23 @@
-import type { Metadata } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
-import '@/app/globals.css';
+import type { Metadata } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
+import { Providers } from "@/components/providers";
+import "@/app/globals.css";
 
 const geistSans = Geist({
-  variable: '--font-geist-sans',
-  subsets: ['latin'],
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
 });
 
 const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin'],
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
 });
 
 export const metadata: Metadata = {
-  title: 'PEKA',
-  description: 'PEKA - Personal Knowledge Base',
+  title: "PEKA",
+  description: "PEKA - Personal Knowledge Base",
   icons: {
-    icon: '/peka.svg',
+    icon: "/peka.svg",
   },
 };
 
@@ -26,9 +27,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang='en' className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
-      <body className='min-h-full flex flex-col'>
-        {children}
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+      <body className="min-h-full flex flex-col">
+        <Providers>{children}</Providers>
       </body>
     </html>
   );
