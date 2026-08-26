@@ -5,8 +5,8 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.auth.repository import auth_repository
-from app.auth.schemas import LoginRequest, TokenResponse, UserActivationUpdate, UserCreate, UserResponse
-from app.auth.security import create_access_token, decode_access_token
+from app.auth.schemas import LoginRequest, RefreshRequest, TokenResponse, UserActivationUpdate, UserCreate, UserResponse
+from app.auth.security import create_access_token, create_refresh_token, decode_access_token, decode_refresh_token
 from app.auth.service import (
     UserHasRelatedRecordsError,
     UserMustBeInactiveError,
@@ -54,6 +54,21 @@ def login(data: LoginRequest) -> dict:
     if user is None:
         raise unauthorized()
     return {"access_token": create_access_token(str(user["id"]), user["role"], user["token_version"]),
+            "refresh_token": create_refresh_token(str(user["id"]), user["role"], user["token_version"]),
+            "token_type": "bearer", "expires_in": settings.jwt_access_token_expire_minutes * 60}
+
+
+@router.post("/refresh", response_model=TokenResponse)
+def refresh(data: RefreshRequest) -> dict:
+    try:
+        claims = decode_refresh_token(data.refresh_token)
+        user = current_user(UUID(claims["sub"]))
+    except (jwt.PyJWTError, ValueError):
+        raise unauthorized() from None
+    if user is None or not user["is_active"] or user["token_version"] != claims["ver"] or user["role"] != claims["role"]:
+        raise unauthorized()
+    return {"access_token": create_access_token(str(user["id"]), user["role"], user["token_version"]),
+            "refresh_token": create_refresh_token(str(user["id"]), user["role"], user["token_version"]),
             "token_type": "bearer", "expires_in": settings.jwt_access_token_expire_minutes * 60}
 
 
