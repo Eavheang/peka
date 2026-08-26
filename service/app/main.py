@@ -1,13 +1,13 @@
 import logging
 from contextlib import asynccontextmanager
 
-import fastapi
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app import routers
-from app.config import settings
 from app.auth.repository import auth_repository
 from app.auth.security import hash_password
+from app.config import settings
 from app.engine.okf.worker import run_worker_in_thread
 
 
@@ -25,8 +25,18 @@ async def lifespan(_: FastAPI):
     if worker_thread.is_alive():
         logging.getLogger(__name__).warning("OKF worker did not stop cleanly")
 
-
 app = FastAPI(title=settings.app_name, debug=settings.debug, lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://localhost:3002",
+    ],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
+)
 
 for router in routers:
     app.include_router(router)

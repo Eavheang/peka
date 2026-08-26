@@ -40,7 +40,7 @@ Toolkit installed and a compatible NVIDIA driver.
 
 Open:
 
-- Webclient: http://localhost:3000
+- Webclient: http://localhost:3000 (or `http://localhost:3001` when port 3000 is occupied)
 - API: http://localhost:8000
 - API docs: http://localhost:8000/docs
 - llama.cpp API: http://localhost:8080
