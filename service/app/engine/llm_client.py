@@ -22,5 +22,7 @@ def chat_completion(messages: list[dict], *, json_mode: bool = False, timeout: i
         )
         response.raise_for_status()
         return response.json()["choices"][0]["message"]["content"]
+    except httpx.HTTPStatusError as error:
+        raise LLMError(f"LLM request failed with HTTP {error.response.status_code}") from error
     except (httpx.HTTPError, KeyError, IndexError, TypeError, ValueError) as error:
         raise LLMError("Unable to complete LLM request") from error

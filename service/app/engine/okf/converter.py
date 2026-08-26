@@ -4,7 +4,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from app.config import settings
-from app.engine.llm_client import chat_completion
+from app.engine.llm_client import LLMError, chat_completion
 from app.engine.okf.file_writer import write_okf_files
 
 
@@ -23,8 +23,8 @@ def convert_to_okf(extraction: dict, base_dir: Path) -> dict:
             ],
             json_mode=True,
         )
-    except RuntimeError as error:
-        raise OKFConversionError("Unable to generate OKF output") from error
+    except LLMError as error:
+        raise OKFConversionError(str(error)) from error
 
     try:
         result = json.loads(content, strict=False)
