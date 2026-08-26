@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useMotionValueEvent, useScroll } from "framer-motion";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 
@@ -51,40 +52,35 @@ function renderStepContent(step: (typeof STEPS)[number], index: number, isTrigge
 export function PublicHero() {
   const [activeStep, setActiveStep] = useState(0);
   const stepRefs = useRef<Array<HTMLElement | null>>([]);
+  const { scrollY } = useScroll();
+
+  const updateActiveStep = () => {
+    const viewportCenter = window.innerHeight / 2;
+    let closestStep = 0;
+    let closestDistance = Number.POSITIVE_INFINITY;
+
+    stepRefs.current.forEach((step, index) => {
+      if (!step) return;
+
+      const rect = step.getBoundingClientRect();
+      const distance = Math.abs(rect.top + rect.height / 2 - viewportCenter);
+
+      if (distance < closestDistance) {
+        closestStep = index;
+        closestDistance = distance;
+      }
+    });
+
+    setActiveStep((currentStep) => (currentStep === closestStep ? currentStep : closestStep));
+  };
+
+  useMotionValueEvent(scrollY, "change", updateActiveStep);
 
   useEffect(() => {
-    let frame = 0;
-
-    const updateActiveStep = () => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => {
-        const viewportCenter = window.innerHeight / 2;
-        let closestStep = 0;
-        let closestDistance = Number.POSITIVE_INFINITY;
-
-        stepRefs.current.forEach((step, index) => {
-          if (!step) return;
-
-          const rect = step.getBoundingClientRect();
-          const distance = Math.abs(rect.top + rect.height / 2 - viewportCenter);
-
-          if (distance < closestDistance) {
-            closestStep = index;
-            closestDistance = distance;
-          }
-        });
-
-        setActiveStep((currentStep) => (currentStep === closestStep ? currentStep : closestStep));
-      });
-    };
-
     updateActiveStep();
-    window.addEventListener("scroll", updateActiveStep, { passive: true });
     window.addEventListener("resize", updateActiveStep);
 
     return () => {
-      cancelAnimationFrame(frame);
-      window.removeEventListener("scroll", updateActiveStep);
       window.removeEventListener("resize", updateActiveStep);
     };
   }, []);

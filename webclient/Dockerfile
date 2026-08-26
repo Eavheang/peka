@@ -8,6 +8,8 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
 COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile --force
+COPY . .
+RUN bun run build
 
 FROM oven/bun:1-alpine AS runner
 
