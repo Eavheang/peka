@@ -30,7 +30,7 @@ def test_embed_chunks_batches_and_preserves_response_order(monkeypatch):
 
     monkeypatch.setattr(embeddings.httpx, "post", post)
     monkeypatch.setattr(embeddings.settings, "embedding_base_url", "http://embeddings:80/v1")
-    monkeypatch.setattr(embeddings.settings, "embedding_model", "BAAI/bge-m3")
+    monkeypatch.setattr(embeddings.settings, "embedding_model", "BAAI/bge-small-en-v1.5")
     monkeypatch.setattr(embeddings.settings, "embedding_dimensions", 3)
     monkeypatch.setattr(embeddings.settings, "embedding_batch_size", 2)
 

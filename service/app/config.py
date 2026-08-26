@@ -13,9 +13,9 @@ class Settings(BaseSettings):
     llm_api_key: SecretStr | None = None
     llm_model: str = "local"
     embedding_base_url: str = "http://localhost:8081/v1"
-    embedding_model: str = "BAAI/bge-m3"
-    embedding_dimensions: int = 1024
-    embedding_batch_size: int = 16
+    embedding_model: str = "BAAI/bge-small-en-v1.5"
+    embedding_dimensions: int = 384
+    embedding_batch_size: int = 1
     search_top_k: int = 5
     search_similarity_floor: float = 0.3
     jwt_secret_key: SecretStr

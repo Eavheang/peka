@@ -27,4 +27,4 @@ class KnowledgeChunk(Base):
     source_locations: Mapped[list[dict]] = mapped_column(
         JSONB, nullable=False, server_default=text("'[]'::jsonb")
     )
-    embedding: Mapped[list[float]] = mapped_column(Vector(1024), nullable=False)
+    embedding: Mapped[list[float]] = mapped_column(Vector(384), nullable=False)
