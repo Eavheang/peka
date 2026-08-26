@@ -28,4 +28,3 @@ Read matching `.agents/*.md` guidance before working in these areas:
 ## Next.js
 
 Next.js 16.2.10 has breaking changes from older versions. Before changing framework APIs or conventions, check relevant guidance under `node_modules/next/dist/docs/` when available and heed deprecation notices.
-

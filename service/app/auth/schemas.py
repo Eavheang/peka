@@ -22,10 +22,12 @@ class LoginRequest(BaseModel):
 
 class TokenResponse(BaseModel):
     access_token: str
+    refresh_token: str
     token_type: str
     expires_in: int
 
-
+class RefreshRequest(BaseModel):
+    refresh_token: str = Field(min_length=1)
 class UserCreate(LoginRequest):
     password: str = Field(min_length=12, max_length=1024)
     role: Role = "staff"

@@ -21,6 +21,8 @@ export default function SignInPage() {
     login.mutate(values, {
       onSuccess: (tokens) => {
         sessionStorage.setItem("peka_access_token", tokens.access_token);
+        sessionStorage.setItem("peka_refresh_token", tokens.refresh_token);
+        document.cookie = `peka_access_token=${encodeURIComponent(tokens.access_token)}; Max-Age=${tokens.expires_in}; Path=/; SameSite=Lax`;
         router.push("/workspace");
       },
     });
@@ -42,21 +44,15 @@ export default function SignInPage() {
           peka
         </div>
         <blockquote className="my-16 max-w-xl text-[clamp(2.375rem,5vw,4.0625rem)] leading-[0.97] tracking-[-0.08em]">
-          Good answers start with{" "}
-          <em className="text-success not-italic">the right context.</em>
+          Good answers start with <em className="text-success not-italic">the right context.</em>
         </blockquote>
         <footer className="font-mono text-[11px] text-[#9ba19a]">
           LOCAL RETRIEVAL / EXPLAINABLE RESPONSES / LESS GUESSING
         </footer>
       </section>
       <section className="grid place-items-center px-7 py-8">
-        <form
-          className="w-full max-w-xl"
-          onSubmit={handleSubmit(submit)}
-        >
-          <p className="font-mono text-xs uppercase tracking-[0.16em] text-primary">
-            Welcome back
-          </p>
+        <form className="w-full max-w-xl" onSubmit={handleSubmit(submit)}>
+          <p className="font-mono text-xs uppercase tracking-[0.16em] text-primary">Welcome back</p>
           <h1 className="mt-3 text-[34px] leading-none tracking-[-0.07em]">
             Enter your workspace.
           </h1>
@@ -91,11 +87,15 @@ export default function SignInPage() {
             />
             <small className="min-h-4 text-xs text-danger">{errors.password?.message}</small>
           </div>
-          {login.isError && (
-            <p className="mt-1 text-xs text-danger">Invalid email or password.</p>
-          )}
+          {login.isError && <p className="mt-1 text-xs text-danger">Invalid email or password.</p>}
           <Button className="mt-5 w-full" type="submit" disabled={login.isPending}>
-            {login.isPending ? "Signing in..." : <>Continue <ArrowRight aria-hidden="true" size={16} /></>}
+            {login.isPending ? (
+              "Signing in..."
+            ) : (
+              <>
+                Continue <ArrowRight aria-hidden="true" size={16} />
+              </>
+            )}
           </Button>
           <button
             className="mt-6 inline-flex items-center gap-1 border-0 bg-transparent p-0 text-sm text-muted hover:text-primary"

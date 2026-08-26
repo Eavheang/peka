@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     search_similarity_floor: float = 0.3
     jwt_secret_key: SecretStr
     jwt_access_token_expire_minutes: int = 30
+    jwt_refresh_token_expire_days: int = 30
     jwt_issuer: str = "peka-service"
     jwt_audience: str = "peka-api"
     admin_email: str | None = None
@@ -29,6 +30,8 @@ class Settings(BaseSettings):
     def validate_auth(self) -> "Settings":
         if len(self.jwt_secret_key.get_secret_value()) < 32:
             raise ValueError("JWT_SECRET_KEY must be at least 32 characters")
+        if not 1 <= self.jwt_refresh_token_expire_days <= 365:
+            raise ValueError("JWT_REFRESH_TOKEN_EXPIRE_DAYS must be between 1 and 365")
         if not 1 <= self.jwt_access_token_expire_minutes <= 60:
             raise ValueError("JWT_ACCESS_TOKEN_EXPIRE_MINUTES must be between 1 and 60")
         if (self.admin_email is None) != (self.admin_password is None):
