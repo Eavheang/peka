@@ -19,7 +19,7 @@ export type WorkspaceRoute = {
 
 export const Routes: WorkspaceRoute[] = [
   {
-    icon: LayoutDashboard,
+    icon: LayoutDashboard,  
     path: ROUTE.WORKSPACE,
     title: "Overview",
     roles: ["admin", "senior", "staff"],

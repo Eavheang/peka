@@ -1,28 +1,35 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import { ArrowLeft, ArrowRight, Eye, EyeOff } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import type { LoginFormValues } from "@/interface/auth";
 import { useLogin } from "@/services/auth";
+import { storeAuthTokens } from "@/utils/auth-storage";
+
+type SignInFormValues = LoginFormValues & {
+  rememberMe: boolean;
+};
 
 export default function SignInPage() {
   const router = useRouter();
+  const [showPassword, setShowPassword] = useState(false);
   const {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<LoginFormValues>();
+  } = useForm<SignInFormValues>({
+    defaultValues: { rememberMe: false },
+  });
   const login = useLogin();
 
-  function submit(values: LoginFormValues) {
-    login.mutate(values, {
+  function submit({ rememberMe, ...credentials }: SignInFormValues) {
+    login.mutate(credentials, {
       onSuccess: (tokens) => {
-        sessionStorage.setItem("peka_access_token", tokens.access_token);
-        sessionStorage.setItem("peka_refresh_token", tokens.refresh_token);
-        document.cookie = `peka_access_token=${encodeURIComponent(tokens.access_token)}; Max-Age=${tokens.expires_in}; Path=/; SameSite=Lax`;
+        storeAuthTokens(tokens, rememberMe);
         router.push("/workspace");
       },
     });
@@ -32,9 +39,9 @@ export default function SignInPage() {
     <main className="grid min-h-screen bg-background lg:grid-cols-[1fr_0.85fr]">
       <section className="flex flex-col justify-between bg-panel px-[5vw] py-10 text-panel-foreground">
         <div className="flex items-center gap-2 text-xl font-bold tracking-[-0.06em]">
-          <span className="grid size-7 place-items-center rounded-full bg-primary">
+          <span className="grid size-7 place-items-center rounded-full bg-background">
             <Image
-              className="size-5 brightness-0 invert"
+              className="size-5 "
               src="/peka.svg"
               alt=""
               width={20}
@@ -77,16 +84,41 @@ export default function SignInPage() {
             <label className="text-xs font-bold" htmlFor="password">
               Password
             </label>
-            <input
-              className="rounded-lg border border-border bg-background px-3.5 py-3 text-foreground outline-none focus:border-primary focus:ring-4 focus:ring-primary/15"
-              id="password"
-              type="password"
-              placeholder="Your password"
-              autoComplete="current-password"
-              {...register("password", { required: "Password is required" })}
-            />
+            <div className="relative">
+              <input
+                className="w-full rounded-lg border border-border bg-background px-3.5 py-3 pr-11 text-foreground outline-none focus:border-primary focus:ring-4 focus:ring-primary/15"
+                id="password"
+                type={showPassword ? "text" : "password"}
+                placeholder="Your password"
+                autoComplete="current-password"
+                {...register("password", { required: "Password is required" })}
+              />
+              <button
+                className="absolute inset-y-0 right-0 grid w-11 place-items-center text-muted hover:text-foreground"
+                type="button"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                aria-pressed={showPassword}
+                title={showPassword ? "Hide password" : "Show password"}
+                onClick={() => setShowPassword((visible) => !visible)}
+              >
+                {showPassword ? (
+                  <EyeOff aria-hidden="true" size={17} />
+                ) : (
+                  <Eye aria-hidden="true" size={17} />
+                )}
+              </button>
+            </div>
             <small className="min-h-4 text-xs text-danger">{errors.password?.message}</small>
           </div>
+          <label className="mt-2 inline-flex items-center gap-2 text-sm text-muted" htmlFor="remember-me">
+            <input
+              className="size-4 accent-primary"
+              id="remember-me"
+              type="checkbox"
+              {...register("rememberMe")}
+            />
+            Remember me
+          </label>
           {login.isError && <p className="mt-1 text-xs text-danger">Invalid email or password.</p>}
           <Button className="mt-5 w-full" type="submit" disabled={login.isPending}>
             {login.isPending ? (

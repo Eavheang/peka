@@ -38,9 +38,6 @@ function renderStepContent(step: (typeof STEPS)[number], index: number, isTrigge
           >
             Start with Peka -&gt;
           </Link>
-          <Link className={cn(buttonVariants({ variant: "outline" }))} href="/#how-it-works">
-            See the flow
-          </Link>
         </nav>
       ) : (
         <p className="font-mono text-xs text-muted">
