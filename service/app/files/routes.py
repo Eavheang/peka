@@ -10,6 +10,7 @@ from app.files.schemas import AccessLevelUpdate, FileResponse, OKFStatusResponse
 from app.files import service as files_service
 from app.files.service import (
     DuplicateFileError,
+    FileTooLargeError,
     OKFJobStateError,
     delete_file,
     find_file,
@@ -29,6 +30,8 @@ def upload_files(
 ) -> list[dict]:
     try:
         return store_files(files, user["id"])
+    except FileTooLargeError as error:
+        raise HTTPException(status_code=413, detail=str(error)) from None
     except DuplicateFileError as error:
         raise HTTPException(status_code=409, detail=str(error)) from None
     except ValueError as error:

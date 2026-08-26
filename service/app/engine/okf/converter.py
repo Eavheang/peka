@@ -27,7 +27,7 @@ def convert_to_okf(extraction: dict, base_dir: Path) -> dict:
         raise OKFConversionError("Unable to generate OKF output") from error
 
     try:
-        result = json.loads(content)
+        result = json.loads(content, strict=False)
     except (json.JSONDecodeError, TypeError) as error:
         raise OKFConversionError("LLM returned invalid JSON") from error
 

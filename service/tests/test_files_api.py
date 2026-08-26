@@ -192,3 +192,21 @@ def test_upload_rejects_duplicate_content(client, monkeypatch, tmp_path):
 
     assert response.status_code == 409
     assert not list(tmp_path.rglob("*.pdf"))
+
+
+def test_upload_rejects_oversized_files_without_saving(client, monkeypatch, tmp_path):
+    account = {"id": uuid4(), "email": "user@example.com", "role": "staff",
+               "token_version": 0, "is_active": True}
+    token = auth_routes.create_access_token(str(account["id"]), account["role"], account["token_version"])
+    monkeypatch.setattr(auth_routes, "current_user", lambda user_id: account)
+    monkeypatch.setattr(service.settings, "file_storage_dir", tmp_path)
+    monkeypatch.setattr(service.settings, "max_upload_bytes", 4)
+
+    response = client.post(
+        "/files",
+        headers={"Authorization": f"Bearer {token}"},
+        files={"files": ("notes.txt", b"notes", "text/plain")},
+    )
+
+    assert response.status_code == 413
+    assert not list(tmp_path.rglob("*.txt"))

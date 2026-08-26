@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     debug: bool = False
     database_url: str = "postgresql://peka:peka_dev_password@localhost:5432/peka"
     file_storage_dir: Path = Path("storage")
+    max_upload_bytes: int = 25 * 1024 * 1024
     llm_base_url: str = "http://localhost:8080/v1"
     llm_api_key: SecretStr | None = None
     llm_model: str = "local"
