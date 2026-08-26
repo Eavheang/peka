@@ -15,6 +15,7 @@ from app.auth.service import (
     create_user,
     current_user,
     delete_user,
+    list_users,
     set_user_active,
 )
 from app.config import settings
@@ -81,6 +82,9 @@ def logout(user: dict = Depends(authenticated)) -> Response:
 @router.get("/me", response_model=UserResponse)
 def me(user: dict = Depends(authenticated)) -> dict:
     return user
+@router.get("/users", response_model=list[UserResponse])
+def get_users(_: dict = Depends(admin_only)) -> list[dict]:
+    return list_users()
 
 
 @router.post("/users", response_model=UserResponse, status_code=status.HTTP_201_CREATED)

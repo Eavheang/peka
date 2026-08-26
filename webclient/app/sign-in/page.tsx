@@ -6,6 +6,8 @@ import { ArrowLeft, ArrowRight, Eye, EyeOff } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { toast } from "@/components/ui/toast";
 import type { LoginFormValues } from "@/interface/auth";
 import { useLogin } from "@/services/auth";
 import { storeAuthTokens } from "@/utils/auth-storage";
@@ -25,13 +27,14 @@ export default function SignInPage() {
     defaultValues: { rememberMe: false },
   });
   const login = useLogin();
-
   function submit({ rememberMe, ...credentials }: SignInFormValues) {
     login.mutate(credentials, {
       onSuccess: (tokens) => {
         storeAuthTokens(tokens, rememberMe);
+        toast.add({ title: "Signed in.", type: "success" });
         router.push("/workspace");
       },
+      onError: () => toast.add({ title: "Invalid email or password.", type: "error" }),
     });
   }
 
@@ -40,13 +43,7 @@ export default function SignInPage() {
       <section className="flex flex-col justify-between bg-panel px-[5vw] py-10 text-panel-foreground">
         <div className="flex items-center gap-2 text-xl font-bold tracking-[-0.06em]">
           <span className="grid size-7 place-items-center rounded-full bg-background">
-            <Image
-              className="size-5 "
-              src="/peka.svg"
-              alt=""
-              width={20}
-              height={20}
-            />
+            <Image className="size-5 " src="/peka.svg" alt="" width={20} height={20} />
           </span>
           peka
         </div>
@@ -70,8 +67,8 @@ export default function SignInPage() {
             <label className="text-xs font-bold" htmlFor="email">
               Work email
             </label>
-            <input
-              className="rounded-lg border border-border bg-background px-3.5 py-3 text-foreground outline-none focus:border-primary focus:ring-4 focus:ring-primary/15"
+            <Input
+              className="rounded-lg px-3.5 py-3"
               id="email"
               type="email"
               placeholder="you@company.com"
@@ -85,8 +82,8 @@ export default function SignInPage() {
               Password
             </label>
             <div className="relative">
-              <input
-                className="w-full rounded-lg border border-border bg-background px-3.5 py-3 pr-11 text-foreground outline-none focus:border-primary focus:ring-4 focus:ring-primary/15"
+              <Input
+                className="w-full rounded-lg px-3.5 py-3 pr-11"
                 id="password"
                 type={showPassword ? "text" : "password"}
                 placeholder="Your password"
@@ -110,9 +107,12 @@ export default function SignInPage() {
             </div>
             <small className="min-h-4 text-xs text-danger">{errors.password?.message}</small>
           </div>
-          <label className="mt-2 inline-flex items-center gap-2 text-sm text-muted" htmlFor="remember-me">
-            <input
-              className="size-4 accent-primary"
+          <label
+            className="mt-2 inline-flex items-center gap-2 text-sm text-muted"
+            htmlFor="remember-me"
+          >
+            <Input
+              className="size-4 h-4 w-4 rounded accent-primary p-0 shadow-none"
               id="remember-me"
               type="checkbox"
               {...register("rememberMe")}
@@ -120,7 +120,7 @@ export default function SignInPage() {
             Remember me
           </label>
           {login.isError && <p className="mt-1 text-xs text-danger">Invalid email or password.</p>}
-          <Button className="mt-5 w-full" type="submit" disabled={login.isPending}>
+          <Button className="mt-5 w-full" type="submit" disabled={login.isPending} size="lg">
             {login.isPending ? (
               "Signing in..."
             ) : (
@@ -129,14 +129,15 @@ export default function SignInPage() {
               </>
             )}
           </Button>
-          <button
-            className="mt-6 inline-flex items-center gap-1 border-0 bg-transparent p-0 text-sm text-muted hover:text-primary"
+          <Button
+            className="mt-6 inline-flex h-auto items-center gap-1 border-0 bg-transparent p-0 text-sm text-muted hover:bg-transparent hover:text-primary"
             type="button"
+            variant="outline"
             onClick={() => router.push("/")}
           >
             <ArrowLeft aria-hidden="true" size={15} />
             Back to peka
-          </button>
+          </Button>
         </form>
       </section>
     </main>

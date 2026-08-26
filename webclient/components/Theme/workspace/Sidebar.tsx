@@ -6,20 +6,9 @@ import { useState } from "react";
 import { ChevronsLeft, ChevronsRight, LogOut, Settings, Sparkles, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import Alertdialog from "@/components/Alertdialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import {
-  Drawer,
-  DrawerClose,
-  DrawerContent,
-  DrawerTitle,
-} from "@/components/ui/drawer";
+import { Drawer, DrawerClose, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
 import type { UserResponse } from "@/interface/auth";
 import { useLogout } from "@/services/auth";
 import { clearAuthStorage, getStoredToken } from "@/utils/auth-storage";
@@ -44,7 +33,6 @@ export function WorkspaceSidebar({
   const visibleRoutes = Routes.filter((route) => user && route.roles.includes(user.role));
   const displayName = user?.email.split("@")[0] ?? "Workspace";
   const initial = displayName.charAt(0).toUpperCase();
-
 
   function handleLogout() {
     const accessToken = getStoredToken("peka_access_token");
@@ -92,7 +80,10 @@ export function WorkspaceSidebar({
             )}
           </button>
         </div>
-        <nav aria-label="Workspace navigation" className="flex-1 space-y-1 overflow-y-auto px-3 py-5">
+        <nav
+          aria-label="Workspace navigation"
+          className="flex-1 space-y-1 overflow-y-auto px-3 py-5"
+        >
           <p
             className={`px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/45 ${collapsed ? "sr-only" : ""}`}
           >
@@ -185,7 +176,9 @@ export function WorkspaceSidebar({
                 <p className="truncate text-xs text-white/45">{user?.role ?? "Loading profile"}</p>
               </div>
             )}
-            {!collapsed && <Sparkles aria-hidden="true" className="ml-auto text-primary" size={15} />}
+            {!collapsed && (
+              <Sparkles aria-hidden="true" className="ml-auto text-primary" size={15} />
+            )}
           </div>
         </div>
       </aside>
@@ -196,7 +189,10 @@ export function WorkspaceSidebar({
               <Image src="/peka.svg" alt="" aria-hidden="true" width={21} height={21} />
               peka
             </DrawerTitle>
-            <DrawerClose aria-label="Close workspace navigation" className="rounded-md p-2 hover:bg-white/10">
+            <DrawerClose
+              aria-label="Close workspace navigation"
+              className="rounded-md p-2 hover:bg-white/10"
+            >
               <X aria-hidden="true" size={18} />
             </DrawerClose>
           </div>
@@ -241,29 +237,15 @@ export function WorkspaceSidebar({
           </div>
         </DrawerContent>
       </Drawer>
-      <Dialog open={logoutOpen} onOpenChange={setLogoutOpen}>
-        <DialogContent className="top-1/2 left-1/2 w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-xl border border-border bg-background p-6 text-foreground shadow-xl">
-          <div>
-            <DialogTitle>Log out?</DialogTitle>
-          </div>
-          <DialogDescription className="mt-3">
-            End your current workspace session?
-          </DialogDescription>
-          <div className="mt-8 flex gap-3">
-            <DialogClose className="flex-1 rounded-md border border-border px-4 py-2.5 text-sm hover:bg-secondary">
-              Cancel
-            </DialogClose>
-            <button
-              className="flex-1 rounded-md bg-danger px-4 py-2.5 text-sm text-danger-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-              type="button"
-              disabled={logout.isPending}
-              onClick={handleLogout}
-            >
-              {logout.isPending ? "Logging out..." : "Log out"}
-            </button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <Alertdialog
+        open={logoutOpen}
+        onOpenChange={setLogoutOpen}
+        title="Log out?"
+        description="End your current workspace session?"
+        confirmLabel="Log out"
+        onConfirm={handleLogout}
+        pending={logout.isPending}
+      />
     </>
   );
 }
