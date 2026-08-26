@@ -4,10 +4,12 @@ setup:
 	@test -f .env || cp .env.example .env
 	docker compose -f compose.yaml -f compose.dev.yaml up -d --build postgres pgadmin service embeddings okf-worker
 	docker compose -f compose.yaml -f compose.dev.yaml run --rm webclient bun install --frozen-lockfile
+	docker compose -f compose.yaml -f compose.dev.yaml run --rm webclient rm -rf .next
 	docker compose -f compose.yaml -f compose.dev.yaml up -d webclient
 	$(MAKE) migrate
 
 up:
+	docker compose -f compose.yaml -f compose.dev.yaml run --rm webclient rm -rf .next
 	docker compose -f compose.yaml -f compose.dev.yaml up -d
 
 migrate:

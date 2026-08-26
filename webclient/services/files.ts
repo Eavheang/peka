@@ -1,18 +1,20 @@
-'use client';
+"use client";
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import type { StoredFile } from '@/interface/files';
-import axiosInstance from '@/utils/axios';
+import type { StoredFile } from "@/interface/files";
+import axiosInstance from "@/utils/axios";
 
-const filesKey = ['files', 'list'];
+const filesKey = ["files", "list"];
 
 export function useListFiles() {
   return useQuery<StoredFile[]>({
     queryKey: filesKey,
-    queryFn: async () => (await axiosInstance.get<StoredFile[]>('/files')).data,
+    queryFn: async () => (await axiosInstance.get<StoredFile[]>("/files")).data,
     refetchInterval: (query) =>
-      query.state.data?.some((file) => file.okf_status === 'queued' || file.okf_status === 'processing')
+      query.state.data?.some(
+        (file) => file.okf_status === "queued" || file.okf_status === "processing",
+      )
         ? 3000
         : false,
   });
@@ -23,8 +25,8 @@ export function useUploadFiles() {
   return useMutation({
     mutationFn: async (files: File[]) => {
       const formData = new FormData();
-      files.forEach((file) => formData.append('files', file));
-      return (await axiosInstance.post<StoredFile[]>('/files', formData)).data;
+      files.forEach((file) => formData.append("files", file));
+      return (await axiosInstance.post<StoredFile[]>("/files", formData)).data;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: filesKey }),
   });
@@ -33,7 +35,8 @@ export function useUploadFiles() {
 export function useRetryFile() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (id: string) => (await axiosInstance.post<StoredFile>(`/files/${id}/retry-okf`)).data,
+    mutationFn: async (id: string) =>
+      (await axiosInstance.post<StoredFile>(`/files/${id}/retry-okf`)).data,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: filesKey }),
   });
 }
@@ -47,11 +50,11 @@ export function useDeleteFile() {
 }
 
 export async function downloadFile(file: StoredFile) {
-  const response = await axiosInstance.get<Blob>(`/files/${file.id}`, { responseType: 'blob' });
+  const response = await axiosInstance.get<Blob>(`/files/${file.id}`, { responseType: "blob" });
   const url = URL.createObjectURL(response.data);
-  const link = document.createElement('a');
+  const link = document.createElement("a");
   link.href = url;
-  link.download = file.path.split('/').pop() ?? 'download';
+  link.download = file.path.split("/").pop() ?? "download";
   link.click();
   URL.revokeObjectURL(url);
 }

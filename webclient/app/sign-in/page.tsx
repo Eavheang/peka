@@ -32,7 +32,10 @@ export default function SignInPage() {
       onSuccess: (tokens) => {
         storeAuthTokens(tokens, rememberMe);
         toast.add({ title: "Signed in.", type: "success" });
-        router.push("/workspace");
+        const next = new URLSearchParams(window.location.search).get("next");
+        const redirectTarget =
+          next?.startsWith("/") && !next.startsWith("//") ? next : "/workspace";
+        router.push(redirectTarget);
       },
       onError: () => toast.add({ title: "Invalid email or password.", type: "error" }),
     });

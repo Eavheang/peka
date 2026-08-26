@@ -10,9 +10,9 @@ class Settings(BaseSettings):
     database_url: str = "postgresql://peka:peka_dev_password@localhost:5432/peka"
     file_storage_dir: Path = Path("storage")
     max_upload_bytes: int = 25 * 1024 * 1024
-    llm_base_url: str = "http://localhost:8080/v1"
-    llm_api_key: SecretStr | None = None
-    llm_model: str = "local"
+    llm_base_url: str
+    llm_api_key: SecretStr
+    llm_model: str
     embedding_base_url: str = "http://localhost:8081/v1"
     embedding_model: str = "BAAI/bge-small-en-v1.5"
     embedding_dimensions: int = 384
