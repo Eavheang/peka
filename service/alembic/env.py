@@ -10,6 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.config import settings
 from app.database import Base
 from app.auth import model  # noqa: F401 - registers User with Base.metadata
+from app.chat import model as chat_model  # noqa: F401 - registers chat tables with Base.metadata
 
 
 config = context.config

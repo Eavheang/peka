@@ -1,5 +1,7 @@
+from uuid import UUID
 
-from app.chat.schemas import ChatResponse, Citation
+from app.chat.repository import chat_repository
+from app.chat.schemas import ChatMessage, ChatResponse, Citation
 from app.engine.llm_client import chat_completion
 from app.engine.search.service import search_knowledge
 
@@ -53,3 +55,36 @@ def answer_from_knowledge(query: str, user_role: str) -> ChatResponse:
         ]
     )
     return ChatResponse(answer=content, refused=False, citations=_citations(results))
+
+
+def persist_response(
+    query: str,
+    user_id: UUID,
+    response: ChatResponse,
+    conversation_id: UUID | None = None,
+) -> ChatResponse:
+    persisted = chat_repository.create_exchange(
+        owner_id=user_id,
+        title=query,
+        query=query,
+        response=response,
+        conversation_id=conversation_id,
+    )
+    return response.model_copy(
+        update={
+            "conversation_id": persisted["conversation"]["id"],
+            "messages": [ChatMessage.model_validate(message) for message in persisted["messages"]],
+        }
+    )
+
+
+def list_conversations(owner_id: UUID) -> list[dict]:
+    return chat_repository.list_owned(owner_id)
+
+
+def get_conversation(conversation_id: UUID, owner_id: UUID) -> dict | None:
+    return chat_repository.get_owned(conversation_id, owner_id)
+
+
+def delete_conversation(conversation_id: UUID, owner_id: UUID) -> bool:
+    return chat_repository.delete_owned(conversation_id, owner_id)

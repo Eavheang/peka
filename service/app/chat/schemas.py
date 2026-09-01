@@ -1,10 +1,17 @@
-import json
+from datetime import datetime
+from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class ChatRequest(BaseModel):
-    query: str = Field(min_length=1)
+    query: str = Field(min_length=1, max_length=4000)
+    conversation_id: UUID | None = None
+
+    @field_validator("query", mode="before")
+    @classmethod
+    def trim_query(cls, value: object) -> object:
+        return value.strip() if isinstance(value, str) else value
 
 
 class Citation(BaseModel):
@@ -14,7 +21,31 @@ class Citation(BaseModel):
     source_locations: list[dict]
 
 
+class ChatMessage(BaseModel):
+    id: UUID
+    role: str
+    content: str
+    refused: bool
+    citations: list[Citation]
+    status: str
+    created_at: datetime
+
+
+class Conversation(BaseModel):
+    id: UUID
+    owner_id: UUID
+    title: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class ConversationDetail(Conversation):
+    messages: list[ChatMessage]
+
+
 class ChatResponse(BaseModel):
     answer: str
     refused: bool
     citations: list[Citation]
+    conversation_id: UUID | None = None
+    messages: list[ChatMessage] | None = None
