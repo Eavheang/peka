@@ -3,16 +3,19 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
-import { ChevronsLeft, ChevronsRight, LogOut, Settings, Sparkles, X } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { ChevronsLeft, ChevronsRight, X } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
 
 import Alertdialog from "@/components/Alertdialog";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Drawer, DrawerClose, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { UserResponse } from "@/interface/auth";
 import { useLogout } from "@/services/auth";
+import { useListConversations } from "@/services/chat";
 import { clearAuthStorage, getStoredToken } from "@/utils/auth-storage";
 import { ROUTE, Routes } from "@/variables/routes";
+import { ConversationHistory } from "./conversationHistory";
+import { ProfileMenu } from "./profileMenu";
 
 export function WorkspaceSidebar({
   user,
@@ -28,9 +31,11 @@ export function WorkspaceSidebar({
   onMobileOpenChange: (open: boolean) => void;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const logout = useLogout();
   const [logoutOpen, setLogoutOpen] = useState(false);
   const visibleRoutes = Routes.filter((route) => user && route.roles.includes(user.role));
+  const conversationsQuery = useListConversations(Boolean(user));
   const displayName = user?.email.split("@")[0] ?? "Workspace";
   const initial = displayName.charAt(0).toUpperCase();
 
@@ -90,12 +95,13 @@ export function WorkspaceSidebar({
             Workspace
           </p>
           {visibleRoutes.map(({ title, path, icon: Icon }) => {
+            const isActive = pathname === path;
             const link = (
               <Link
                 aria-label={collapsed ? title : undefined}
                 key={path}
                 title={collapsed ? title : undefined}
-                className={`flex items-center gap-3 rounded-md px-3 py-2.5 text-sm text-white/65 transition-colors hover:bg-white/10 hover:text-white ${collapsed ? "justify-center" : ""}`}
+                className={`flex items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-colors hover:bg-white/10 hover:text-white ${isActive ? "bg-white/10 text-white" : "text-white/65"} ${collapsed ? "justify-center" : ""}`}
                 href={path}
               >
                 <Icon aria-hidden="true" size={17} strokeWidth={1.8} />
@@ -112,74 +118,22 @@ export function WorkspaceSidebar({
               link
             );
           })}
+          <ConversationHistory
+            collapsed={collapsed}
+            conversations={conversationsQuery.data}
+            error={conversationsQuery.isError}
+            loading={conversationsQuery.isPending}
+            pathname={pathname}
+          />
         </nav>
         <div className="border-t border-white/10 p-3">
-          {collapsed ? (
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Link
-                    aria-label="Settings"
-                    className="flex items-center justify-center rounded-md p-2.5 text-white/65 hover:bg-white/10 hover:text-white"
-                    href={ROUTE.SETTINGS}
-                  />
-                }
-              >
-                <Settings aria-hidden="true" size={17} strokeWidth={1.8} />
-              </TooltipTrigger>
-              <TooltipContent side="right">Settings</TooltipContent>
-            </Tooltip>
-          ) : (
-            <Link
-              className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm text-white/65 hover:bg-white/10 hover:text-white"
-              href={ROUTE.SETTINGS}
-            >
-              <Settings aria-hidden="true" size={17} strokeWidth={1.8} />
-              Settings
-            </Link>
-          )}
-          {collapsed ? (
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <button
-                    aria-label="Log out"
-                    className="mt-1 flex w-full items-center justify-center rounded-md p-2.5 text-white/65 hover:bg-white/10 hover:text-white"
-                    type="button"
-                    onClick={() => setLogoutOpen(true)}
-                  />
-                }
-              >
-                <LogOut aria-hidden="true" size={17} strokeWidth={1.8} />
-              </TooltipTrigger>
-              <TooltipContent side="right">Log out</TooltipContent>
-            </Tooltip>
-          ) : (
-            <button
-              className="mt-1 flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm text-white/65 hover:bg-white/10 hover:text-white"
-              type="button"
-              onClick={() => setLogoutOpen(true)}
-            >
-              <LogOut aria-hidden="true" size={17} strokeWidth={1.8} />
-              Log out
-            </button>
-          )}
-          <div
-            className={`mt-4 flex items-center gap-3 rounded-md bg-white/8 p-3 ${collapsed ? "justify-center" : ""}`}
-          >
-            <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
-              {initial}
-            </div>
-            {!collapsed && (
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-white">{displayName}</p>
-                <p className="truncate text-xs text-white/45">{user?.role ?? "Loading profile"}</p>
-              </div>
-            )}
-            {!collapsed && (
-              <Sparkles aria-hidden="true" className="ml-auto text-primary" size={15} />
-            )}
-          </div>
+          <ProfileMenu
+            collapsed={collapsed}
+            displayName={displayName}
+            initial={initial}
+            onLogout={() => setLogoutOpen(true)}
+            role={user?.role}
+          />
         </div>
       </aside>
       <Drawer swipeDirection="left" open={mobileOpen} onOpenChange={onMobileOpenChange}>
@@ -213,27 +167,25 @@ export function WorkspaceSidebar({
                 </Link>
               ))}
             </div>
+            <ConversationHistory
+              conversations={conversationsQuery.data}
+              error={conversationsQuery.isError}
+              loading={conversationsQuery.isPending}
+              onNavigate={() => onMobileOpenChange(false)}
+              pathname={pathname}
+            />
           </nav>
           <div className="border-t border-white/10 pt-3">
-            <Link
-              className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm text-panel-foreground/75 hover:bg-white/10 hover:text-panel-foreground"
-              href={ROUTE.SETTINGS}
-              onClick={() => onMobileOpenChange(false)}
-            >
-              <Settings aria-hidden="true" size={17} strokeWidth={1.8} />
-              Settings
-            </Link>
-            <button
-              className="mt-1 flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm text-panel-foreground/75 hover:bg-white/10 hover:text-panel-foreground"
-              type="button"
-              onClick={() => {
+            <ProfileMenu
+              displayName={displayName}
+              initial={initial}
+              onLogout={() => {
                 onMobileOpenChange(false);
                 setLogoutOpen(true);
               }}
-            >
-              <LogOut aria-hidden="true" size={17} strokeWidth={1.8} />
-              Log out
-            </button>
+              onNavigate={() => onMobileOpenChange(false)}
+              role={user?.role}
+            />
           </div>
         </DrawerContent>
       </Drawer>

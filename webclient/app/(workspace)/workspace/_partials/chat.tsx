@@ -1,28 +1,40 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { ArrowUp, BookOpen, LoaderCircle } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import type { ChatResult, ChatUIMessage } from "@/interface/chat";
-import { sendChatMessage } from "@/services/chat";
+import { sendChatMessage, useGetConversation } from "@/services/chat";
 
 const MAX_QUERY_LENGTH = 4000;
 
-export function ChatPanel() {
+export function ChatPanel({ conversationId }: { conversationId?: string }) {
+  const router = useRouter();
+  const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
   const [validationError, setValidationError] = useState("");
-  const [conversationId, setConversationId] = useState<string>();
   const [messages, setMessages] = useState<ChatUIMessage[]>([]);
   const [isPending, setIsPending] = useState(false);
   const [requestError, setRequestError] = useState("");
   const conversationRef = useRef<HTMLDivElement>(null);
+  const queryInputRef = useRef<HTMLTextAreaElement>(null);
   const shouldAutoScroll = useRef(true);
+  const conversationQuery = useGetConversation(conversationId);
 
   useEffect(() => {
-    const result = messages.map(getChatResult).find(Boolean);
-    if (result) setConversationId(result.conversationId);
-  }, [messages]);
+    setMessages([]);
+  }, [conversationId]);
+
+  useEffect(() => {
+    if (!conversationQuery.data) return;
+
+    setMessages(
+      conversationQuery.data.messages.map((message) => toChatUIMessage(message, conversationId)),
+    );
+  }, [conversationQuery.data, conversationId]);
 
   useEffect(() => {
     const conversation = conversationRef.current;
@@ -30,6 +42,14 @@ export function ChatPanel() {
 
     conversation.scrollTo({ top: conversation.scrollHeight, behavior: "auto" });
   }, [messages]);
+
+  useEffect(() => {
+    const queryInput = queryInputRef.current;
+    if (!queryInput) return;
+
+    queryInput.style.height = "auto";
+    queryInput.style.height = `${queryInput.scrollHeight}px`;
+  }, [query]);
 
   const trimmedQuery = query.trim();
 
@@ -58,14 +78,11 @@ export function ChatPanel() {
     setQuery("");
 
     try {
-      const response = await sendChatMessage(
-        {
-          query: trimmedQuery,
-          ...(conversationId ? { conversation_id: conversationId } : {}),
-        },
-      );
+      const response = await sendChatMessage({
+        query: trimmedQuery,
+        ...(conversationId ? { conversation_id: conversationId } : {}),
+      });
 
-      setConversationId(response.conversation_id);
       setMessages((current) => [
         ...current,
         {
@@ -84,6 +101,8 @@ export function ChatPanel() {
           ],
         },
       ]);
+      queryClient.invalidateQueries({ queryKey: ["chat", "conversations"] });
+      if (!conversationId) router.replace(`/workspace/${response.conversation_id}`);
     } catch {
       setQuery((currentQuery) => currentQuery || trimmedQuery);
       setRequestError("We could not save that conversation. Please try again.");
@@ -105,7 +124,16 @@ export function ChatPanel() {
         }}
       >
         <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col gap-8 px-4 pb-56 pt-8 sm:px-0">
-          {messages.length === 0 ? (
+          {conversationId && conversationQuery.isPending ? (
+            <div className="flex flex-1 items-center justify-center py-16 text-sm text-muted">
+              <LoaderCircle aria-hidden="true" className="mr-2 animate-spin" size={16} />
+              Loading conversation...
+            </div>
+          ) : conversationId && conversationQuery.isError ? (
+            <p className="flex flex-1 items-center justify-center py-16 text-sm text-danger">
+              We could not load this conversation.
+            </p>
+          ) : messages.length === 0 ? (
             <div className="flex min-h-full flex-col items-center justify-center py-16 text-center">
               <div className="mb-5 flex size-14 items-center justify-center rounded-2xl border border-border bg-secondary text-primary">
                 <BookOpen aria-hidden="true" size={24} />
@@ -136,14 +164,16 @@ export function ChatPanel() {
           <label className="sr-only" htmlFor="chat-question">
             Your question
           </label>
-          <div className="rounded-2xl border border-border bg-white/70 p-2 shadow-[0_8px_30px_rgb(24_26_25/8%)] transition-shadow focus-within:border-primary/60 focus-within:shadow-[0_8px_30px_rgb(24_26_25/12%)]">
+          <div className="flex items-end gap-2 rounded-2xl border border-border bg-white/70 p-2 shadow-[0_8px_30px_rgb(24_26_25/8%)] transition-shadow focus-within:border-primary/60 focus-within:shadow-[0_8px_30px_rgb(24_26_25/12%)]">
             <textarea
               aria-describedby="chat-question-help"
-              className="max-h-48 min-h-16 w-full resize-none overflow-y-auto bg-transparent px-3 py-2 text-sm leading-6 text-foreground outline-none placeholder:text-muted"
+              className="max-h-48 min-h-10 min-w-0 flex-1 resize-none overflow-y-auto bg-transparent px-3 py-2 text-sm leading-6 text-foreground outline-none placeholder:text-muted"
               id="chat-question"
               maxLength={MAX_QUERY_LENGTH + 100}
               name="question"
               placeholder="Message Peka..."
+              ref={queryInputRef}
+              rows={1}
               value={query}
               onChange={(event) => {
                 setQuery(event.target.value);
@@ -156,25 +186,23 @@ export function ChatPanel() {
                 }
               }}
             />
-            <div className="flex items-center justify-between gap-3 px-2 pt-1">
-              <p id="chat-question-help" className="text-xs text-muted">
-                Enter to send · Shift + Enter for a new line
-              </p>
-              <Button
-                aria-label={isPending ? "Searching" : "Send message"}
-                className="rounded-full"
-                disabled={isPending}
-                size="icon-lg"
-                type="submit"
-              >
-                {isPending ? (
-                  <LoaderCircle aria-hidden="true" className="animate-spin" />
-                ) : (
-                  <ArrowUp aria-hidden="true" />
-                )}
-              </Button>
-            </div>
+            <Button
+              aria-label={isPending ? "Searching" : "Send message"}
+              className="rounded-full"
+              disabled={isPending || conversationQuery.isPending || conversationQuery.isError}
+              size="icon-lg"
+              type="submit"
+            >
+              {isPending ? (
+                <LoaderCircle aria-hidden="true" className="animate-spin" />
+              ) : (
+                <ArrowUp aria-hidden="true" />
+              )}
+            </Button>
           </div>
+          <p id="chat-question-help" className="sr-only">
+            Press Enter to send or Shift + Enter for a new line.
+          </p>
           {(validationError || requestError) && (
             <p className="mt-2 text-sm text-danger" role="alert">
               {validationError || "We could not save that conversation. Please try again."}
@@ -253,4 +281,35 @@ function ChatMessageBubble({ message, result }: { message: ChatUIMessage; result
 function getChatResult(message: ChatUIMessage): ChatResult | undefined {
   const part = message.parts.find((candidate) => candidate.type === "data-chat-result");
   return part?.type === "data-chat-result" ? part.data : undefined;
+}
+
+function toChatUIMessage(
+  message: {
+    id: string;
+    role: "user" | "assistant";
+    content: string;
+    refused: boolean;
+    citations: ChatResult["citations"];
+  },
+  conversationId?: string,
+): ChatUIMessage {
+  return {
+    id: message.id,
+    role: message.role,
+    parts: [
+      { type: "text", text: message.content },
+      ...(message.role === "assistant"
+        ? [
+            {
+              type: "data-chat-result" as const,
+              data: {
+                conversationId: conversationId ?? "",
+                refused: message.refused,
+                citations: message.citations,
+              },
+            },
+          ]
+        : []),
+    ],
+  };
 }

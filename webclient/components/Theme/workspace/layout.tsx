@@ -9,7 +9,7 @@ import type { UserResponse } from "@/interface/auth";
 import { clearAuthStorage, getStoredToken } from "@/utils/auth-storage";
 import { useGetCurrentUser } from "@/services/auth";
 
-import { WorkspaceSidebar } from "./Sidebar";
+import { WorkspaceSidebar } from "./_partials/sidebar";
 
 export default function WorkspaceLayout({ children }: Readonly<{ children: ReactNode }>) {
   const router = useRouter();

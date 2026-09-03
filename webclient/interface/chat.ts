@@ -43,3 +43,15 @@ export interface ChatMessage {
   status: "completed";
   created_at: string;
 }
+
+export interface Conversation {
+  id: string;
+  owner_id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ConversationDetail extends Conversation {
+  messages: ChatMessage[];
+}

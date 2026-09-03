@@ -18,6 +18,7 @@
   --color-success-foreground: #181a19;
   --color-border: #d8d3c9;
   --color-panel: #202523;
+  --color-panel-elevated: #303131;
   --color-panel-foreground: #f3f1ea;
 }
 @layer base {
