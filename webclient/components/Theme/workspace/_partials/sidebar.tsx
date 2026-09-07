@@ -10,8 +10,9 @@ import Alertdialog from "@/components/Alertdialog";
 import { Drawer, DrawerClose, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { UserResponse } from "@/interface/auth";
+import type { Conversation } from "@/interface/chat";
 import { useLogout } from "@/services/auth";
-import { useListConversations } from "@/services/chat";
+import { useDeleteConversation, useListConversations } from "@/services/chat";
 import { clearAuthStorage, getStoredToken } from "@/utils/auth-storage";
 import { ROUTE, Routes } from "@/variables/routes";
 import { ConversationHistory } from "./conversationHistory";
@@ -34,8 +35,10 @@ export function WorkspaceSidebar({
   const pathname = usePathname();
   const logout = useLogout();
   const [logoutOpen, setLogoutOpen] = useState(false);
+  const [conversationToDelete, setConversationToDelete] = useState<Conversation | null>(null);
   const visibleRoutes = Routes.filter((route) => user && route.roles.includes(user.role));
   const conversationsQuery = useListConversations(Boolean(user));
+  const deleteConversation = useDeleteConversation();
   const displayName = user?.email.split("@")[0] ?? "Workspace";
   const initial = displayName.charAt(0).toUpperCase();
 
@@ -51,6 +54,18 @@ export function WorkspaceSidebar({
       onSettled: () => {
         clearAuthStorage();
         router.replace("/sign-in");
+      },
+    });
+  }
+
+  function handleDeleteConversation() {
+    if (!conversationToDelete) return;
+
+    const deletedConversationId = conversationToDelete.id;
+    deleteConversation.mutate(deletedConversationId, {
+      onSuccess: () => {
+        setConversationToDelete(null);
+        if (pathname === `/workspace/${deletedConversationId}`) router.replace(ROUTE.WORKSPACE);
       },
     });
   }
@@ -87,7 +102,7 @@ export function WorkspaceSidebar({
         </div>
         <nav
           aria-label="Workspace navigation"
-          className="flex-1 space-y-1 overflow-y-auto px-3 py-5"
+          className="flex min-h-0 flex-1 flex-col gap-1 overflow-hidden px-3 py-5"
         >
           <p
             className={`px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/45 ${collapsed ? "sr-only" : ""}`}
@@ -123,6 +138,7 @@ export function WorkspaceSidebar({
             conversations={conversationsQuery.data}
             error={conversationsQuery.isError}
             loading={conversationsQuery.isPending}
+            onDelete={setConversationToDelete}
             pathname={pathname}
           />
         </nav>
@@ -150,7 +166,10 @@ export function WorkspaceSidebar({
               <X aria-hidden="true" size={18} />
             </DrawerClose>
           </div>
-          <nav aria-label="Mobile workspace navigation" className="flex-1 py-5">
+          <nav
+            aria-label="Mobile workspace navigation"
+            className="flex min-h-0 flex-1 flex-col gap-1 overflow-hidden py-5"
+          >
             <p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-panel-foreground/60">
               Workspace
             </p>
@@ -171,6 +190,7 @@ export function WorkspaceSidebar({
               conversations={conversationsQuery.data}
               error={conversationsQuery.isError}
               loading={conversationsQuery.isPending}
+              onDelete={setConversationToDelete}
               onNavigate={() => onMobileOpenChange(false)}
               pathname={pathname}
             />
@@ -190,13 +210,28 @@ export function WorkspaceSidebar({
         </DrawerContent>
       </Drawer>
       <Alertdialog
-        open={logoutOpen}
-        onOpenChange={setLogoutOpen}
-        title="Log out?"
-        description="End your current workspace session?"
-        confirmLabel="Log out"
-        onConfirm={handleLogout}
-        pending={logout.isPending}
+        open={logoutOpen || Boolean(conversationToDelete)}
+        onOpenChange={(open) => {
+          if (logoutOpen) {
+            setLogoutOpen(open);
+            return;
+          }
+          if (!open) {
+            setConversationToDelete(null);
+            deleteConversation.reset();
+          }
+        }}
+        title={conversationToDelete ? "Delete conversation?" : "Log out?"}
+        description={
+          conversationToDelete
+            ? deleteConversation.isError
+              ? "We could not delete this conversation. Please try again."
+              : `Delete “${conversationToDelete.title}”? This cannot be undone.`
+            : "End your current workspace session?"
+        }
+        confirmLabel={conversationToDelete ? "Delete" : "Log out"}
+        onConfirm={conversationToDelete ? handleDeleteConversation : handleLogout}
+        pending={conversationToDelete ? deleteConversation.isPending : logout.isPending}
       />
     </>
   );

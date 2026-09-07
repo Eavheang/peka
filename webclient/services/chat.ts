@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import type { ChatRequest, ChatResponse, Conversation, ConversationDetail } from "@/interface/chat";
 import axiosInstance from "@/utils/axios";
@@ -20,6 +20,10 @@ export async function getConversation(conversationId: string): Promise<Conversat
   return response.data;
 }
 
+export async function deleteConversation(conversationId: string): Promise<void> {
+  await axiosInstance.delete(`/chat/conversations/${conversationId}`);
+}
+
 export function useListConversations(enabled = true) {
   return useQuery<Conversation[]>({
     queryKey: ["chat", "conversations"],
@@ -34,5 +38,17 @@ export function useGetConversation(conversationId?: string) {
     queryKey: ["chat", "conversations", conversationId],
     enabled: Boolean(conversationId),
     queryFn: () => getConversation(conversationId as string),
+  });
+}
+
+export function useDeleteConversation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: deleteConversation,
+    onSuccess: (_data, conversationId) => {
+      queryClient.removeQueries({ queryKey: ["chat", "conversations", conversationId] });
+      queryClient.invalidateQueries({ queryKey: ["chat", "conversations"] });
+    },
   });
 }

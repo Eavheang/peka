@@ -87,6 +87,35 @@
   }
 }
 
+.workspace-scrollbar {
+  scrollbar-color: rgb(255 255 255 / 0.2) transparent;
+  scrollbar-width: thin;
+}
+
+.workspace-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.workspace-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.workspace-scrollbar::-webkit-scrollbar-thumb {
+  background: rgb(255 255 255 / 0.2);
+  background-clip: content-box;
+  border: 1px solid transparent;
+  border-radius: 9999px;
+}
+
+.workspace-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgb(255 255 255 / 0.35);
+  background-clip: content-box;
+}
+
+.workspace-scrollbar::-webkit-scrollbar-button {
+  display: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
