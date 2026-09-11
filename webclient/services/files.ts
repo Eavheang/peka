@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import type { StoredFile } from "@/interface/files";
+import type { AccessLevel, StoredFile } from "@/interface/files";
 import axiosInstance from "@/utils/axios";
 
 const filesKey = ["files", "list"];
@@ -23,9 +23,12 @@ export function useListFiles() {
 export function useUploadFiles() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (files: File[]) => {
+    mutationFn: async (uploads: { file: File; accessLevel: AccessLevel }[]) => {
       const formData = new FormData();
-      files.forEach((file) => formData.append("files", file));
+      uploads.forEach(({ file, accessLevel }) => {
+        formData.append("files", file);
+        formData.append("access_levels", accessLevel);
+      });
       return (await axiosInstance.post<StoredFile[]>("/files", formData)).data;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: filesKey }),
@@ -37,6 +40,17 @@ export function useRetryFile() {
   return useMutation({
     mutationFn: async (id: string) =>
       (await axiosInstance.post<StoredFile>(`/files/${id}/retry-okf`)).data,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: filesKey }),
+  });
+}
+
+export function useUpdateFileAccessLevel() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, accessLevel }: { id: string; accessLevel: AccessLevel }) =>
+      (await axiosInstance.patch<StoredFile>(`/files/${id}/access-level`, {
+        access_level: accessLevel,
+      })).data,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: filesKey }),
   });
 }

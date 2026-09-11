@@ -3,11 +3,9 @@
 import Link from "next/link";
 import { LoaderCircle, MessageSquare, Trash2 } from "lucide-react";
 
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Conversation } from "@/interface/chat";
 
 export function ConversationHistory({
-  collapsed = false,
   conversations,
   error,
   loading,
@@ -15,7 +13,6 @@ export function ConversationHistory({
   onNavigate,
   pathname,
 }: {
-  collapsed?: boolean;
   conversations?: Conversation[];
   error: boolean;
   loading: boolean;
@@ -23,23 +20,6 @@ export function ConversationHistory({
   onNavigate?: () => void;
   pathname: string;
 }) {
-  if (collapsed) {
-    return (
-      <div className="workspace-scrollbar mt-5 min-h-0 flex-1 overflow-y-auto border-t border-white/10 pt-5">
-        {conversations?.map((conversation) => (
-          <ConversationLink
-            key={conversation.id}
-            collapsed
-            conversation={conversation}
-            onDelete={onDelete}
-            onNavigate={onNavigate}
-            pathname={pathname}
-          />
-        ))}
-      </div>
-    );
-  }
-
   return (
     <section
       className="mt-6 flex min-h-0 flex-1 flex-col border-t border-white/10 pt-5"
@@ -78,13 +58,11 @@ export function ConversationHistory({
 }
 
 function ConversationLink({
-  collapsed = false,
   conversation,
   onDelete,
   onNavigate,
   pathname,
 }: {
-  collapsed?: boolean;
   conversation: Conversation;
   onDelete: (conversation: Conversation) => void;
   onNavigate?: () => void;
@@ -94,14 +72,12 @@ function ConversationLink({
   const title = conversation.title || "Untitled chat";
   const link = (
     <Link
-      aria-label={collapsed ? title : undefined}
-      className={`flex min-w-0 flex-1 items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-colors hover:bg-white/10 hover:text-white ${isActive ? "bg-white/10 text-white" : "text-white/65"} ${collapsed ? "justify-center" : ""}`}
+      className={`flex min-w-0 flex-1 items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-colors hover:bg-white/10 hover:text-white ${isActive ? "bg-white/10 text-white" : "text-white/65"}`}
       href={`/workspace/${conversation.id}`}
-      title={collapsed ? title : undefined}
       onClick={onNavigate}
     >
       <MessageSquare aria-hidden="true" size={17} strokeWidth={1.8} />
-      {!collapsed && <span className="truncate">{title}</span>}
+      <span className="truncate">{title}</span>
     </Link>
   );
 
@@ -123,15 +99,8 @@ function ConversationLink({
   );
 
   const content = (
-    <div className={`group flex min-w-0 items-center ${collapsed ? "gap-0" : "gap-1"}`}>
-      {collapsed ? (
-        <Tooltip>
-          <TooltipTrigger render={link} />
-          <TooltipContent side="right">{title}</TooltipContent>
-        </Tooltip>
-      ) : (
-        link
-      )}
+    <div className="group flex min-w-0 items-center gap-1">
+      {link}
       {deleteButton}
     </div>
   );

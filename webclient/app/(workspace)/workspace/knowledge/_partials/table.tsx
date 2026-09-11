@@ -4,7 +4,10 @@ import { useEffect, useState } from "react";
 import { Download, FileText, RotateCcw, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import type { AccessLevel, StoredFile } from "@/interface/files";
+import { useUpdateFileAccessLevel } from "@/services/files";
 import {
   Table,
   TableBody,
@@ -13,8 +16,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { StoredFile } from '@/interface/files';
-
 function fileName(file: StoredFile) {
   return file.path.split('/').pop() ?? file.path;
 }
@@ -35,13 +36,24 @@ const PAGE_SIZE = 5;
 
 type KnowledgeTableProps = {
   sources: StoredFile[];
+  canManageAccess: boolean;
   onRetry: (id: string) => void;
   onDownload: (file: StoredFile) => void;
   onRemove: (id: string) => void;
 };
 
-export function KnowledgeTable({ sources, onRetry, onDownload, onRemove }: KnowledgeTableProps) {
+export function KnowledgeTable({
+  sources,
+  canManageAccess,
+  onRetry,
+  onDownload,
+  onRemove,
+}: KnowledgeTableProps) {
   const [page, setPage] = useState(1);
+  const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
+  const [bulkAccessLevel, setBulkAccessLevel] = useState("");
+  const [accessError, setAccessError] = useState("");
+  const updateAccess = useUpdateFileAccessLevel();
   const pageCount = Math.max(1, Math.ceil(sources.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
   const pageSources = sources.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
@@ -50,11 +62,66 @@ export function KnowledgeTable({ sources, onRetry, onDownload, onRemove }: Knowl
     if (page > pageCount) setPage(pageCount);
   }, [page, pageCount]);
 
+  useEffect(() => {
+    const sourceIds = new Set(sources.map((source) => source.id));
+    setSelectedFiles((current) => {
+      const next = new Set(Array.from(current).filter((id) => sourceIds.has(id)));
+      return next.size === current.size ? current : next;
+    });
+  }, [sources]);
+
+  async function applyBulkAccess(accessLevel: AccessLevel) {
+    setAccessError("");
+    try {
+      await Promise.all(
+        Array.from(selectedFiles).map((id) => updateAccess.mutateAsync({ id, accessLevel })),
+      );
+      setSelectedFiles(new Set());
+      setBulkAccessLevel("");
+    } catch (error) {
+      setAccessError(error instanceof Error ? error.message : "Unable to update access level.");
+    }
+  }
+
   return (
     <div className="overflow-hidden rounded-2xl border border-border bg-background shadow-sm">
+      {canManageAccess && selectedFiles.size > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-secondary/20 px-5 py-2.5">
+          <span className="text-sm font-medium text-copy">
+            {selectedFiles.size} selected
+          </span>
+          <Select
+            value={bulkAccessLevel || null}
+            onValueChange={(value) => {
+              if (!value) return;
+              const accessLevel = value as AccessLevel;
+              setBulkAccessLevel(accessLevel);
+              void applyBulkAccess(accessLevel);
+            }}
+          >
+            <SelectTrigger
+              disabled={updateAccess.isPending}
+              aria-label="Set access for selected files"
+              className={buttonVariants({
+                variant: "outline",
+                size: "sm",
+                className: "w-auto min-w-36",
+              })}
+            >
+              <SelectValue placeholder="Set access…" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="general">General</SelectItem>
+              <SelectItem value="confidential">Confidential</SelectItem>
+            </SelectContent>
+          </Select>
+          {accessError && <p className="basis-full text-sm text-danger">{accessError}</p>}
+        </div>
+      )}
       <Table>
         <TableHeader className="bg-secondary/70">
           <TableRow className="border-border hover:bg-secondary/70">
+            {canManageAccess && <TableHead className="w-12 px-3 py-4" />}
             <TableHead className="px-5 py-4 text-xs uppercase tracking-[0.14em] text-muted">
               Name
             </TableHead>
@@ -78,6 +145,25 @@ export function KnowledgeTable({ sources, onRetry, onDownload, onRemove }: Knowl
         <TableBody>
           {pageSources.map((file) => (
             <TableRow key={file.id} className="border-border hover:bg-secondary/40">
+              {canManageAccess && (
+                <TableCell className="w-12 px-3 py-4">
+                  <input
+                    type="checkbox"
+                    checked={selectedFiles.has(file.id)}
+                    aria-label={`Select ${fileName(file)}`}
+                    className="size-4 accent-primary"
+                    disabled={updateAccess.isPending}
+                    onChange={() => {
+                      setSelectedFiles((current) => {
+                        const next = new Set(current);
+                        if (next.has(file.id)) next.delete(file.id);
+                        else next.add(file.id);
+                        return next;
+                      });
+                    }}
+                  />
+                </TableCell>
+              )}
               <TableCell className="max-w-64 px-5 py-4">
                 <div className="flex min-w-0 items-center gap-3">
                   <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-secondary text-muted-foreground">
@@ -139,7 +225,7 @@ export function KnowledgeTable({ sources, onRetry, onDownload, onRemove }: Knowl
           ))}
           {!sources.length && (
             <TableRow className="border-border hover:bg-secondary/40">
-              <TableCell className="px-5 py-16 text-center" colSpan={6}>
+              <TableCell className="px-5 py-16 text-center" colSpan={canManageAccess ? 7 : 6}>
                 <div className="mx-auto max-w-xs">
                   <FileText className="mx-auto text-muted-foreground" size={24} />
                   <p className="mt-3 font-medium">No sources yet</p>

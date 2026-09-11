@@ -3,9 +3,13 @@
 import { ChangeEvent, DragEvent, useRef, useState } from "react";
 import { FileText, FileUp, Loader2, Plus, Trash2, UploadCloud, XCircle } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import type { AccessLevel } from "@/interface/files";
 import { useUploadFiles } from "@/services/files";
+import { useGetCurrentUser } from "@/services/auth";
+import { getStoredToken } from "@/utils/auth-storage";
 
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 const ACCEPTED_EXTENSIONS = [".pdf", ".docx", ".pptx", ".xlsx", ".md", ".txt"];
@@ -16,19 +20,32 @@ function formatFileSize(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
+type PendingFile = {
+  file: File;
+  accessLevel: AccessLevel;
+};
+
+function fileKey(file: File) {
+  return `${file.name}-${file.size}-${file.lastModified}`;
+}
+
 export function Upload() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const [isDragging, setIsDragging] = useState(false);
   const [uploadError, setUploadError] = useState("");
-  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
+  const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
+  const [bulkAccessLevel, setBulkAccessLevel] = useState("");
 
   const upload = useUploadFiles();
+  const user = useGetCurrentUser(getStoredToken("peka_access_token") ?? "");
+  const canSetConfidential = user.data?.role === "admin";
 
   function ingestFiles(selected: File[]) {
     setUploadError("");
 
-    const valid: File[] = [];
+    const valid: PendingFile[] = [];
     const errors: string[] = [];
 
     selected.forEach((file) => {
@@ -44,7 +61,7 @@ export function Upload() {
         return;
       }
 
-      valid.push(file);
+      valid.push({ file, accessLevel: "general" });
     });
 
     if (errors.length) {
@@ -53,14 +70,12 @@ export function Upload() {
 
     if (valid.length) {
       setPendingFiles((current) => {
-        const existing = new Set(
-          current.map((file) => `${file.name}-${file.size}-${file.lastModified}`),
-        );
+        const existing = new Set(current.map(({ file }) => fileKey(file)));
 
         return [
           ...current,
           ...valid.filter(
-            (file) => !existing.has(`${file.name}-${file.size}-${file.lastModified}`),
+            ({ file }) => !existing.has(fileKey(file)),
           ),
         ];
       });
@@ -80,7 +95,36 @@ export function Upload() {
   }
 
   function removeFile(index: number) {
+    const fileToRemove = pendingFiles[index];
+    if (!fileToRemove) return;
+
     setPendingFiles((current) => current.filter((_, fileIndex) => fileIndex !== index));
+    setSelectedFiles((current) => {
+      const next = new Set(current);
+      next.delete(fileKey(fileToRemove.file));
+      return next;
+    });
+  }
+
+  function toggleFile(file: File) {
+    const key = fileKey(file);
+    setSelectedFiles((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  function applyBulkAccess(level: AccessLevel) {
+    setPendingFiles((current) =>
+      current.map((pendingFile) =>
+        selectedFiles.has(fileKey(pendingFile.file))
+          ? { ...pendingFile, accessLevel: level }
+          : pendingFile,
+      ),
+    );
+    setBulkAccessLevel("");
   }
 
   function proceed() {
@@ -91,6 +135,8 @@ export function Upload() {
     upload.mutate(pendingFiles, {
       onSuccess: () => {
         setPendingFiles([]);
+        setSelectedFiles(new Set());
+        setBulkAccessLevel("");
       },
       onError: (error) => {
         setUploadError(error instanceof Error ? error.message : "Upload failed.");
@@ -170,7 +216,7 @@ export function Upload() {
         ) : (
           <>
             {/* Header */}
-            <div className="flex items-center justify-between gap-4 border-b border-border px-5 py-2">
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border px-5 py-2">
               <div>
                 <h2 className="font-semibold">Documents</h2>
 
@@ -180,16 +226,48 @@ export function Upload() {
                 </p>
               </div>
 
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={upload.isPending}
-                onClick={() => inputRef.current?.click()}
-              >
-                <Plus size={15} />
-                Add files
-              </Button>
+              <div className="flex items-center gap-2">
+                {selectedFiles.size > 0 && (
+                  <Select
+                    value={bulkAccessLevel || null}
+                    onValueChange={(value) => {
+                      if (!value) return;
+                      const accessLevel = value as AccessLevel;
+                      setBulkAccessLevel(accessLevel);
+                      if (accessLevel === "general" || (accessLevel === "confidential" && canSetConfidential)) {
+                        applyBulkAccess(accessLevel);
+                      }
+                    }}
+                  >
+                    <SelectTrigger
+                      disabled={upload.isPending}
+                      aria-label={`Set access for ${selectedFiles.size} selected ${selectedFiles.size === 1 ? "file" : "files"}`}
+                      className={buttonVariants({
+                        variant: "outline",
+                        size: "sm",
+                        className: "w-auto min-w-36",
+                      })}
+                    >
+                      <SelectValue placeholder="Set access…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="general">General</SelectItem>
+                      {canSetConfidential && <SelectItem value="confidential">Confidential</SelectItem>}
+                    </SelectContent>
+                  </Select>
+                )}
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={upload.isPending}
+                  onClick={() => inputRef.current?.click()}
+                >
+                  <Plus size={15} />
+                  Add files
+                </Button>
+              </div>
             </div>
 
             {/* File queue */}
@@ -215,21 +293,32 @@ export function Upload() {
               )}
 
               <ul className="h-full max-h-none space-y-1 overflow-y-auto">
-                {pendingFiles.map((file, index) => (
+                {pendingFiles.map(({ file, accessLevel }, index) => (
                   <li
-                    key={`${file.name}-${file.lastModified}-${index}`}
+                    key={`${fileKey(file)}-${index}`}
                     className="group flex items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-secondary/50"
                   >
-                    <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-secondary">
+                      <input
+                        type="checkbox"
+                        checked={selectedFiles.has(fileKey(file))}
+                        aria-label={`Select ${file.name}`}
+                        className="size-4 shrink-0 accent-primary"
+                        disabled={upload.isPending}
+                        onChange={() => toggleFile(file)}
+                      />
+
+                      <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-secondary">
                       <FileText aria-hidden="true" size={17} className="text-copy" />
                     </div>
 
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">{file.name}</p>
 
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {formatFileSize(file.size)}
-                      </p>
+                      <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
+                        <span>{formatFileSize(file.size)}</span>
+                        <span aria-hidden="true">·</span>
+                        <span className="capitalize">{accessLevel}</span>
+                      </div>
                     </div>
 
                     <Button
@@ -273,7 +362,11 @@ export function Upload() {
               <button
                 type="button"
                 disabled={upload.isPending}
-                onClick={() => setPendingFiles([])}
+                onClick={() => {
+                  setPendingFiles([]);
+                  setSelectedFiles(new Set());
+                  setBulkAccessLevel("");
+                }}
                 className="rounded-lg px-3 py-2 text-sm font-medium text-copy transition-colors hover:bg-secondary hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
               >
                 Clear all

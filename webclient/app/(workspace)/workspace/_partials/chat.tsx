@@ -222,9 +222,6 @@ function ChatMessageBubble({ message, result }: { message: ChatUIMessage; result
 
   return (
     <article className={isUser ? "ml-auto max-w-2xl" : "max-w-3xl"}>
-      {isUser && (
-        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted">You</p>
-      )}
       <div
         className={
           isUser
