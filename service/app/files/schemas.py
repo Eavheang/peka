@@ -5,6 +5,9 @@ from uuid import UUID
 from pydantic import BaseModel
 
 
+AccessLevel = Literal["general", "confidential"]
+
+
 class OKFStatusResponse(BaseModel):
     file_id: str
     okf_status: str
@@ -18,7 +21,7 @@ class FileResponse(BaseModel):
     content_type: str | None
     sha256: str | None
     author_id: UUID
-    access_level: Literal["general", "confidential"]
+    access_level: AccessLevel
     created_at: datetime
     okf_status: Literal["queued", "processing", "completed", "failed"]
     okf_attempts: int
@@ -26,4 +29,4 @@ class FileResponse(BaseModel):
 
 
 class AccessLevelUpdate(BaseModel):
-    access_level: Literal["general", "confidential"]
+    access_level: AccessLevel
