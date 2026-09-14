@@ -3,7 +3,10 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 
 from app.auth.routes import authenticated
-from app.chat.schemas import ChatRequest, ChatResponse, Conversation, ConversationDetail
+from app.chat.schemas import (
+    ChatRequest, ChatResponse, Conversation, ConversationDetail,
+    SourcePreviewRequest, SourcePreviewResponse,
+)
 from app.chat import service as chat_service
 from app.chat.repository import ConversationNotFoundError
 from app.chat.service import answer_from_knowledge
@@ -11,10 +14,24 @@ from app.chat.service import answer_from_knowledge
 router = APIRouter(prefix="/chat", tags=["chat"])
 
 
+@router.post("/source-preview", response_model=SourcePreviewResponse)
+def source_preview(payload: SourcePreviewRequest, user: dict = Depends(authenticated)) -> dict:
+    result = chat_service.preview_source(payload, user["role"])
+    if result is None or not result["content"].strip():
+        raise HTTPException(status_code=404, detail="Source preview unavailable")
+    return result
+
+
 @router.post("", response_model=ChatResponse, response_model_exclude_none=True)
 def chat(payload: ChatRequest, user: dict = Depends(authenticated)) -> ChatResponse:
     try:
-        answer = answer_from_knowledge(payload.query, user["role"])
+        history = []
+        if payload.conversation_id is not None:
+            conversation = chat_service.get_conversation(payload.conversation_id, user["id"])
+            if conversation is None:
+                raise ConversationNotFoundError
+            history = conversation["messages"]
+        answer = answer_from_knowledge(payload.query, user["role"], history)
         return chat_service.persist_response(
             payload.query,
             user["id"],

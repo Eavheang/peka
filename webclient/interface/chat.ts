@@ -1,8 +1,13 @@
 export interface Citation {
+  chunk_id?: string | null;
   title: string;
   heading: string;
   page: number | null;
   source_locations: Record<string, unknown>[];
+}
+
+export interface SourcePreviewResponse {
+  content: string;
 }
 
 export interface ChatRequest {

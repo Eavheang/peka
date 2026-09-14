@@ -35,9 +35,11 @@ def search_knowledge(query: str, user_role: str) -> list[dict]:
     results = search_repository.search_chunks(vector, access_levels_for_role(user_role))
     return [
         {
+            "chunk_id": str(row["id"]),
             "title": search_repository.file_title(row["file_id"]),
             "heading": row["heading"],
             "snippet": row["content"][:300],
+            "content": row["content"],
             "source_locations": row["source_locations"],
             "score": float(row["score"]),
         }

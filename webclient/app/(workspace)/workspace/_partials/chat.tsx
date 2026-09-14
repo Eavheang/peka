@@ -4,12 +4,14 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowUp, BookOpen, LoaderCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 
 import { Button } from "@/components/ui/button";
 import type { ChatResult, ChatUIMessage } from "@/interface/chat";
 import { sendChatMessage, useGetConversation } from "@/services/chat";
 
 const MAX_QUERY_LENGTH = 4000;
+const SourcePreview = dynamic(() => import('./sourcePreview').then((module) => module.SourcePreview));
 
 export function ChatPanel({ conversationId }: { conversationId?: string }) {
   const router = useRouter();
@@ -55,6 +57,7 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (isPending) return;
     if (!trimmedQuery) {
       setValidationError("Ask a question to start a conversation.");
       return;
@@ -140,8 +143,8 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
               </div>
               <h1 className="text-3xl tracking-tight sm:text-4xl">What can I help you find?</h1>
               <p className="mt-3 max-w-md text-sm leading-6 text-copy">
-                Ask about a policy, project, or document in your library. Peka answers using the
-                knowledge you have indexed.
+                Ask a question or explore a document in your library. Peka searches your indexed
+                knowledge when needed.
               </p>
             </div>
           ) : (
@@ -187,7 +190,7 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
               }}
             />
             <Button
-              aria-label={isPending ? "Searching" : "Send message"}
+              aria-label={isPending ? "Responding" : "Send message"}
               className="rounded-full"
               disabled={isPending || conversationQuery.isPending || conversationQuery.isError}
               size="icon-lg"
@@ -222,9 +225,6 @@ function ChatMessageBubble({ message, result }: { message: ChatUIMessage; result
 
   return (
     <article className={isUser ? "ml-auto max-w-2xl" : "max-w-3xl"}>
-      {isUser && (
-        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted">You</p>
-      )}
       <div
         className={
           isUser
@@ -253,25 +253,21 @@ function ChatMessageBubble({ message, result }: { message: ChatUIMessage; result
             ),
         )}
         {!isUser && result && result.citations.length > 0 && (
-          <div className="mt-5 border-t border-border pt-4">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">
-              Sources
-            </p>
-            <ul className="space-y-2">
+          <details className="mt-5 border-t border-border pt-4">
+            <summary className="cursor-pointer text-xs font-semibold text-muted hover:text-foreground">
+              Sources ({result.citations.length})
+            </summary>
+            <ul className="mt-3 flex flex-col gap-2">
               {result.citations.map((citation, index) => (
                 <li
                   className="text-xs text-copy"
                   key={`${citation.title}-${citation.heading}-${index}`}
                 >
-                  <span className="font-medium text-foreground">
-                    [{index + 1}] {citation.title}
-                  </span>
-                  {citation.heading && ` · ${citation.heading}`}
-                  {citation.page !== null && ` · p. ${citation.page}`}
+                  <SourcePreview citation={citation} number={index + 1} />
                 </li>
               ))}
             </ul>
-          </div>
+          </details>
         )}
       </div>
     </article>
