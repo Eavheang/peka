@@ -19,6 +19,17 @@ class Citation(BaseModel):
     heading: str
     page: int | None = None
     source_locations: list[dict]
+    chunk_id: UUID | None = None
+
+
+class SourcePreviewRequest(BaseModel):
+    chunk_id: UUID | None = None
+    title: str = Field(min_length=1, max_length=1024)
+    heading: str = Field(max_length=4096)
+
+
+class SourcePreviewResponse(BaseModel):
+    content: str
 
 
 class ChatMessage(BaseModel):

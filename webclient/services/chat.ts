@@ -1,11 +1,26 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import type { ChatRequest, ChatResponse, Conversation, ConversationDetail } from "@/interface/chat";
+import type { ChatRequest, ChatResponse, Citation, Conversation, ConversationDetail, SourcePreviewResponse } from "@/interface/chat";
 import axiosInstance from "@/utils/axios";
 
 export async function sendChatMessage(request: ChatRequest): Promise<ChatResponse> {
   const response = await axiosInstance.post<ChatResponse>("/chat", request);
   return response.data;
+}
+
+export function useSourcePreview(citation: Citation) {
+  return useQuery<SourcePreviewResponse>({
+    queryKey: ["chat", "source-preview", citation.chunk_id, citation.title, citation.heading],
+    queryFn: async ({ signal }) => (
+      await axiosInstance.post<SourcePreviewResponse>("/chat/source-preview", {
+        chunk_id: citation.chunk_id,
+        title: citation.title,
+        heading: citation.heading,
+      }, { signal })
+    ).data,
+    retry: false,
+    refetchOnMount: false,
+  });
 }
 
 export async function listConversations(): Promise<Conversation[]> {

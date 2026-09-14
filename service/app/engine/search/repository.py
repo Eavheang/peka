@@ -21,7 +21,7 @@ class SearchRepository:
         with get_connection() as connection:
             register_vector(connection)
             rows = connection.execute(
-                "SELECT kc.file_id, kc.heading, kc.content, kc.source_locations, "
+                "SELECT kc.id, kc.file_id, kc.heading, kc.content, kc.source_locations, "
                 "1 - (kc.embedding <=> %s) AS score "
                 "FROM knowledge_chunks kc "
                 "JOIN chunk_sets cs ON cs.id = kc.chunk_set_id AND cs.status = 'active' "
@@ -43,6 +43,26 @@ class SearchRepository:
         with get_connection() as connection:
             row = connection.execute("SELECT path FROM files WHERE id = %s", (file_id,)).fetchone()
             return row["path"].rsplit("/", 1)[-1] if row else "unknown"
+
+    def find_source(
+        self, chunk_id: UUID | None, title: str, heading: str,
+        allowed_access_levels: tuple[str, ...],
+    ) -> dict[str, Any] | None:
+        query = (
+            "SELECT kc.content FROM knowledge_chunks kc "
+            "JOIN chunk_sets cs ON cs.id = kc.chunk_set_id AND cs.status = 'active' "
+            "JOIN files f ON f.id = kc.file_id "
+            "WHERE f.access_level = ANY(%s) "
+            "AND regexp_replace(f.path, '^.*/', '') = %s AND kc.heading = %s"
+        )
+        parameters: list[Any] = [list(allowed_access_levels), title, heading]
+        if chunk_id is not None:
+            query += " AND kc.id = %s"
+            parameters.append(chunk_id)
+        with get_connection() as connection:
+            rows = connection.execute(query + " LIMIT 2", parameters).fetchall()
+        # Older citations lack chunk IDs; never guess between multiple matching passages.
+        return cast(dict[str, Any], rows[0]) if len(rows) == 1 else None
 
 
 search_repository = SearchRepository()
