@@ -1,4 +1,5 @@
 export type FileIndexStatus = "queued" | "processing" | "completed" | "failed";
+export type AccessLevel = "general" | "confidential";
 
 export interface StoredFile {
   id: string;
@@ -6,7 +7,7 @@ export interface StoredFile {
   content_type: string | null;
   sha256: string | null;
   author_id: string;
-  access_level: "general" | "confidential";
+  access_level: AccessLevel;
   created_at: string;
   okf_status: FileIndexStatus;
   okf_attempts: number;

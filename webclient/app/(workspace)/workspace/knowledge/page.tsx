@@ -1,16 +1,22 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Progress } from "@/components/ui/progress";
+import { useGetCurrentUser } from "@/services/auth";
 import { useDeleteFile, useListFiles, useRetryFile, downloadFile } from "@/services/files";
+import { getStoredToken } from "@/utils/auth-storage";
 import { KnowledgeTable } from "./_partials/table";
 import { Upload } from "./_partials/upload";
 
 export default function KnowledgePage() {
+  const [token, setToken] = useState("");
   const files = useListFiles();
   const retry = useRetryFile();
   const remove = useDeleteFile();
+  const me = useGetCurrentUser(token);
   const sources = files.data ?? [];
+
+  useEffect(() => setToken(getStoredToken("peka_access_token") ?? ""), []);
   const counts = useMemo(
     () => ({
       indexed: sources.filter((file) => file.okf_status === "completed").length,
@@ -75,6 +81,7 @@ export default function KnowledgePage() {
           </div>
         </div>
         <KnowledgeTable
+          canManageAccess={me.data?.role === "admin"}
           onDownload={downloadFile}
           onRemove={(id) => remove.mutate(id)}
           onRetry={(id) => retry.mutate(id)}

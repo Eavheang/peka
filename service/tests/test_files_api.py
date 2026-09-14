@@ -25,10 +25,10 @@ def test_files_require_login_and_support_upload_list_download(client, monkeypatc
     def create_many(files, author_id):
         created = [
             {"id": uuid4(), "path": path, "content_type": content_type, "sha256": sha256,
-             "author_id": author_id, "access_level": "general",
+             "author_id": author_id, "access_level": access_level,
              "created_at": datetime.now(timezone.utc),
              "okf_status": "queued", "okf_attempts": 0, "okf_error": None}
-            for path, content_type, sha256 in files
+            for path, content_type, sha256, access_level in files
         ]
         records.extend(created)
         return created
@@ -210,3 +210,58 @@ def test_upload_rejects_oversized_files_without_saving(client, monkeypatch, tmp_
 
     assert response.status_code == 413
     assert not list(tmp_path.rglob("*.txt"))
+
+
+def test_upload_accepts_per_file_access_levels_and_restricts_confidential_to_admin(
+    client, monkeypatch, tmp_path
+):
+    admin = {"id": uuid4(), "email": "admin@example.com", "role": "admin",
+             "token_version": 0, "is_active": True}
+    staff = {"id": uuid4(), "email": "staff@example.com", "role": "staff",
+             "token_version": 0, "is_active": True}
+    accounts = {admin["id"]: admin, staff["id"]: staff}
+    records = []
+
+    def create_many(files, author_id):
+        created = [
+            {"id": uuid4(), "path": path, "content_type": content_type, "sha256": sha256,
+             "author_id": author_id, "access_level": access_level,
+             "created_at": datetime.now(timezone.utc),
+             "okf_status": "queued", "okf_attempts": 0, "okf_error": None}
+            for path, content_type, sha256, access_level in files
+        ]
+        records.extend(created)
+        return created
+
+    def token_for(account):
+        token = auth_routes.create_access_token(str(account["id"]), account["role"], account["token_version"])
+        return {"Authorization": f"Bearer {token}"}
+
+    monkeypatch.setattr(auth_routes, "current_user", lambda user_id: accounts[user_id])
+    monkeypatch.setattr(service.settings, "file_storage_dir", tmp_path)
+    monkeypatch.setattr(service.files_repository, "create_many", create_many)
+    monkeypatch.setattr(service.files_repository, "exists_by_sha256", lambda sha256: False)
+
+    response = client.post(
+        "/files",
+        headers=token_for(admin),
+        files=[
+            ("files", ("private.txt", b"private", "text/plain")),
+            ("files", ("public.txt", b"public", "text/plain")),
+            ("access_levels", (None, "confidential")),
+            ("access_levels", (None, "general")),
+        ],
+    )
+
+    assert response.status_code == 201, response.text
+    assert [item["access_level"] for item in response.json()] == ["confidential", "general"]
+
+    unauthorized = client.post(
+        "/files",
+        headers=token_for(staff),
+        files=[
+            ("files", ("staff-private.txt", b"private", "text/plain")),
+            ("access_levels", (None, "confidential")),
+        ],
+    )
+    assert unauthorized.status_code == 403

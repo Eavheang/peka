@@ -1,12 +1,12 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
 from fastapi.responses import FileResponse as DownloadResponse
 
 from app.auth.routes import authenticated
 
-from app.files.schemas import AccessLevelUpdate, FileResponse, OKFStatusResponse
+from app.files.schemas import AccessLevel, AccessLevelUpdate, FileResponse, OKFStatusResponse
 from app.files import service as files_service
 from app.files.service import (
     DuplicateFileError,
@@ -26,10 +26,16 @@ router = APIRouter(prefix="/files", tags=["files"])
 @router.post("", response_model=list[FileResponse], status_code=status.HTTP_201_CREATED)
 def upload_files(
     files: Annotated[list[UploadFile], File()],
+    access_levels: Annotated[list[AccessLevel] | None, Form()] = None,
     user: dict = Depends(authenticated),
 ) -> list[dict]:
+    levels = access_levels if access_levels is not None else ["general"] * len(files)
+    if len(levels) != len(files):
+        raise HTTPException(status_code=422, detail="Each uploaded file must have an access level")
+    if user["role"] != "admin" and "confidential" in levels:
+        raise HTTPException(status_code=403, detail="Only admins can upload confidential files")
     try:
-        return store_files(files, user["id"])
+        return store_files(files, user["id"], levels)
     except FileTooLargeError as error:
         raise HTTPException(status_code=413, detail=str(error)) from None
     except DuplicateFileError as error:

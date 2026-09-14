@@ -105,7 +105,7 @@ export function WorkspaceSidebar({
           className="flex min-h-0 flex-1 flex-col gap-1 overflow-hidden px-3 py-5"
         >
           <p
-            className={`px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/45 ${collapsed ? "sr-only" : ""}`}
+            className={`px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/45 ${collapsed ? "invisible" : ""}`}
           >
             Workspace
           </p>
@@ -116,7 +116,7 @@ export function WorkspaceSidebar({
                 aria-label={collapsed ? title : undefined}
                 key={path}
                 title={collapsed ? title : undefined}
-                className={`flex items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-colors hover:bg-white/10 hover:text-white ${isActive ? "bg-white/10 text-white" : "text-white/65"} ${collapsed ? "justify-center" : ""}`}
+                className={`flex h-10 items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-colors hover:bg-white/10 hover:text-white ${isActive ? "bg-white/10 text-white" : "text-white/65"} ${collapsed ? "mx-auto w-10 flex-none justify-center p-0" : ""}`}
                 href={path}
               >
                 <Icon aria-hidden="true" size={17} strokeWidth={1.8} />
@@ -133,14 +133,15 @@ export function WorkspaceSidebar({
               link
             );
           })}
-          <ConversationHistory
-            collapsed={collapsed}
-            conversations={conversationsQuery.data}
-            error={conversationsQuery.isError}
-            loading={conversationsQuery.isPending}
-            onDelete={setConversationToDelete}
-            pathname={pathname}
-          />
+          {!collapsed && (
+            <ConversationHistory
+              conversations={conversationsQuery.data}
+              error={conversationsQuery.isError}
+              loading={conversationsQuery.isPending}
+              onDelete={setConversationToDelete}
+              pathname={pathname}
+            />
+          )}
         </nav>
         <div className="border-t border-white/10 p-3">
           <ProfileMenu

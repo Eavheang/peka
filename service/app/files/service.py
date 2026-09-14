@@ -34,14 +34,20 @@ FILE_CATEGORIES = {
 }
 
 
-def store_files(uploads: list[UploadFile], author_id: UUID) -> list[dict]:
+def store_files(
+    uploads: list[UploadFile], author_id: UUID, access_levels: list[str] | None = None
+) -> list[dict]:
     storage_root = settings.file_storage_dir.resolve()
     saved_paths: list[Path] = []
-    records: list[tuple[str, str | None, str]] = []
+    records: list[tuple[str, str | None, str, str]] = []
     seen_hashes: set[str] = set()
+    levels = access_levels if access_levels is not None else ["general"] * len(uploads)
+
+    if len(levels) != len(uploads) or any(level not in {"general", "confidential"} for level in levels):
+        raise ValueError("Each uploaded file must have a valid access level")
 
     try:
-        for upload in uploads:
+        for upload, access_level in zip(uploads, levels, strict=True):
             name = Path((upload.filename or "").replace("\\", "/")).name.strip()
             category = FILE_CATEGORIES.get(Path(name).suffix.lower())
             if not name or category is None:
@@ -77,7 +83,7 @@ def store_files(uploads: list[UploadFile], author_id: UUID) -> list[dict]:
             saved_paths.append(extracted)
             extracted.parent.mkdir(parents=True, exist_ok=True)
             extracted.write_text(json.dumps(extraction, indent=2) + "\n", encoding="utf-8")
-            records.append((relative_path, upload.content_type, file_sha256))
+            records.append((relative_path, upload.content_type, file_sha256, access_level))
 
         try:
             return files_repository.create_many(records, author_id)

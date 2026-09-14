@@ -5,14 +5,17 @@ from app.database import get_connection
 
 
 class FilesRepository:
-    def create_many(self, records: list[tuple[str, str | None, str]], author_id: UUID) -> list[dict]:
+    def create_many(
+        self, records: list[tuple[str, str | None, str, str]], author_id: UUID
+    ) -> list[dict]:
         created = []
         with get_connection() as connection:
-            for path, content_type, sha256 in records:
+            for path, content_type, sha256, access_level in records:
                 row = connection.execute(
-                    "INSERT INTO files (path, content_type, sha256, author_id) VALUES (%s, %s, %s, %s) "
+                    "INSERT INTO files (path, content_type, sha256, author_id, access_level) "
+                    "VALUES (%s, %s, %s, %s, %s) "
                     "RETURNING id, path, content_type, sha256, author_id, access_level, created_at",
-                    (path, content_type, sha256, author_id),
+                    (path, content_type, sha256, author_id, access_level),
                 ).fetchone()
                 if row is None:
                     raise RuntimeError("Unable to create file record")
