@@ -1,3 +1,4 @@
+import logging
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
@@ -12,6 +13,7 @@ from app.chat.repository import ConversationNotFoundError
 from app.chat.service import answer_from_knowledge
 
 router = APIRouter(prefix="/chat", tags=["chat"])
+logger = logging.getLogger(__name__)
 
 
 @router.post("/source-preview", response_model=SourcePreviewResponse)
@@ -31,7 +33,12 @@ def chat(payload: ChatRequest, user: dict = Depends(authenticated)) -> ChatRespo
             if conversation is None:
                 raise ConversationNotFoundError
             history = conversation["messages"]
-        answer = answer_from_knowledge(payload.query, user["role"], history)
+        if payload.web_search:
+            answer = answer_from_knowledge(
+                payload.query, user["role"], history, web_search=True,
+            )
+        else:
+            answer = answer_from_knowledge(payload.query, user["role"], history)
         return chat_service.persist_response(
             payload.query,
             user["id"],
@@ -41,6 +48,7 @@ def chat(payload: ChatRequest, user: dict = Depends(authenticated)) -> ChatRespo
     except ConversationNotFoundError:
         raise HTTPException(status_code=404, detail="Conversation not found") from None
     except (RuntimeError,) as error:
+        logger.warning("Chat request failed: %s", error)
         raise HTTPException(status_code=503, detail=str(error)) from None
 
 

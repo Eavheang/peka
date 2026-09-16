@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field, field_validator
 class ChatRequest(BaseModel):
     query: str = Field(min_length=1, max_length=4000)
     conversation_id: UUID | None = None
+    web_search: bool = False
 
     @field_validator("query", mode="before")
     @classmethod
@@ -20,6 +21,8 @@ class Citation(BaseModel):
     page: int | None = None
     source_locations: list[dict]
     chunk_id: UUID | None = None
+    url: str | None = None
+    excerpt: str | None = None
 
 
 class SourcePreviewRequest(BaseModel):

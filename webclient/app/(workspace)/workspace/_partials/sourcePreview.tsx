@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { LoaderCircle } from 'lucide-react';
+import { ExternalLink, LoaderCircle } from 'lucide-react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -19,6 +19,36 @@ import { useSourcePreview } from '@/services/chat';
 
 export function SourcePreview({ citation, number }: { citation: Citation; number: number }) {
   const [open, setOpen] = useState(false);
+
+  if (citation.url) {
+    return (
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogTrigger className="text-left text-xs leading-5 text-copy hover:text-foreground hover:underline underline-offset-4">
+          <span className="font-medium text-foreground">[{number}] {citation.title}</span>
+        </DialogTrigger>
+        <DialogContent className="max-h-[85dvh] overflow-hidden bg-background text-foreground sm:max-w-2xl">
+          <DialogHeader className="min-w-0 pr-8">
+            <DialogTitle className="break-words leading-6">{citation.title}</DialogTitle>
+            <DialogDescription>Web source</DialogDescription>
+          </DialogHeader>
+          <div className="min-h-0 overflow-y-auto border-t border-border pt-4">
+            <p className="whitespace-pre-wrap break-words text-sm leading-7 text-copy">
+              {citation.excerpt || 'No preview excerpt is available for this source.'}
+            </p>
+          </div>
+          <a
+            className="inline-flex w-fit items-center gap-2 text-sm font-medium text-primary hover:underline underline-offset-4"
+            href={citation.url}
+            rel="noreferrer"
+            target="_blank"
+          >
+            Open original source
+            <ExternalLink aria-hidden="true" size={14} />
+          </a>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

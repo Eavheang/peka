@@ -4,6 +4,8 @@ export interface Citation {
   heading: string;
   page: number | null;
   source_locations: Record<string, unknown>[];
+  url?: string | null;
+  excerpt?: string | null;
 }
 
 export interface SourcePreviewResponse {
@@ -13,6 +15,7 @@ export interface SourcePreviewResponse {
 export interface ChatRequest {
   query: string;
   conversation_id?: string;
+  web_search?: boolean;
 }
 
 export interface ChatResponse {

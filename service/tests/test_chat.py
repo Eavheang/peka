@@ -30,6 +30,21 @@ def test_general_question_does_not_search(monkeypatch) -> None:
     assert response.refused is False
 
 
+def test_answer_accepts_json_with_model_preamble_and_trailing_text(monkeypatch) -> None:
+    content = (
+        "Here is the answer:\n```json\n"
+        '{"blocks":[{"kind":"general","text":"Answer","source_ids":[]}]}'
+        "\n```\nI hope this helps."
+    )
+    monkeypatch.setattr(
+        chat_service, "chat_tool_completion", lambda *args, **kwargs: {"content": content},
+    )
+
+    response = chat_service.answer_from_knowledge("question", "staff")
+
+    assert response.answer == "Answer"
+
+
 def test_grounded_answer_carries_citations(monkeypatch) -> None:
     results = [
         {
