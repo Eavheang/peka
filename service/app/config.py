@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     embedding_batch_size: int = 1
     search_top_k: int = 5
     search_similarity_floor: float = 0.3
+    exa_api_key: SecretStr | None = None
+    exa_base_url: str = "https://api.exa.ai"
+    web_search_top_k: int = 5
+    web_search_timeout: float = 20
     jwt_secret_key: SecretStr
     jwt_access_token_expire_minutes: int = 30
     jwt_refresh_token_expire_days: int = 30

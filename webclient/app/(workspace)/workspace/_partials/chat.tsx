@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowUp, BookOpen, LoaderCircle } from "lucide-react";
+import axios from "axios";
+import { ArrowUp, BookOpen, Globe2, LoaderCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 
@@ -11,7 +12,9 @@ import type { ChatResult, ChatUIMessage } from "@/interface/chat";
 import { sendChatMessage, useGetConversation } from "@/services/chat";
 
 const MAX_QUERY_LENGTH = 4000;
-const SourcePreview = dynamic(() => import('./sourcePreview').then((module) => module.SourcePreview));
+const SourcePreview = dynamic(() =>
+  import("./sourcePreview").then((module) => module.SourcePreview),
+);
 
 export function ChatPanel({ conversationId }: { conversationId?: string }) {
   const router = useRouter();
@@ -21,6 +24,7 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
   const [messages, setMessages] = useState<ChatUIMessage[]>([]);
   const [isPending, setIsPending] = useState(false);
   const [requestError, setRequestError] = useState("");
+  const [webSearchEnabled, setWebSearchEnabled] = useState(false);
   const conversationRef = useRef<HTMLDivElement>(null);
   const queryInputRef = useRef<HTMLTextAreaElement>(null);
   const shouldAutoScroll = useRef(true);
@@ -84,6 +88,7 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
       const response = await sendChatMessage({
         query: trimmedQuery,
         ...(conversationId ? { conversation_id: conversationId } : {}),
+        web_search: webSearchEnabled,
       });
 
       setMessages((current) => [
@@ -106,9 +111,14 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
       ]);
       queryClient.invalidateQueries({ queryKey: ["chat", "conversations"] });
       if (!conversationId) router.replace(`/workspace/${response.conversation_id}`);
-    } catch {
+    } catch (error: unknown) {
       setQuery((currentQuery) => currentQuery || trimmedQuery);
-      setRequestError("We could not save that conversation. Please try again.");
+      const detail = axios.isAxiosError(error) ? error.response?.data?.detail : undefined;
+      setRequestError(
+        typeof detail === "string"
+          ? detail
+          : "We could not save that conversation. Please try again.",
+      );
     } finally {
       setIsPending(false);
     }
@@ -168,31 +178,55 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
             Your question
           </label>
           <div className="flex items-end gap-2 rounded-2xl border border-border bg-white/70 p-2 shadow-[0_8px_30px_rgb(24_26_25/8%)] transition-shadow focus-within:border-primary/60 focus-within:shadow-[0_8px_30px_rgb(24_26_25/12%)]">
-            <textarea
-              aria-describedby="chat-question-help"
-              className="max-h-48 min-h-10 min-w-0 flex-1 resize-none overflow-y-auto bg-transparent px-3 py-2 text-sm leading-6 text-foreground outline-none placeholder:text-muted"
-              id="chat-question"
-              maxLength={MAX_QUERY_LENGTH + 100}
-              name="question"
-              placeholder="Message Peka..."
-              ref={queryInputRef}
-              rows={1}
-              value={query}
-              onChange={(event) => {
-                setQuery(event.target.value);
-                if (validationError) setValidationError("");
-              }}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey) {
-                  event.preventDefault();
-                  event.currentTarget.form?.requestSubmit();
-                }
-              }}
-            />
+            <div className="flex min-w-0 flex-1 flex-col">
+              <textarea
+                aria-describedby="chat-question-help"
+                className="max-h-48 min-h-10 min-w-0 resize-none overflow-y-auto bg-transparent px-3 py-2 text-sm leading-6 text-foreground outline-none placeholder:text-muted"
+                id="chat-question"
+                maxLength={MAX_QUERY_LENGTH + 100}
+                name="question"
+                placeholder="Message Peka..."
+                ref={queryInputRef}
+                rows={1}
+                value={query}
+                onChange={(event) => {
+                  setQuery(event.target.value);
+                  if (validationError) setValidationError("");
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
+                    event.currentTarget.form?.requestSubmit();
+                  }
+                }}
+              />
+              <div className="flex items-center gap-3 px-3 pb-1 pt-2">
+                 <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-medium text-copy">
+                   <input
+                     aria-describedby="web-search-help"
+                     aria-label="Enable web search"
+                     checked={webSearchEnabled}
+                     className="peer sr-only"
+                     role="switch"
+                     type="checkbox"
+                     onChange={(event) => setWebSearchEnabled(event.target.checked)}
+                   />
+                   <Globe2 aria-hidden="true" size={14} />
+                   Web search
+                   <span
+                     aria-hidden="true"
+                     className="relative h-5 w-9 rounded-full bg-border transition-colors after:absolute after:top-0.5 after:left-0.5 after:size-4 after:rounded-full after:bg-white after:shadow-sm after:transition-transform peer-checked:bg-primary peer-checked:after:translate-x-4 peer-focus-visible:ring-2 peer-focus-visible:ring-ring/50"
+                   />
+                 </label>
+                <span id="web-search-help" className="text-[11px] text-muted">
+                  {webSearchEnabled ? "Public web enabled" : "Private knowledge only"}
+                </span>
+              </div>
+            </div>
             <Button
               aria-label={isPending ? "Responding" : "Send message"}
               className="rounded-full"
-              disabled={isPending || conversationQuery.isPending || conversationQuery.isError}
+                  disabled={isPending}
               size="icon-lg"
               type="submit"
             >
