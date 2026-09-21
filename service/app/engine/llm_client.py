@@ -15,18 +15,28 @@ def chat_completion(messages: list[dict], *, json_mode: bool = False, timeout: i
     return content
 
 
-def chat_tool_completion(messages: list[dict], tools: list[dict], *, allow_tools: bool = True) -> dict:
+def chat_tool_completion(
+    messages: list[dict], tools: list[dict], *, allow_tools: bool = True,
+    required_tool: str | None = None,
+) -> dict:
+    if not allow_tools and required_tool is not None:
+        raise LLMError("Cannot require a tool when tools are disabled")
+    tool_choice = (
+        {"type": "function", "function": {"name": required_tool}}
+        if required_tool is not None
+        else "auto" if allow_tools else "none"
+    )
     return _completion_message(
         messages,
         json_mode=not allow_tools,
         tools=tools,
-        tool_choice="auto" if allow_tools else "none",
+        tool_choice=tool_choice,
     )
 
 
 def _completion_message(
     messages: list[dict], *, json_mode: bool = False, timeout: int = 600,
-    tools: list[dict] | None = None, tool_choice: str = "auto",
+    tools: list[dict] | None = None, tool_choice: str | dict = "auto",
 ) -> dict:
     if settings.llm_api_key is None:
         raise LLMError("LLM_API_KEY is not configured")

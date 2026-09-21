@@ -1,3 +1,4 @@
+import re
 from typing import Any
 from urllib.parse import urlparse
 
@@ -43,6 +44,13 @@ def web_search(query: str) -> list[dict[str, Any]]:
         if not isinstance(title, str) or not title.strip():
             title = url
         content = _result_content(result)
+        if content == title:
+            content = ""
+        else:
+            for title_prefix in (f"# {title}", title):
+                if content.startswith(f"{title_prefix}\n"):
+                    content = content[len(title_prefix):].lstrip()
+                    break
         if not content:
             continue
         score = result.get("score", 0)
@@ -68,8 +76,19 @@ def _is_http_url(value: object) -> bool:
 def _result_content(result: dict[str, Any]) -> str:
     highlights = result.get("highlights")
     if isinstance(highlights, list):
-        content = "\n".join(item.strip() for item in highlights if isinstance(item, str) and item.strip())
+        excerpts = [
+            item.strip()
+            for item in highlights
+            if isinstance(item, str) and item.strip() and item.strip() not in {"...", "…"}
+        ]
+        content = "\n\n".join(excerpts)
         if content:
-            return content
+            return _clean_excerpt(content)
     text = result.get("text")
-    return text.strip() if isinstance(text, str) else ""
+    return _clean_excerpt(text) if isinstance(text, str) else ""
+
+
+def _clean_excerpt(content: str) -> str:
+    content = re.sub(r"(?m)^[ \t]*(?:\.\.\.|…)[ \t]*$", "", content)
+    content = re.sub(r"\n{3,}", "\n\n", content)
+    return content.strip()

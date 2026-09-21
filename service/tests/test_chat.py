@@ -45,6 +45,39 @@ def test_answer_accepts_json_with_model_preamble_and_trailing_text(monkeypatch) 
     assert response.answer == "Answer"
 
 
+def test_invalid_web_search_answer_is_repaired(monkeypatch) -> None:
+    calls = []
+    web_results = [{
+        "title": "Operations report",
+        "heading": "",
+        "snippet": "Operations are running.",
+        "content": "Operations are running.",
+        "source_locations": [],
+        "score": 0.9,
+        "url": "https://example.com/operations",
+    }]
+
+    def complete(messages, tools, *, allow_tools=True, required_tool=None):
+        calls.append((messages, allow_tools))
+        if len(calls) == 1:
+            response = search_call("operations")
+            response["tool_calls"][0]["function"]["name"] = "web_search"
+            return response
+        if len(calls) == 2:
+            return {"role": "assistant", "content": "* **Operations:**"}
+        return final_answer([{"kind": "grounded", "text": "Operations are running.", "source_ids": ["source-1"]}])
+
+    monkeypatch.setattr(chat_service, "chat_tool_completion", complete)
+    monkeypatch.setattr(chat_service, "perform_web_search", lambda query: web_results)
+
+    response = chat_service.answer_from_knowledge("How are operations?", "staff", web_search=True)
+
+    assert response.answer == "Operations are running. [1]"
+    assert response.citations[0].url == "https://example.com/operations"
+    assert [allow_tools for _, allow_tools in calls] == [True, False, False]
+    assert "required response format" in calls[2][0][-1]["content"]
+
+
 def test_grounded_answer_carries_citations(monkeypatch) -> None:
     results = [
         {
@@ -150,10 +183,33 @@ def test_mixed_answer_remaps_and_deduplicates_sources(monkeypatch):
     monkeypatch.setattr(chat_service, "chat_tool_completion", complete)
     response = chat_service.answer_from_knowledge("Report and your opinion?", "staff")
     assert response.answer == (
-        "From your documents\nSales increased. [1]\n\nGeneral analysis\nConsider expanding distribution."
+        "From your documents\n\nSales increased. [1]\n\nGeneral analysis\n\nConsider expanding distribution."
     )
     assert [citation.title for citation in response.citations] == ["report.pdf"]
     assert searches == [("sales report", "staff")]
+
+
+def test_answer_formats_markdown_bullets_and_labels_once(monkeypatch):
+    results = [{"title": "report.pdf", "heading": "Sales", "snippet": "Sales increased.", "source_locations": []}]
+
+    def complete(messages, tools, *, allow_tools=True):
+        if allow_tools:
+            return search_call("sales report")
+        return final_answer([
+            {"kind": "grounded", "text": "• Sales increased.\n• Distribution grew.", "source_ids": ["source-1"]},
+            {"kind": "grounded", "text": "• Customer retention improved.", "source_ids": ["source-1"]},
+            {"kind": "general", "text": "Consider expanding distribution.", "source_ids": []},
+        ])
+
+    monkeypatch.setattr(chat_service, "search_knowledge", lambda query, role: results)
+    monkeypatch.setattr(chat_service, "chat_tool_completion", complete)
+
+    response = chat_service.answer_from_knowledge("Report and your opinion?", "staff")
+
+    assert response.answer == (
+        "From your documents\n\n- Sales increased.\n- Distribution grew. [1]\n\n"
+        "- Customer retention improved. [1]\n\nGeneral analysis\n\nConsider expanding distribution."
+    )
 
 
 @pytest.mark.parametrize("multiple_initial_calls", [True, False])

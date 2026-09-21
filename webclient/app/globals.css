@@ -116,6 +116,44 @@
   display: none;
 }
 
+.citation-scroll {
+  scrollbar-color: rgb(118 120 114 / 0.55) transparent !important;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+}
+
+.citation-scroll::-webkit-scrollbar {
+  background: transparent !important;
+  width: 8px;
+}
+
+.citation-scroll::-webkit-scrollbar-track {
+  background-color: transparent !important;
+  background: transparent !important;
+}
+
+.citation-scroll::-webkit-scrollbar-corner {
+  background: transparent !important;
+}
+
+.citation-scroll::-webkit-scrollbar-thumb {
+  background: rgb(118 120 114 / 0.55);
+  background-clip: content-box;
+  border: 2px solid transparent;
+  border-radius: 9999px;
+}
+
+.citation-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgb(118 120 114 / 0.75);
+  background-clip: content-box;
+}
+
+.citation-scroll::-webkit-scrollbar-button {
+  display: none !important;
+  height: 0;
+  width: 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

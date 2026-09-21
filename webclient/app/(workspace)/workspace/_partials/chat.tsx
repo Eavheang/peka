@@ -6,6 +6,8 @@ import axios from "axios";
 import { ArrowUp, BookOpen, Globe2, LoaderCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
+import Markdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 import { Button } from "@/components/ui/button";
 import type { ChatResult, ChatUIMessage } from "@/interface/chat";
@@ -201,23 +203,23 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
                 }}
               />
               <div className="flex items-center gap-3 px-3 pb-1 pt-2">
-                 <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-medium text-copy">
-                   <input
-                     aria-describedby="web-search-help"
-                     aria-label="Enable web search"
-                     checked={webSearchEnabled}
-                     className="peer sr-only"
-                     role="switch"
-                     type="checkbox"
-                     onChange={(event) => setWebSearchEnabled(event.target.checked)}
-                   />
-                   <Globe2 aria-hidden="true" size={14} />
-                   Web search
-                   <span
-                     aria-hidden="true"
-                     className="relative h-5 w-9 rounded-full bg-border transition-colors after:absolute after:top-0.5 after:left-0.5 after:size-4 after:rounded-full after:bg-white after:shadow-sm after:transition-transform peer-checked:bg-primary peer-checked:after:translate-x-4 peer-focus-visible:ring-2 peer-focus-visible:ring-ring/50"
-                   />
-                 </label>
+                <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-medium text-copy">
+                  <input
+                    aria-describedby="web-search-help"
+                    aria-label="Allow web search"
+                    checked={webSearchEnabled}
+                    className="peer sr-only"
+                    role="switch"
+                    type="checkbox"
+                    onChange={(event) => setWebSearchEnabled(event.target.checked)}
+                  />
+                  <Globe2 aria-hidden="true" size={14} />
+                  Allow web search
+                  <span
+                    aria-hidden="true"
+                    className="relative h-5 w-9 rounded-full bg-border transition-colors after:absolute after:top-0.5 after:left-0.5 after:size-4 after:rounded-full after:bg-white after:shadow-sm after:transition-transform peer-checked:bg-primary peer-checked:after:translate-x-4 peer-focus-visible:ring-2 peer-focus-visible:ring-ring/50"
+                  />
+                </label>
                 <span id="web-search-help" className="text-[11px] text-muted">
                   {webSearchEnabled ? "Public web enabled" : "Private knowledge only"}
                 </span>
@@ -226,7 +228,7 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
             <Button
               aria-label={isPending ? "Responding" : "Send message"}
               className="rounded-full"
-                  disabled={isPending}
+              disabled={isPending}
               size="icon-lg"
               type="submit"
             >
@@ -271,21 +273,31 @@ function ChatMessageBubble({ message, result }: { message: ChatUIMessage; result
             Not enough evidence
           </p>
         )}
-        {message.parts.map(
-          (part, index) =>
-            part.type === "text" && (
+        {message.parts.map((part, index) => {
+          if (part.type !== "text") return null;
+
+          if (isUser) {
+            return (
               <p
-                className={
-                  isUser
-                    ? "whitespace-pre-wrap text-sm leading-7 text-panel-foreground"
-                    : "whitespace-pre-wrap text-sm leading-7"
-                }
+                className="whitespace-pre-wrap text-sm leading-7 text-panel-foreground"
                 key={`${message.id}-text-${index}`}
               >
                 {part.text}
               </p>
-            ),
-        )}
+            );
+          }
+
+          return (
+            <div
+              className="break-words text-sm leading-7 [&_h1]:my-4 [&_h1]:text-xl [&_h2]:my-4 [&_h2]:text-lg [&_h3]:my-3 [&_h3]:text-base [&_p]:my-3 [&_ul]:my-3 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:my-3 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-1 [&_pre]:my-3 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-secondary [&_pre]:p-3 [&_code]:text-xs"
+              key={`${message.id}-text-${index}`}
+            >
+              <Markdown remarkPlugins={[remarkGfm]} skipHtml>
+                {part.text}
+              </Markdown>
+            </div>
+          );
+        })}
         {!isUser && result && result.citations.length > 0 && (
           <details className="mt-5 border-t border-border pt-4">
             <summary className="cursor-pointer text-xs font-semibold text-muted hover:text-foreground">
