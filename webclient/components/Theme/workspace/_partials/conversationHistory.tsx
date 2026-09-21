@@ -76,8 +76,8 @@ function ConversationLink({
       href={`/workspace/${conversation.id}`}
       onClick={onNavigate}
     >
-      <MessageSquare aria-hidden="true" size={17} strokeWidth={1.8} />
-      <span className="truncate">{title}</span>
+      <MessageSquare aria-hidden="true" className="shrink-0" size={17} strokeWidth={1.8} />
+      <span className="min-w-0 flex-1 truncate">{title}</span>
     </Link>
   );
 

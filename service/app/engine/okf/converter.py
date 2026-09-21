@@ -2,9 +2,12 @@ import json
 import re
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
-from app.config import settings
-from app.engine.llm_client import LLMError, chat_completion
+import ai
+from pydantic import BaseModel, ConfigDict, Field
+
+from app.engine.ai_runtime import AIModelError, generate_structured
 from app.engine.okf.file_writer import write_okf_files
 
 
@@ -12,32 +15,66 @@ class OKFConversionError(RuntimeError):
     pass
 
 
+class OKFDocumentAnalysis(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    title: str = Field(min_length=1)
+    document_type: str = Field(min_length=1)
+    category: str = Field(min_length=1)
+    filename: str = Field(min_length=1)
+    confidence: float = Field(ge=0, le=1)
+
+
+class OKFFile(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    path: str = Field(min_length=1)
+    file_type: Literal["okf_concept"]
+    content: str = Field(min_length=1)
+
+
+class OKFRetrievalSection(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    concept_path: str = Field(min_length=1)
+    heading: str = Field(min_length=1)
+    anchor: str = Field(min_length=1)
+    pages: list[int]
+    summary: str = Field(min_length=1)
+
+
+class OKFResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    document_analysis: OKFDocumentAnalysis
+    folder_structure: list[str] = Field(min_length=1)
+    files: list[OKFFile] = Field(min_length=1)
+    retrieval_sections: list[OKFRetrievalSection]
+
+
 def convert_to_okf(extraction: dict, base_dir: Path) -> dict:
     payload = dict(extraction)
 
     try:
-        content = chat_completion(
+        result = generate_structured(
             [
-                {"role": "system", "content": _prompt()},
-                {"role": "user", "content": json.dumps(dict(extraction), ensure_ascii=False)},
+                ai.system_message(_prompt()),
+                ai.user_message(json.dumps(payload, ensure_ascii=False, default=str)),
             ],
-            json_mode=True,
+            OKFResult,
         )
-    except LLMError as error:
+    except AIModelError as error:
         raise OKFConversionError(str(error)) from error
 
-    try:
-        result = json.loads(content, strict=False)
-    except (json.JSONDecodeError, TypeError) as error:
-        raise OKFConversionError("LLM returned invalid JSON") from error
+    result_dict = result.model_dump(mode="json")
 
     try:
-        _validate_concept_result(result)
-        write_okf_files(result, base_dir)
+        _validate_concept_result(result_dict)
+        write_okf_files(result_dict, base_dir)
         write_indexes(base_dir)
     except ValueError as error:
         raise OKFConversionError(str(error)) from error
-    return result
+    return result_dict
 
 
 def _validate_concept_result(result: dict) -> None:

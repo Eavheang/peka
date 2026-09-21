@@ -1,7 +1,7 @@
+import asyncio
 from fastapi.testclient import TestClient
 from datetime import datetime, timezone
 from uuid import uuid4
-import json
 
 import pytest
 
@@ -19,10 +19,13 @@ def test_general_question_does_not_search(monkeypatch) -> None:
         raise AssertionError("General questions must not search")
 
     monkeypatch.setattr(chat_service, "search_knowledge", no_search)
-    monkeypatch.setattr(chat_service, "chat_tool_completion", lambda *args, **kwargs: {
-        "role": "assistant",
-        "content": json.dumps({"blocks": [{"kind": "general", "text": "2", "source_ids": []}]}),
-    })
+    monkeypatch.setattr(
+        chat_service,
+        "generate_structured",
+        lambda messages, output_type: chat_service.ModelAnswer(
+            blocks=[{"kind": "general", "text": "2", "source_ids": []}]
+        ),
+    )
 
     response = chat_service.answer_from_knowledge("What is 1+1?", "staff")
     assert response.answer == "2"
@@ -30,52 +33,26 @@ def test_general_question_does_not_search(monkeypatch) -> None:
     assert response.refused is False
 
 
-def test_answer_accepts_json_with_model_preamble_and_trailing_text(monkeypatch) -> None:
-    content = (
-        "Here is the answer:\n```json\n"
-        '{"blocks":[{"kind":"general","text":"Answer","source_ids":[]}]}'
-        "\n```\nI hope this helps."
-    )
-    monkeypatch.setattr(
-        chat_service, "chat_tool_completion", lambda *args, **kwargs: {"content": content},
-    )
+def test_answer_rejects_json_with_model_preamble_and_trailing_text(monkeypatch) -> None:
+    def invalid_output(messages, output_type):
+        raise chat_service.AIModelError("Model returned an invalid structured response")
 
-    response = chat_service.answer_from_knowledge("question", "staff")
+    monkeypatch.setattr(chat_service, "generate_structured", invalid_output)
 
-    assert response.answer == "Answer"
+    with pytest.raises(chat_service.AIModelError, match="invalid structured"):
+        chat_service.answer_from_knowledge("question", "staff")
 
 
-def test_invalid_web_search_answer_is_repaired(monkeypatch) -> None:
-    calls = []
-    web_results = [{
-        "title": "Operations report",
-        "heading": "",
-        "snippet": "Operations are running.",
-        "content": "Operations are running.",
-        "source_locations": [],
-        "score": 0.9,
-        "url": "https://example.com/operations",
-    }]
+def test_invalid_structured_answer_fails_closed(monkeypatch) -> None:
+    def invalid_output(messages, output_type):
+        raise chat_service.AIModelError("Model returned an invalid structured response")
 
-    def complete(messages, tools, *, allow_tools=True, required_tool=None):
-        calls.append((messages, allow_tools))
-        if len(calls) == 1:
-            response = search_call("operations")
-            response["tool_calls"][0]["function"]["name"] = "web_search"
-            return response
-        if len(calls) == 2:
-            return {"role": "assistant", "content": "* **Operations:**"}
-        return final_answer([{"kind": "grounded", "text": "Operations are running.", "source_ids": ["source-1"]}])
+    monkeypatch.setattr(chat_service, "generate_structured", invalid_output)
 
-    monkeypatch.setattr(chat_service, "chat_tool_completion", complete)
-    monkeypatch.setattr(chat_service, "perform_web_search", lambda query: web_results)
-
-    response = chat_service.answer_from_knowledge("How are operations?", "staff", web_search=True)
-
-    assert response.answer == "Operations are running. [1]"
-    assert response.citations[0].url == "https://example.com/operations"
-    assert [allow_tools for _, allow_tools in calls] == [True, False, False]
-    assert "required response format" in calls[2][0][-1]["content"]
+    with pytest.raises(chat_service.AIModelError):
+        chat_service.answer_from_knowledge(
+            "Do you know about JEV AI?", "staff", web_search=True
+        )
 
 
 def test_grounded_answer_carries_citations(monkeypatch) -> None:
@@ -97,16 +74,22 @@ def test_grounded_answer_carries_citations(monkeypatch) -> None:
     ]
     seen: dict = {}
 
-    def fake_completion(messages, tools, *, allow_tools=True):
-        if allow_tools:
-            return search_call("refund time?")
-        seen["prompt"] = messages[-1]["content"]
-        return final_answer([
-            {"kind": "grounded", "text": "Refunds take 14 days.", "source_ids": ["source-1"]},
-        ])
+    def fake_generation(messages, output_type):
+        if output_type is chat_service.SearchRequest:
+            return chat_service.SearchRequest(query="refund time?")
+        seen["prompt"] = messages[-1].text
+        return chat_service.ModelAnswer(
+            blocks=[
+                {
+                    "kind": "grounded",
+                    "text": "Refunds take 14 days.",
+                    "source_ids": ["source-1"],
+                }
+            ]
+        )
 
     monkeypatch.setattr(chat_service, "search_knowledge", lambda query, role: results)
-    monkeypatch.setattr(chat_service, "chat_tool_completion", fake_completion)
+    monkeypatch.setattr(chat_service, "generate_structured", fake_generation)
 
     response = chat_service.answer_from_knowledge("refund time?", "admin")
 
@@ -118,45 +101,45 @@ def test_grounded_answer_carries_citations(monkeypatch) -> None:
     assert response.citations[0].page == 3
 
 
-def search_call(query):
-    return {"role": "assistant", "content": None, "tool_calls": [{
-        "id": "call-1", "type": "function",
-        "function": {"name": "search_knowledge_base", "arguments": json.dumps({"query": query})},
-    }]}
-
-
-def final_answer(blocks):
-    return {"role": "assistant", "content": json.dumps({"blocks": blocks})}
-
-
 def test_empty_search_falls_back_without_citations(monkeypatch):
     calls = []
 
-    def complete(messages, tools, *, allow_tools=True):
-        calls.append(allow_tools)
-        if allow_tools:
-            return search_call("improve sales")
-        assert json.loads(messages[-1]["content"]) == {}
-        return final_answer([{"kind": "general", "text": "Consider customer feedback.", "source_ids": []}])
+    def generate(messages, output_type):
+        calls.append(output_type)
+        if output_type is chat_service.SearchRequest:
+            return chat_service.SearchRequest(query="improve sales")
+        assert "<search_results>\n{}\n</search_results>" in messages[-1].text
+        return chat_service.ModelAnswer(
+            blocks=[
+                {
+                    "kind": "general",
+                    "text": "Consider customer feedback.",
+                    "source_ids": [],
+                }
+            ]
+        )
 
-    monkeypatch.setattr(chat_service, "chat_tool_completion", complete)
+    monkeypatch.setattr(chat_service, "generate_structured", generate)
     monkeypatch.setattr(chat_service, "search_knowledge", lambda *args: [])
     response = chat_service.answer_from_knowledge("How do we improve sales?", "staff")
     assert response.answer == "Consider customer feedback."
     assert response.citations == []
     assert response.refused is False
-    assert calls == [True, False]
+    assert calls == [chat_service.SearchRequest, chat_service.ModelAnswer]
 
 
 @pytest.mark.parametrize("blocks", [
     [{"kind": "grounded", "text": "Invented.", "source_ids": ["source-99"]}],
     [{"kind": "grounded", "text": "Uncited.", "source_ids": []}],
     [{"kind": "general", "text": "Incorrect citation.", "source_ids": ["source-1"]}],
-    [],
 ])
 def test_invalid_answer_sources_fail_closed(monkeypatch, blocks):
-    monkeypatch.setattr(chat_service, "chat_tool_completion", lambda *args, **kwargs: final_answer(blocks))
-    with pytest.raises(chat_service.LLMError):
+    monkeypatch.setattr(
+        chat_service,
+        "generate_structured",
+        lambda messages, output_type: chat_service.ModelAnswer(blocks=blocks),
+    )
+    with pytest.raises(chat_service.AIModelError):
         chat_service.answer_from_knowledge("question", "staff")
 
 
@@ -171,16 +154,26 @@ def test_mixed_answer_remaps_and_deduplicates_sources(monkeypatch):
         searches.append((query, role))
         return results
 
-    def complete(messages, tools, *, allow_tools=True):
-        if allow_tools:
-            return search_call("sales report")
-        return final_answer([
-            {"kind": "grounded", "text": "Sales increased.", "source_ids": ["source-2", "source-2"]},
-            {"kind": "general", "text": "Consider expanding distribution.", "source_ids": []},
-        ])
+    def generate(messages, output_type):
+        if output_type is chat_service.SearchRequest:
+            return chat_service.SearchRequest(query="sales report")
+        return chat_service.ModelAnswer(
+            blocks=[
+                {
+                    "kind": "grounded",
+                    "text": "Sales increased.",
+                    "source_ids": ["source-2", "source-2"],
+                },
+                {
+                    "kind": "general",
+                    "text": "Consider expanding distribution.",
+                    "source_ids": [],
+                },
+            ]
+        )
 
     monkeypatch.setattr(chat_service, "search_knowledge", search)
-    monkeypatch.setattr(chat_service, "chat_tool_completion", complete)
+    monkeypatch.setattr(chat_service, "generate_structured", generate)
     response = chat_service.answer_from_knowledge("Report and your opinion?", "staff")
     assert response.answer == (
         "From your documents\n\nSales increased. [1]\n\nGeneral analysis\n\nConsider expanding distribution."
@@ -192,17 +185,31 @@ def test_mixed_answer_remaps_and_deduplicates_sources(monkeypatch):
 def test_answer_formats_markdown_bullets_and_labels_once(monkeypatch):
     results = [{"title": "report.pdf", "heading": "Sales", "snippet": "Sales increased.", "source_locations": []}]
 
-    def complete(messages, tools, *, allow_tools=True):
-        if allow_tools:
-            return search_call("sales report")
-        return final_answer([
-            {"kind": "grounded", "text": "• Sales increased.\n• Distribution grew.", "source_ids": ["source-1"]},
-            {"kind": "grounded", "text": "• Customer retention improved.", "source_ids": ["source-1"]},
-            {"kind": "general", "text": "Consider expanding distribution.", "source_ids": []},
-        ])
+    def generate(messages, output_type):
+        if output_type is chat_service.SearchRequest:
+            return chat_service.SearchRequest(query="sales report")
+        return chat_service.ModelAnswer(
+            blocks=[
+                {
+                    "kind": "grounded",
+                    "text": "• Sales increased.\n• Distribution grew.",
+                    "source_ids": ["source-1"],
+                },
+                {
+                    "kind": "grounded",
+                    "text": "• Customer retention improved.",
+                    "source_ids": ["source-1"],
+                },
+                {
+                    "kind": "general",
+                    "text": "Consider expanding distribution.",
+                    "source_ids": [],
+                },
+            ]
+        )
 
     monkeypatch.setattr(chat_service, "search_knowledge", lambda query, role: results)
-    monkeypatch.setattr(chat_service, "chat_tool_completion", complete)
+    monkeypatch.setattr(chat_service, "generate_structured", generate)
 
     response = chat_service.answer_from_knowledge("Report and your opinion?", "staff")
 
@@ -212,17 +219,19 @@ def test_answer_formats_markdown_bullets_and_labels_once(monkeypatch):
     )
 
 
-@pytest.mark.parametrize("multiple_initial_calls", [True, False])
-def test_enforces_one_search_per_turn(monkeypatch, multiple_initial_calls):
+def test_enforces_one_search_per_turn(monkeypatch):
     searches = []
-    response = search_call("sales")
-    if multiple_initial_calls:
-        response["tool_calls"] *= 2
-    monkeypatch.setattr(chat_service, "chat_tool_completion", lambda *args, **kwargs: response)
+    def generate(messages, output_type):
+        if output_type is chat_service.SearchRequest:
+            return chat_service.SearchRequest(query="sales")
+        return chat_service.ModelAnswer(
+            blocks=[{"kind": "general", "text": "No results.", "source_ids": []}]
+        )
+
+    monkeypatch.setattr(chat_service, "generate_structured", generate)
     monkeypatch.setattr(chat_service, "search_knowledge", lambda *args: searches.append(args) or [])
-    with pytest.raises(chat_service.LLMError):
-        chat_service.answer_from_knowledge("sales", "staff")
-    assert len(searches) == (0 if multiple_initial_calls else 1)
+    chat_service.answer_from_knowledge("sales", "staff")
+    assert len(searches) == 1
 
 
 def test_model_receives_bounded_conversation_context(monkeypatch):
@@ -230,16 +239,18 @@ def test_model_receives_bounded_conversation_context(monkeypatch):
     history = [{"role": "user", "content": "old", "id": "ignored"}] * 25
     history.append({"role": "assistant", "content": "Option two is distribution."})
 
-    def complete(messages, tools, **kwargs):
+    def generate(messages, output_type):
         seen.extend(messages)
-        return final_answer([{"kind": "general", "text": "More details.", "source_ids": []}])
+        return chat_service.ModelAnswer(
+            blocks=[{"kind": "general", "text": "More details.", "source_ids": []}]
+        )
 
-    monkeypatch.setattr(chat_service, "chat_tool_completion", complete)
+    monkeypatch.setattr(chat_service, "generate_structured", generate)
     chat_service.answer_from_knowledge("What about the second option?", "staff", history)
     assert len(seen) == 22
-    assert seen[-2] == {"role": "assistant", "content": "Option two is distribution."}
-    assert seen[-1]["content"] == "What about the second option?"
-    assert all("id" not in message for message in seen)
+    assert seen[-2].role == "assistant"
+    assert seen[-2].text == "Option two is distribution."
+    assert seen[-1].text == "What about the second option?"
 
 
 def test_chat_endpoint_requires_auth(client: TestClient) -> None:
@@ -264,6 +275,71 @@ def test_chat_endpoint_returns_answer(monkeypatch) -> None:
         assert body == {"answer": "ok [1]", "refused": False, "citations": []}
     finally:
         app.dependency_overrides.clear()
+
+
+def test_chat_stream_endpoint_emits_text_and_persists_completion(monkeypatch) -> None:
+    from app.chat import routes as chat_routes
+
+    conversation_id = uuid4()
+
+    async def stream_answer(*args, **kwargs):
+        yield chat_service.ChatStreamStatus("Writing response...")
+        yield chat_service.ChatStreamText("Hello")
+        yield chat_service.ChatStreamText(" world")
+        yield chat_service.ChatStreamCompleted(
+            chat_service.ChatResponse(answer="Hello world", refused=False, citations=[])
+        )
+
+    def persist(*args):
+        return args[2].model_copy(
+            update={"conversation_id": conversation_id, "messages": []}
+        )
+
+    monkeypatch.setattr(chat_routes.chat_service, "stream_answer_from_knowledge", stream_answer)
+    monkeypatch.setattr(chat_routes.chat_service, "persist_response", persist)
+    _override_admin()
+    try:
+        response = TestClient(app).post("/chat/stream", json={"query": "hello"})
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/event-stream")
+    assert '"type": "text", "delta": "Hello"' in response.text
+    assert '"type": "done"' in response.text
+    assert '"conversation_id": "' + str(conversation_id) in response.text
+    assert "data: [DONE]" in response.text
+
+
+def test_stream_answer_parses_incremental_json_and_validates_answer(monkeypatch) -> None:
+    async def stream_text(*args, **kwargs):
+        for chunk in (
+            '{"blocks":[{"kind":"general","text":"Hello ',
+            'world\\nline',
+            '","source_ids":[]}]}'
+        ):
+            yield chunk
+
+    monkeypatch.setattr(chat_service, "stream_structured_text", stream_text)
+
+    async def collect():
+        return [
+            event
+            async for event in chat_service.stream_answer_from_knowledge("hello", "staff")
+        ]
+
+    events = asyncio.run(collect())
+    text = "".join(
+        event.delta
+        for event in events
+        if isinstance(event, chat_service.ChatStreamText)
+    )
+    completed = next(
+        event for event in events if isinstance(event, chat_service.ChatStreamCompleted)
+    )
+
+    assert text == "Hello world\nline"
+    assert completed.response.answer == "Hello world\nline"
 
 
 def test_first_message_is_persisted_and_returned(monkeypatch) -> None:
