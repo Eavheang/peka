@@ -23,6 +23,27 @@ def test_tool_completion_sends_controlled_payload(monkeypatch, allow_tools):
         assert sent[0]["response_format"] == {"type": "json_object"}
 
 
+def test_tool_completion_can_require_a_specific_tool(monkeypatch):
+    sent = []
+    message = {"role": "assistant", "content": None, "tool_calls": []}
+
+    def post(url, **kwargs):
+        sent.append(kwargs["json"])
+        return httpx.Response(200, json={"choices": [{"message": message}]}, request=httpx.Request("POST", url))
+
+    monkeypatch.setattr(llm_client.httpx, "post", post)
+    llm_client.chat_tool_completion(
+        [{"role": "user", "content": "question"}],
+        [{"type": "function", "function": {"name": "web_search"}}],
+        required_tool="web_search",
+    )
+
+    assert sent[0]["tool_choice"] == {
+        "type": "function",
+        "function": {"name": "web_search"},
+    }
+
+
 @pytest.mark.parametrize("payload", [{}, {"choices": []}, {"choices": [{"message": "invalid"}]}])
 def test_malformed_provider_response_is_a_safe_error(monkeypatch, payload):
     monkeypatch.setattr(llm_client.httpx, "post", lambda url, **kwargs: httpx.Response(
