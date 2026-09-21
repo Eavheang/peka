@@ -10,7 +10,7 @@ import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import { Button } from "@/components/ui/button";
-import type { ChatResult, ChatUIMessage } from "@/interface/chat";
+import type { ChatMessage, ChatResult } from "@/interface/chat";
 import { sendChatMessageStream, useGetConversation } from "@/services/chat";
 
 const MAX_QUERY_LENGTH = 4000;
@@ -19,12 +19,19 @@ const SourcePreview = dynamic(() =>
   import("./sourcePreview").then((module) => module.SourcePreview),
 );
 
+type DisplayMessage = {
+  id: string;
+  role: "user" | "assistant";
+  text: string;
+  result?: ChatResult;
+};
+
 export function ChatPanel({ conversationId }: { conversationId?: string }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
   const [validationError, setValidationError] = useState("");
-  const [messages, setMessages] = useState<ChatUIMessage[]>([]);
+  const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [isPending, setIsPending] = useState(false);
   const [requestError, setRequestError] = useState("");
   const [streamStatus, setStreamStatus] = useState("");
@@ -47,7 +54,7 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
     if (!conversationQuery.data) return;
 
     setMessages(
-      conversationQuery.data.messages.map((message) => toChatUIMessage(message, conversationId)),
+      conversationQuery.data.messages.map((message) => toDisplayMessage(message, conversationId)),
     );
   }, [conversationQuery.data, conversationId]);
 
@@ -84,16 +91,16 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
 
     setValidationError("");
     setRequestError("");
-    const userMessage: ChatUIMessage = {
+    const userMessage: DisplayMessage = {
       id: crypto.randomUUID(),
       role: "user",
-      parts: [{ type: "text", text: trimmedQuery }],
+      text: trimmedQuery,
     };
     const assistantMessageId = crypto.randomUUID();
     setMessages((current) => [
       ...current,
       userMessage,
-      { id: assistantMessageId, role: "assistant", parts: [{ type: "text", text: "" }] },
+      { id: assistantMessageId, role: "assistant", text: "" },
     ]);
     setIsPending(true);
     setStreamingMessageId(assistantMessageId);
@@ -112,7 +119,13 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
             setStreamStatus(event.message);
             return;
           }
-          setMessages((current) => appendAssistantText(current, assistantMessageId, event.delta));
+          setMessages((current) =>
+            current.map((message) =>
+              message.id === assistantMessageId
+                ? { ...message, text: message.text + event.delta }
+                : message,
+            ),
+          );
         },
       );
 
@@ -121,17 +134,12 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
           message.id === assistantMessageId
             ? {
                 ...message,
-                parts: [
-                  { type: "text", text: response.answer },
-                  {
-                    type: "data-chat-result" as const,
-                    data: {
-                      conversationId: response.conversation_id,
-                      refused: response.refused,
-                      citations: response.citations,
-                    },
-                  },
-                ],
+                text: response.answer,
+                result: {
+                  conversationId: response.conversation_id,
+                  refused: response.refused,
+                  citations: response.citations,
+                },
               }
             : message,
         ),
@@ -196,7 +204,6 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
               <ChatMessageBubble
                 key={message.id}
                 message={message}
-                result={getChatResult(message)}
                 streamingStatus={message.id === streamingMessageId ? streamStatus : undefined}
               />
             ))
@@ -295,14 +302,13 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
 
 function ChatMessageBubble({
   message,
-  result,
   streamingStatus,
 }: {
-  message: ChatUIMessage;
-  result?: ChatResult;
+  message: DisplayMessage;
   streamingStatus?: string;
 }) {
   const isUser = message.role === "user";
+  const result = message.result;
 
   return (
     <article className={isUser ? "ml-auto max-w-2xl" : "max-w-3xl"}>
@@ -318,33 +324,19 @@ function ChatMessageBubble({
             Not enough evidence
           </p>
         )}
-        {message.parts.map((part, index) => {
-          if (part.type !== "text") return null;
-          if (!part.text) return null;
-
-          if (isUser) {
-            return (
-              <p
-                className="whitespace-pre-wrap text-sm leading-7 text-panel-foreground"
-                key={`${message.id}-text-${index}`}
-              >
-                {part.text}
-              </p>
-            );
-          }
-
-          return (
-            <div
-              className="break-words text-sm leading-7 [&_h1]:my-4 [&_h1]:text-xl [&_h2]:my-4 [&_h2]:text-lg [&_h3]:my-3 [&_h3]:text-base [&_p]:my-3 [&_ul]:my-3 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:my-3 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-1 [&_pre]:my-3 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-secondary [&_pre]:p-3 [&_code]:text-xs"
-              key={`${message.id}-text-${index}`}
-            >
+        {message.text &&
+          (isUser ? (
+            <p className="whitespace-pre-wrap text-sm leading-7 text-panel-foreground">
+              {message.text}
+            </p>
+          ) : (
+            <div className="break-words text-sm leading-7 [&_h1]:my-4 [&_h1]:text-xl [&_h2]:my-4 [&_h2]:text-lg [&_h3]:my-3 [&_h3]:text-base [&_p]:my-3 [&_ul]:my-3 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:my-3 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-1 [&_pre]:my-3 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-secondary [&_pre]:p-3 [&_code]:text-xs">
               <Markdown remarkPlugins={[remarkGfm]} skipHtml>
-                {part.text}
+                {message.text}
               </Markdown>
             </div>
-          );
-        })}
-        {streamingStatus && !message.parts.some((part) => part.type === "text" && part.text) && (
+          ))}
+        {streamingStatus && !message.text && (
           <p className="flex items-center gap-2 text-sm text-muted">
             <LoaderCircle aria-hidden="true" className="animate-spin" size={14} />
             {streamingStatus}
@@ -372,54 +364,22 @@ function ChatMessageBubble({
   );
 }
 
-function getChatResult(message: ChatUIMessage): ChatResult | undefined {
-  const part = message.parts.find((candidate) => candidate.type === "data-chat-result");
-  return part?.type === "data-chat-result" ? part.data : undefined;
-}
-
-function appendAssistantText(
-  messages: ChatUIMessage[],
-  messageId: string,
-  delta: string,
-): ChatUIMessage[] {
-  return messages.map((message) => {
-    if (message.id !== messageId) return message;
-    return {
-      ...message,
-      parts: message.parts.map((part) =>
-        part.type === "text" ? { ...part, text: part.text + delta } : part,
-      ),
-    };
-  });
-}
-
-function toChatUIMessage(
-  message: {
-    id: string;
-    role: "user" | "assistant";
-    content: string;
-    refused: boolean;
-    citations: ChatResult["citations"];
-  },
+function toDisplayMessage(
+  message: Pick<ChatMessage, "id" | "role" | "content" | "refused" | "citations">,
   conversationId?: string,
-): ChatUIMessage {
+): DisplayMessage {
   return {
     id: message.id,
     role: message.role,
-    parts: [
-      { type: "text", text: message.content },
-      ...(message.role === "assistant"
-        ? [
-            {
-              type: "data-chat-result" as const,
-              data: {
-                conversationId: conversationId ?? "",
-                refused: message.refused,
-                citations: message.citations,
-              },
-            },
-          ]
-        : []),
-    ],
+    text: message.content,
+    ...(message.role === "assistant"
+      ? {
+          result: {
+            conversationId: conversationId ?? "",
+            refused: message.refused,
+            citations: message.citations,
+          },
+        }
+      : {}),
   };
 }

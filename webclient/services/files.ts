@@ -48,9 +48,11 @@ export function useUpdateFileAccessLevel() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, accessLevel }: { id: string; accessLevel: AccessLevel }) =>
-      (await axiosInstance.patch<StoredFile>(`/files/${id}/access-level`, {
-        access_level: accessLevel,
-      })).data,
+      (
+        await axiosInstance.patch<StoredFile>(`/files/${id}/access-level`, {
+          access_level: accessLevel,
+        })
+      ).data,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: filesKey }),
   });
 }

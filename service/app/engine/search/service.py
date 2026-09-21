@@ -1,23 +1,16 @@
+from app.engine.chunks.embeddings import EmbeddingError, embed_texts
 from app.engine.search.repository import search_repository
-
-import httpx
-from app.config import settings
 
 
 def embed_query(query: str) -> list[float]:
     try:
-        response = httpx.post(
-            f"{settings.embedding_base_url.rstrip('/')}/embeddings",
-            json={"input": [query], "model": settings.embedding_model, "encoding_format": "float"},
+        return embed_texts(
+            [query],
             timeout=60,
-        )
-        response.raise_for_status()
-        vector = sorted(response.json()["data"], key=lambda item: item["index"])[0]["embedding"]
-    except (httpx.HTTPError, KeyError, IndexError, TypeError, ValueError) as error:
-        raise RuntimeError("Unable to embed query") from error
-    if not isinstance(vector, list) or len(vector) != settings.embedding_dimensions:
-        raise RuntimeError("Query embedding has invalid dimensions")
-    return vector
+            error_message="Unable to embed query",
+        )[0]
+    except (EmbeddingError, IndexError) as error:
+        raise RuntimeError(str(error)) from error
 
 
 ROLE_ACCESS_LEVELS = {

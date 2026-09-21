@@ -12,10 +12,10 @@ export const useLogin = () => {
   });
 };
 
-export const useGetCurrentUser = (accessToken: string, enabled = true) => {
+export const useGetCurrentUser = (accessToken: string) => {
   return useQuery<UserResponse>({
     queryKey: ["users", "me"],
-    enabled: enabled && Boolean(accessToken),
+    enabled: Boolean(accessToken),
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,

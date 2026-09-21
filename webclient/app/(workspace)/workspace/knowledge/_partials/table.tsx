@@ -5,7 +5,13 @@ import { Download, FileText, RotateCcw, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { AccessLevel, StoredFile } from "@/interface/files";
 import { useUpdateFileAccessLevel } from "@/services/files";
 import {
@@ -17,19 +23,21 @@ import {
   TableRow,
 } from "@/components/ui/table";
 function fileName(file: StoredFile) {
-  return file.path.split('/').pop() ?? file.path;
+  return file.path.split("/").pop() ?? file.path;
 }
 
-function statusLabel(status: StoredFile['okf_status']) {
-  return { queued: 'Queued', processing: 'Indexing', completed: 'Indexed', failed: 'Failed' }[status];
+function statusLabel(status: StoredFile["okf_status"]) {
+  return { queued: "Queued", processing: "Indexing", completed: "Indexed", failed: "Failed" }[
+    status
+  ];
 }
 
-function statusClass(status: StoredFile['okf_status']) {
-  return status === 'completed'
-    ? 'border-success bg-success text-success-foreground'
-    : status === 'failed'
-      ? 'border-danger bg-danger text-danger-foreground'
-      : 'border-border bg-secondary text-secondary-foreground';
+function statusClass(status: StoredFile["okf_status"]) {
+  return status === "completed"
+    ? "border-success bg-success text-success-foreground"
+    : status === "failed"
+      ? "border-danger bg-danger text-danger-foreground"
+      : "border-border bg-secondary text-secondary-foreground";
 }
 
 const PAGE_SIZE = 5;
@@ -87,9 +95,7 @@ export function KnowledgeTable({
     <div className="overflow-hidden rounded-2xl border border-border bg-background shadow-sm">
       {canManageAccess && selectedFiles.size > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-secondary/20 px-5 py-2.5">
-          <span className="text-sm font-medium text-copy">
-            {selectedFiles.size} selected
-          </span>
+          <span className="text-sm font-medium text-copy">{selectedFiles.size} selected</span>
           <Select
             value={bulkAccessLevel || null}
             onValueChange={(value) => {

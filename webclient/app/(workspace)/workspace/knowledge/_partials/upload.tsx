@@ -5,7 +5,13 @@ import { FileText, FileUp, Loader2, Plus, Trash2, UploadCloud, XCircle } from "l
 
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { AccessLevel } from "@/interface/files";
 import { useUploadFiles } from "@/services/files";
 import { useGetCurrentUser } from "@/services/auth";
@@ -72,12 +78,7 @@ export function Upload() {
       setPendingFiles((current) => {
         const existing = new Set(current.map(({ file }) => fileKey(file)));
 
-        return [
-          ...current,
-          ...valid.filter(
-            ({ file }) => !existing.has(fileKey(file)),
-          ),
-        ];
+        return [...current, ...valid.filter(({ file }) => !existing.has(fileKey(file)))];
       });
     }
   }
@@ -234,7 +235,10 @@ export function Upload() {
                       if (!value) return;
                       const accessLevel = value as AccessLevel;
                       setBulkAccessLevel(accessLevel);
-                      if (accessLevel === "general" || (accessLevel === "confidential" && canSetConfidential)) {
+                      if (
+                        accessLevel === "general" ||
+                        (accessLevel === "confidential" && canSetConfidential)
+                      ) {
                         applyBulkAccess(accessLevel);
                       }
                     }}
@@ -252,7 +256,9 @@ export function Upload() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="general">General</SelectItem>
-                      {canSetConfidential && <SelectItem value="confidential">Confidential</SelectItem>}
+                      {canSetConfidential && (
+                        <SelectItem value="confidential">Confidential</SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
                 )}
@@ -298,16 +304,16 @@ export function Upload() {
                     key={`${fileKey(file)}-${index}`}
                     className="group flex items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-secondary/50"
                   >
-                      <input
-                        type="checkbox"
-                        checked={selectedFiles.has(fileKey(file))}
-                        aria-label={`Select ${file.name}`}
-                        className="size-4 shrink-0 accent-primary"
-                        disabled={upload.isPending}
-                        onChange={() => toggleFile(file)}
-                      />
+                    <input
+                      type="checkbox"
+                      checked={selectedFiles.has(fileKey(file))}
+                      aria-label={`Select ${file.name}`}
+                      className="size-4 shrink-0 accent-primary"
+                      disabled={upload.isPending}
+                      onChange={() => toggleFile(file)}
+                    />
 
-                      <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-secondary">
+                    <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-secondary">
                       <FileText aria-hidden="true" size={17} className="text-copy" />
                     </div>
 

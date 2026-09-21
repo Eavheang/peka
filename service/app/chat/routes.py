@@ -27,15 +27,19 @@ def source_preview(payload: SourcePreviewRequest, user: dict = Depends(authentic
     return result
 
 
+def _conversation_history(payload: ChatRequest, user_id: UUID) -> list[dict]:
+    if payload.conversation_id is None:
+        return []
+    conversation = chat_service.get_conversation(payload.conversation_id, user_id)
+    if conversation is None:
+        raise ConversationNotFoundError
+    return conversation["messages"]
+
+
 @router.post("", response_model=ChatResponse, response_model_exclude_none=True)
 def chat(payload: ChatRequest, user: dict = Depends(authenticated)) -> ChatResponse:
     try:
-        history = []
-        if payload.conversation_id is not None:
-            conversation = chat_service.get_conversation(payload.conversation_id, user["id"])
-            if conversation is None:
-                raise ConversationNotFoundError
-            history = conversation["messages"]
+        history = _conversation_history(payload, user["id"])
         if payload.web_search:
             answer = answer_from_knowledge(
                 payload.query, user["role"], history, web_search=True,
@@ -58,12 +62,7 @@ def chat(payload: ChatRequest, user: dict = Depends(authenticated)) -> ChatRespo
 @router.post("/stream")
 async def chat_stream(payload: ChatRequest, user: dict = Depends(authenticated)) -> StreamingResponse:
     try:
-        history = []
-        if payload.conversation_id is not None:
-            conversation = chat_service.get_conversation(payload.conversation_id, user["id"])
-            if conversation is None:
-                raise ConversationNotFoundError
-            history = conversation["messages"]
+        history = _conversation_history(payload, user["id"])
     except ConversationNotFoundError:
         raise HTTPException(status_code=404, detail="Conversation not found") from None
 
