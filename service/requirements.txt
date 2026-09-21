@@ -12,8 +12,6 @@ PyJWT
 pwdlib[argon2]
 python-multipart
 PyMuPDF
-pdfplumber
 python-docx
 python-pptx
 openpyxl
-pandas

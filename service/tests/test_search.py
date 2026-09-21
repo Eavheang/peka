@@ -45,8 +45,6 @@ def test_search_returns_results_for_authenticated_user(monkeypatch) -> None:
         def file_title(self, file_id):
             return "policy.pdf"
 
-    from app.engine.search import repository as repo_module
-
     fake = FakeRepo()
     monkeypatch.setattr(search_service.search_repository, "search_chunks", fake.search_chunks)
     monkeypatch.setattr(search_service.search_repository, "file_title", fake.file_title)

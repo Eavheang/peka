@@ -49,19 +49,5 @@ def run_worker(stop: threading.Event | None = None) -> None:
                 stop.wait(1)
 
 
-def run_worker_in_thread() -> tuple[threading.Thread, threading.Event]:
-    stop = threading.Event()
-    thread = threading.Thread(target=_guarded_run, args=(stop,), daemon=True, name="okf-worker")
-    thread.start()
-    return thread, stop
-
-
-def _guarded_run(stop: threading.Event) -> None:
-    try:
-        run_worker(stop)
-    except Exception:
-        logger.exception("OKF worker stopped unexpectedly")
-
-
 if __name__ == "__main__":
     run_worker()

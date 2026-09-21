@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useMotionValueEvent, useScroll } from "framer-motion";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 
@@ -52,7 +51,6 @@ function renderStepContent(step: (typeof STEPS)[number], index: number, isTrigge
 export function PublicHero() {
   const [activeStep, setActiveStep] = useState(0);
   const stepRefs = useRef<Array<HTMLElement | null>>([]);
-  const { scrollY } = useScroll();
 
   const updateActiveStep = () => {
     const viewportCenter = window.innerHeight / 2;
@@ -74,14 +72,14 @@ export function PublicHero() {
     setActiveStep((currentStep) => (currentStep === closestStep ? currentStep : closestStep));
   };
 
-  useMotionValueEvent(scrollY, "change", updateActiveStep);
-
   useEffect(() => {
     updateActiveStep();
     window.addEventListener("resize", updateActiveStep);
+    window.addEventListener("scroll", updateActiveStep, { passive: true });
 
     return () => {
       window.removeEventListener("resize", updateActiveStep);
+      window.removeEventListener("scroll", updateActiveStep);
     };
   }, []);
 

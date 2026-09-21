@@ -3,8 +3,6 @@ import threading
 from fastapi.testclient import TestClient
 
 from app.engine.okf import worker
-from app.files import service as files_service
-from app.files.routes import get_okf_status
 from app.auth.routes import authenticated
 from app.main import app
 
@@ -24,21 +22,6 @@ def test_run_worker_stops_on_event(monkeypatch) -> None:
     stop.set()
     worker.run_worker(stop)
     assert processed == ["reset"]
-
-
-def test_worker_thread_helper_returns_joinable_thread() -> None:
-    calls = []
-    original = worker.run_worker
-    monkeypatch_run = lambda *a: None  # noqa: E731
-    worker.run_worker = lambda stop=None: calls.append(stop)  # type: ignore[method-assign]
-    try:
-        thread, stop = worker.run_worker_in_thread()
-        stop.set()
-        thread.join(timeout=5)
-        assert not thread.is_alive()
-        assert len(calls) == 1
-    finally:
-        worker.run_worker = original  # type: ignore[method-assign]
 
 
 def test_okf_status_reports_all_fields(monkeypatch) -> None:

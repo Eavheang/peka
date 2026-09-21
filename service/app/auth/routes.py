@@ -49,14 +49,21 @@ def admin_only(user: dict = Depends(authenticated)) -> dict:
     return user
 
 
+def _token_response(user: dict) -> dict:
+    return {
+        "access_token": create_access_token(str(user["id"]), user["role"], user["token_version"]),
+        "refresh_token": create_refresh_token(str(user["id"]), user["role"], user["token_version"]),
+        "token_type": "bearer",
+        "expires_in": settings.jwt_access_token_expire_minutes * 60,
+    }
+
+
 @router.post("/login", response_model=TokenResponse)
 def login(data: LoginRequest) -> dict:
     user = authenticate(data.email, data.password)
     if user is None:
         raise unauthorized()
-    return {"access_token": create_access_token(str(user["id"]), user["role"], user["token_version"]),
-            "refresh_token": create_refresh_token(str(user["id"]), user["role"], user["token_version"]),
-            "token_type": "bearer", "expires_in": settings.jwt_access_token_expire_minutes * 60}
+    return _token_response(user)
 
 
 @router.post("/refresh", response_model=TokenResponse)
@@ -68,9 +75,7 @@ def refresh(data: RefreshRequest) -> dict:
         raise unauthorized() from None
     if user is None or not user["is_active"] or user["token_version"] != claims["ver"] or user["role"] != claims["role"]:
         raise unauthorized()
-    return {"access_token": create_access_token(str(user["id"]), user["role"], user["token_version"]),
-            "refresh_token": create_refresh_token(str(user["id"]), user["role"], user["token_version"]),
-            "token_type": "bearer", "expires_in": settings.jwt_access_token_expire_minutes * 60}
+    return _token_response(user)
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)

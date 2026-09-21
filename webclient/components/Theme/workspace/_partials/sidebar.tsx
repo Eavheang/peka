@@ -153,7 +153,7 @@ export function WorkspaceSidebar({
           />
         </div>
       </aside>
-      <Drawer swipeDirection="left" open={mobileOpen} onOpenChange={onMobileOpenChange}>
+      <Drawer open={mobileOpen} onOpenChange={onMobileOpenChange}>
         <DrawerContent className="!bg-panel !text-panel-foreground w-[min(20rem,85vw)] max-w-[85vw] p-4">
           <div className="flex items-center justify-between border-b border-white/10 pb-4">
             <DrawerTitle className="flex items-center gap-2 text-xl tracking-tight text-panel-foreground">

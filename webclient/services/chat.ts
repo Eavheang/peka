@@ -10,19 +10,12 @@ import type {
 } from "@/interface/chat";
 import axiosInstance, { fetchAuthenticated } from "@/utils/axios";
 
-export type ChatStreamUpdate =
-  | { type: "status"; message: string }
-  | { type: "text"; delta: string };
+type ChatStreamUpdate = { type: "status"; message: string } | { type: "text"; delta: string };
 
 type ChatStreamEvent =
   | ChatStreamUpdate
   | { type: "done"; response: ChatResponse }
   | { type: "error"; message: string };
-
-export async function sendChatMessage(request: ChatRequest): Promise<ChatResponse> {
-  const response = await axiosInstance.post<ChatResponse>("/chat", request);
-  return response.data;
-}
 
 export async function sendChatMessageStream(
   request: ChatRequest,

@@ -8,7 +8,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import fitz
-import pdfplumber
 from docx import Document
 from docx.table import Table
 from docx.text.paragraph import Paragraph
@@ -41,24 +40,12 @@ def source_id_for(path: Path) -> str:
 
 
 def extract_pdf(path: Path) -> list[dict[str, object]]:
-    with fitz.open(path) as document:
-        pymupdf_text = [clean_text(page.get_text()) for page in document]
-
-    try:
-        with pdfplumber.open(path) as document:
-            pdfplumber_text = [
-                clean_text(page.extract_text() or "") for page in document.pages
-            ]
-    except Exception:
-        pdfplumber_text = []
-
     sections = []
-    for number in range(max(len(pymupdf_text), len(pdfplumber_text))):
-        text = pymupdf_text[number] if number < len(pymupdf_text) else ""
-        if not text and number < len(pdfplumber_text):
-            text = pdfplumber_text[number]
-        if text:
-            sections.append({"page": number + 1, "text": text})
+    with fitz.open(path) as document:
+        for number, page in enumerate(document, start=1):
+            text = clean_text(page.get_text())
+            if text:
+                sections.append({"page": number, "text": text})
     return sections
 
 
@@ -119,33 +106,13 @@ def extract_pptx(path: Path) -> list[dict[str, object]]:
 
 
 def extract_xlsx(path: Path) -> list[dict[str, object]]:
-    try:
-        import pandas
-    except ImportError:
-        pandas = None
-
     workbook = load_workbook(path, read_only=True, data_only=True)
-    sheet_names = workbook.sheetnames
     sections = []
-    for number, sheet_name in enumerate(sheet_names, start=1):
-        if pandas is not None:
-            frame = pandas.read_excel(
-                path,
-                sheet_name=sheet_name,
-                header=None,
-                dtype=object,
-                engine="openpyxl",
-            )
-            rows = [
-                "\t".join("" if pandas.isna(value) else str(value) for value in row)
-                for row in frame.itertuples(index=False, name=None)
-            ]
-        else:
-            worksheet = workbook[sheet_name]
-            rows = [
-                "\t".join("" if value is None else str(value) for value in row)
-                for row in worksheet.iter_rows(values_only=True)
-            ]
+    for number, sheet_name in enumerate(workbook.sheetnames, start=1):
+        rows = [
+            "\t".join("" if value is None else str(value) for value in row)
+            for row in workbook[sheet_name].iter_rows(values_only=True)
+        ]
         text = clean_text("\n".join(rows))
         if text:
             sections.append({"sheet": number, "name": sheet_name, "text": text})
@@ -186,5 +153,4 @@ def extract_file(
         "extracted_at": datetime.now(UTC).isoformat(),
         "sections": sections,
     }
-
 

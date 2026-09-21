@@ -32,16 +32,6 @@ export interface ChatResult {
   citations: Citation[];
 }
 
-export type ChatMessagePart =
-  | { type: "text"; text: string }
-  | { type: "data-chat-result"; data: ChatResult };
-
-export interface ChatUIMessage {
-  id: string;
-  role: "user" | "assistant";
-  parts: ChatMessagePart[];
-}
-
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant";

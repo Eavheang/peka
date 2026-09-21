@@ -14,12 +14,7 @@ export const useUpdateUserActivation = () => {
   return useMutation({
     mutationFn: async ({ id, is_active }: Pick<UserResponse, "id" | "is_active">) =>
       (await axiosInstance.patch<UserResponse>(`/auth/users/${id}`, { is_active })).data,
-    onSuccess: (updatedUser) => {
-      queryClient.setQueryData<UserResponse[]>(["users", "list"], (users) =>
-        users?.map((user) => (user.id === updatedUser.id ? updatedUser : user)),
-      );
-      queryClient.invalidateQueries({ queryKey: ["users", "list"] });
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["users", "list"] }),
   });
 };
 

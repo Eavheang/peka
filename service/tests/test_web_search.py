@@ -1,4 +1,3 @@
-import pytest
 from pydantic import SecretStr
 
 from app.chat import service as chat_service
