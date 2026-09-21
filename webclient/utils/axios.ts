@@ -48,4 +48,32 @@ axiosInstance.interceptors.response.use(undefined, async (error) => {
   }
 });
 
+export async function fetchAuthenticated(
+  input: RequestInfo | URL,
+  init: RequestInit = {},
+): Promise<Response> {
+  const request = (accessToken: string | null) => {
+    const headers = new Headers(init.headers);
+    if (accessToken) headers.set("Authorization", `Bearer ${accessToken}`);
+    return fetch(input, { ...init, headers });
+  };
+
+  const response = await request(getStoredToken("peka_access_token"));
+  if (response.status !== 401) return response;
+
+  const refreshToken = getStoredToken("peka_refresh_token");
+  if (!refreshToken) return response;
+
+  try {
+    const refreshResponse = await refreshClient.post<TokenResponse>("/auth/refresh", {
+      refresh_token: refreshToken,
+    });
+    storeAuthTokens(refreshResponse.data);
+    return request(getStoredToken("peka_access_token"));
+  } catch (error) {
+    clearAuthStorage();
+    throw error;
+  }
+}
+
 export default axiosInstance;

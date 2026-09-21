@@ -1,7 +1,10 @@
+import asyncio
+import json
 import logging
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi.responses import StreamingResponse
 
 from app.auth.routes import authenticated
 from app.chat.schemas import (
@@ -50,6 +53,62 @@ def chat(payload: ChatRequest, user: dict = Depends(authenticated)) -> ChatRespo
     except (RuntimeError,) as error:
         logger.warning("Chat request failed: %s", error)
         raise HTTPException(status_code=503, detail=str(error)) from None
+
+
+@router.post("/stream")
+async def chat_stream(payload: ChatRequest, user: dict = Depends(authenticated)) -> StreamingResponse:
+    try:
+        history = []
+        if payload.conversation_id is not None:
+            conversation = chat_service.get_conversation(payload.conversation_id, user["id"])
+            if conversation is None:
+                raise ConversationNotFoundError
+            history = conversation["messages"]
+    except ConversationNotFoundError:
+        raise HTTPException(status_code=404, detail="Conversation not found") from None
+
+    async def events():
+        try:
+            async for event in chat_service.stream_answer_from_knowledge(
+                payload.query,
+                user["role"],
+                history,
+                web_search=payload.web_search,
+            ):
+                if isinstance(event, chat_service.ChatStreamStatus):
+                    yield _sse({"type": "status", "message": event.message})
+                elif isinstance(event, chat_service.ChatStreamText):
+                    yield _sse({"type": "text", "delta": event.delta})
+                else:
+                    response = await asyncio.to_thread(
+                        chat_service.persist_response,
+                        payload.query,
+                        user["id"],
+                        event.response,
+                        payload.conversation_id,
+                    )
+                    yield _sse({
+                        "type": "done",
+                        "response": response.model_dump(mode="json", exclude_none=True),
+                    })
+                    yield "data: [DONE]\n\n"
+        except RuntimeError as error:
+            logger.warning("Streaming chat request failed: %s", error)
+            yield _sse({"type": "error", "message": str(error)})
+
+    return StreamingResponse(
+        events(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+def _sse(payload: dict) -> str:
+    return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
 
 
 @router.get("/conversations", response_model=list[Conversation])

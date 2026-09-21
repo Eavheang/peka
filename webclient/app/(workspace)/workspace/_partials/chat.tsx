@@ -11,9 +11,10 @@ import remarkGfm from "remark-gfm";
 
 import { Button } from "@/components/ui/button";
 import type { ChatResult, ChatUIMessage } from "@/interface/chat";
-import { sendChatMessage, useGetConversation } from "@/services/chat";
+import { sendChatMessageStream, useGetConversation } from "@/services/chat";
 
 const MAX_QUERY_LENGTH = 4000;
+const WEB_SEARCH_STORAGE_KEY = "peka_web_search_enabled";
 const SourcePreview = dynamic(() =>
   import("./sourcePreview").then((module) => module.SourcePreview),
 );
@@ -26,11 +27,17 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
   const [messages, setMessages] = useState<ChatUIMessage[]>([]);
   const [isPending, setIsPending] = useState(false);
   const [requestError, setRequestError] = useState("");
+  const [streamStatus, setStreamStatus] = useState("");
+  const [streamingMessageId, setStreamingMessageId] = useState<string>();
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
   const conversationRef = useRef<HTMLDivElement>(null);
   const queryInputRef = useRef<HTMLTextAreaElement>(null);
   const shouldAutoScroll = useRef(true);
   const conversationQuery = useGetConversation(conversationId);
+
+  useEffect(() => {
+    setWebSearchEnabled(window.localStorage.getItem(WEB_SEARCH_STORAGE_KEY) === "true");
+  }, []);
 
   useEffect(() => {
     setMessages([]);
@@ -82,40 +89,63 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
       role: "user",
       parts: [{ type: "text", text: trimmedQuery }],
     };
-    setMessages((current) => [...current, userMessage]);
+    const assistantMessageId = crypto.randomUUID();
+    setMessages((current) => [
+      ...current,
+      userMessage,
+      { id: assistantMessageId, role: "assistant", parts: [{ type: "text", text: "" }] },
+    ]);
     setIsPending(true);
+    setStreamingMessageId(assistantMessageId);
+    setStreamStatus("Thinking...");
     setQuery("");
 
     try {
-      const response = await sendChatMessage({
-        query: trimmedQuery,
-        ...(conversationId ? { conversation_id: conversationId } : {}),
-        web_search: webSearchEnabled,
-      });
-
-      setMessages((current) => [
-        ...current,
+      const response = await sendChatMessageStream(
         {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          parts: [
-            { type: "text", text: response.answer },
-            {
-              type: "data-chat-result",
-              data: {
-                conversationId: response.conversation_id,
-                refused: response.refused,
-                citations: response.citations,
-              },
-            },
-          ],
+          query: trimmedQuery,
+          ...(conversationId ? { conversation_id: conversationId } : {}),
+          web_search: webSearchEnabled,
         },
-      ]);
+        (event) => {
+          if (event.type === "status") {
+            setStreamStatus(event.message);
+            return;
+          }
+          setMessages((current) => appendAssistantText(current, assistantMessageId, event.delta));
+        },
+      );
+
+      setMessages((current) =>
+        current.map((message) =>
+          message.id === assistantMessageId
+            ? {
+                ...message,
+                parts: [
+                  { type: "text", text: response.answer },
+                  {
+                    type: "data-chat-result" as const,
+                    data: {
+                      conversationId: response.conversation_id,
+                      refused: response.refused,
+                      citations: response.citations,
+                    },
+                  },
+                ],
+              }
+            : message,
+        ),
+      );
       queryClient.invalidateQueries({ queryKey: ["chat", "conversations"] });
       if (!conversationId) router.replace(`/workspace/${response.conversation_id}`);
     } catch (error: unknown) {
+      setMessages((current) => current.filter((message) => message.id !== assistantMessageId));
       setQuery((currentQuery) => currentQuery || trimmedQuery);
-      const detail = axios.isAxiosError(error) ? error.response?.data?.detail : undefined;
+      const detail = axios.isAxiosError(error)
+        ? error.response?.data?.detail
+        : error instanceof Error
+          ? error.message
+          : undefined;
       setRequestError(
         typeof detail === "string"
           ? detail
@@ -123,6 +153,8 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
       );
     } finally {
       setIsPending(false);
+      setStreamingMessageId(undefined);
+      setStreamStatus("");
     }
   }
 
@@ -165,6 +197,7 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
                 key={message.id}
                 message={message}
                 result={getChatResult(message)}
+                streamingStatus={message.id === streamingMessageId ? streamStatus : undefined}
               />
             ))
           )}
@@ -211,7 +244,11 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
                     className="peer sr-only"
                     role="switch"
                     type="checkbox"
-                    onChange={(event) => setWebSearchEnabled(event.target.checked)}
+                    onChange={(event) => {
+                      const enabled = event.target.checked;
+                      setWebSearchEnabled(enabled);
+                      window.localStorage.setItem(WEB_SEARCH_STORAGE_KEY, String(enabled));
+                    }}
                   />
                   <Globe2 aria-hidden="true" size={14} />
                   Allow web search
@@ -244,7 +281,7 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
           </p>
           {(validationError || requestError) && (
             <p className="mt-2 text-sm text-danger" role="alert">
-              {validationError || "We could not save that conversation. Please try again."}
+              {validationError || requestError}
             </p>
           )}
           <p className="mt-2 text-center text-[11px] text-muted">
@@ -256,7 +293,15 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
   );
 }
 
-function ChatMessageBubble({ message, result }: { message: ChatUIMessage; result?: ChatResult }) {
+function ChatMessageBubble({
+  message,
+  result,
+  streamingStatus,
+}: {
+  message: ChatUIMessage;
+  result?: ChatResult;
+  streamingStatus?: string;
+}) {
   const isUser = message.role === "user";
 
   return (
@@ -275,6 +320,7 @@ function ChatMessageBubble({ message, result }: { message: ChatUIMessage; result
         )}
         {message.parts.map((part, index) => {
           if (part.type !== "text") return null;
+          if (!part.text) return null;
 
           if (isUser) {
             return (
@@ -298,6 +344,12 @@ function ChatMessageBubble({ message, result }: { message: ChatUIMessage; result
             </div>
           );
         })}
+        {streamingStatus && !message.parts.some((part) => part.type === "text" && part.text) && (
+          <p className="flex items-center gap-2 text-sm text-muted">
+            <LoaderCircle aria-hidden="true" className="animate-spin" size={14} />
+            {streamingStatus}
+          </p>
+        )}
         {!isUser && result && result.citations.length > 0 && (
           <details className="mt-5 border-t border-border pt-4">
             <summary className="cursor-pointer text-xs font-semibold text-muted hover:text-foreground">
@@ -323,6 +375,22 @@ function ChatMessageBubble({ message, result }: { message: ChatUIMessage; result
 function getChatResult(message: ChatUIMessage): ChatResult | undefined {
   const part = message.parts.find((candidate) => candidate.type === "data-chat-result");
   return part?.type === "data-chat-result" ? part.data : undefined;
+}
+
+function appendAssistantText(
+  messages: ChatUIMessage[],
+  messageId: string,
+  delta: string,
+): ChatUIMessage[] {
+  return messages.map((message) => {
+    if (message.id !== messageId) return message;
+    return {
+      ...message,
+      parts: message.parts.map((part) =>
+        part.type === "text" ? { ...part, text: part.text + delta } : part,
+      ),
+    };
+  });
 }
 
 function toChatUIMessage(

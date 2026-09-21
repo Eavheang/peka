@@ -1,7 +1,6 @@
 import json
 
 import pytest
-from pydantic import SecretStr
 
 from app.engine.okf import converter as main
 from app.engine.okf.file_writer import write_okf_files
@@ -28,24 +27,23 @@ def test_convert_to_okf_calls_llm_and_writes_files(monkeypatch, tmp_path):
                 "content": "---\ntype: Policy Document\n---\n\n# Overview\n\nEmployees must sign in.\n",
             }
         ],
+        "folder_structure": ["knowledge_base/policies/sign-in-policy.md"],
         "retrieval_sections": [],
     }
     request = {}
 
-    def fake_chat_completion(messages, *, json_mode=False, timeout=600):
-        request.update(messages=messages, json_mode=json_mode)
-        return json.dumps(result)
+    def fake_generation(messages, output_type):
+        request["messages"] = messages
+        request["output_type"] = output_type
+        return main.OKFResult.model_validate(result)
 
-    monkeypatch.setattr(main, "chat_completion", fake_chat_completion)
-    monkeypatch.setattr(main.settings, "llm_base_url", "http://llama:8080/v1")
-    monkeypatch.setattr(main.settings, "llm_api_key", SecretStr("secret"))
-    monkeypatch.setattr(main.settings, "llm_model", "local")
+    monkeypatch.setattr(main, "generate_structured", fake_generation)
 
     converted = main.convert_to_okf(extraction, tmp_path)
 
     assert converted == result
-    assert request["json_mode"] is True
-    payload = json.loads(request["messages"][1]["content"])
+    assert request["output_type"] is main.OKFResult
+    payload = json.loads(request["messages"][1].text)
     assert payload["source_id"] == "abc123"
     assert "knowledge_base_state" not in payload
     assert (tmp_path / "knowledge_base" / "policies" / "sign-in-policy.md").is_file()
@@ -88,15 +86,14 @@ def test_write_okf_files_rejects_paths_outside_knowledge_base(tmp_path):
         )
 
 
-def test_convert_to_okf_rejects_invalid_llm_json(monkeypatch, tmp_path):
-    class Response:
-        def raise_for_status(self):
-            pass
+def test_convert_to_okf_rejects_invalid_structured_output(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        main,
+        "generate_structured",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            main.AIModelError("Model returned an invalid structured response")
+        ),
+    )
 
-        def json(self):
-            return {"choices": [{"message": {"content": "not json"}}]}
-
-    monkeypatch.setattr(main, "chat_completion", lambda *a, **k: "not json")
-
-    with pytest.raises(main.OKFConversionError, match="invalid JSON"):
+    with pytest.raises(main.OKFConversionError, match="invalid structured"):
         main.convert_to_okf({"source_id": "abc123", "sections": []}, tmp_path)

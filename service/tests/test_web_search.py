@@ -1,5 +1,3 @@
-import json
-
 import pytest
 from pydantic import SecretStr
 
@@ -87,46 +85,26 @@ def test_chat_uses_web_search_only_when_enabled(monkeypatch) -> None:
         "score": 0.9,
         "url": "https://example.com/article",
     }]
-    seen_tools = []
-    required_tools = []
+    seen = []
 
-    def complete(messages, tools, *, allow_tools=True, required_tool=None):
-        seen_tools.append([tool["function"]["name"] for tool in tools])
-        required_tools.append(required_tool)
-        if allow_tools:
-            return {
-                "role": "assistant",
-                "content": None,
-                "tool_calls": [{
-                    "id": "call-web-1",
-                    "type": "function",
-                    "function": {
-                        "name": "web_search",
-                        "arguments": json.dumps({"query": "current information"}),
-                    },
-                }],
-            }
-        return {
-            "role": "assistant",
-            "content": json.dumps({
-                "blocks": [{
-                    "kind": "grounded",
-                    "text": "Current information.",
-                    "source_ids": [1],
-                }],
-            }),
-        }
+    def generate(messages, output_type):
+        seen.append(output_type)
+        if output_type is chat_service.SearchRequest:
+            return chat_service.SearchRequest(query="current information")
+        return chat_service.ModelAnswer(
+            blocks=[{
+                "kind": "grounded",
+                "text": "Current information.",
+                "source_ids": ["source-1"],
+            }]
+        )
 
     monkeypatch.setattr(chat_service, "perform_web_search", lambda query: web_results)
-    monkeypatch.setattr(chat_service, "chat_tool_completion", complete)
+    monkeypatch.setattr(chat_service, "generate_structured", generate)
 
     response = chat_service.answer_from_knowledge("What is current?", "staff", web_search=True)
 
-    assert seen_tools == [
-        ["search_knowledge_base", "web_search"],
-        ["search_knowledge_base", "web_search"],
-    ]
-    assert required_tools == [None, None]
+    assert seen == [chat_service.SearchRequest, chat_service.ModelAnswer]
     assert response.citations[0].url == "https://example.com/article"
     assert response.answer == "Current information. [1]"
 
@@ -134,11 +112,10 @@ def test_chat_uses_web_search_only_when_enabled(monkeypatch) -> None:
 def test_chat_can_answer_directly_when_web_search_is_enabled(monkeypatch) -> None:
     monkeypatch.setattr(
         chat_service,
-        "chat_tool_completion",
-        lambda *args, **kwargs: {
-            "role": "assistant",
-            "content": json.dumps({"blocks": [{"kind": "general", "text": "Stale", "source_ids": []}]}),
-        },
+        "generate_structured",
+        lambda messages, output_type: chat_service.ModelAnswer(
+            blocks=[{"kind": "general", "text": "Stale", "source_ids": []}]
+        ),
     )
 
     response = chat_service.answer_from_knowledge("What is 1 + 1?", "staff", web_search=True)
