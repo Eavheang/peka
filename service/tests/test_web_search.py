@@ -88,8 +88,8 @@ def test_chat_uses_web_search_only_when_enabled(monkeypatch) -> None:
 
     def generate(messages, output_type):
         seen.append(output_type)
-        if output_type is chat_service.SearchRequest:
-            return chat_service.SearchRequest(query="current information")
+        if output_type is chat_service.SearchPlan:
+            return chat_service.SearchPlan(tool="web_search", query="current information")
         return chat_service.ModelAnswer(
             blocks=[{
                 "kind": "grounded",
@@ -103,7 +103,7 @@ def test_chat_uses_web_search_only_when_enabled(monkeypatch) -> None:
 
     response = chat_service.answer_from_knowledge("What is current?", "staff", web_search=True)
 
-    assert seen == [chat_service.SearchRequest, chat_service.ModelAnswer]
+    assert seen == [chat_service.SearchPlan, chat_service.ModelAnswer]
     assert response.citations[0].url == "https://example.com/article"
     assert response.answer == "Current information. [1]"
 
@@ -112,8 +112,12 @@ def test_chat_can_answer_directly_when_web_search_is_enabled(monkeypatch) -> Non
     monkeypatch.setattr(
         chat_service,
         "generate_structured",
-        lambda messages, output_type: chat_service.ModelAnswer(
-            blocks=[{"kind": "general", "text": "Stale", "source_ids": []}]
+        lambda messages, output_type: (
+            chat_service.SearchPlan(tool="none")
+            if output_type is chat_service.SearchPlan
+            else chat_service.ModelAnswer(
+                blocks=[{"kind": "general", "text": "Stale", "source_ids": []}]
+            )
         ),
     )
 

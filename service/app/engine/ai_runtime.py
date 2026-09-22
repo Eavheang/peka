@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import re
 from collections.abc import AsyncIterator
 from typing import TypeVar
@@ -8,8 +9,11 @@ from pydantic import BaseModel, ValidationError
 
 from app.config import settings
 
+logger = logging.getLogger(__name__)
+
 StructuredOutput = TypeVar("StructuredOutput", bound=BaseModel)
 _JSON_CODE_FENCE = re.compile(r"```(?:json)?\s*(.*?)\s*```", re.IGNORECASE | re.DOTALL)
+_MAX_STRUCTURED_ATTEMPTS = 2
 
 
 class AIModelError(RuntimeError):
@@ -26,6 +30,10 @@ def _model() -> tuple[ai.Model, ai.Provider]:
         api_key=settings.llm_api_key.get_secret_value(),
     )
     return ai.Model(id=settings.llm_model, provider=provider), provider
+
+
+def _inference_params() -> ai.InferenceRequestParams:
+    return ai.InferenceRequestParams(output=ai.OutputParams(max_tokens=settings.llm_max_tokens))
 
 
 def parse_structured_output(
@@ -48,6 +56,35 @@ def parse_structured_output(
         return output_type.model_validate_json(candidate[start:end + 1])
 
 
+async def _run_structured_stream(
+    model: ai.Model,
+    messages: list[ai.messages.Message],
+    output_type: type[StructuredOutput],
+) -> StructuredOutput:
+    async with ai.stream(
+        model, messages, output_type=output_type, params=_inference_params()
+    ) as stream:
+        async for _ in stream:
+            pass
+        try:
+            output = stream.output
+        except ValidationError:
+            # Some OpenAI-compatible local servers ignore structured-output
+            # mode and wrap the otherwise valid JSON in a Markdown fence.
+            try:
+                output = parse_structured_output(stream.message.text, output_type)
+            except ValidationError:
+                logger.warning(
+                    "Model returned invalid structured output for %s: %r",
+                    output_type.__name__, stream.message.text[:2000],
+                )
+                raise
+
+    if not isinstance(output, output_type):
+        raise AIModelError("Model returned an invalid structured response")
+    return output
+
+
 async def _generate_structured(
     messages: list[ai.messages.Message],
     output_type: type[StructuredOutput],
@@ -55,51 +92,23 @@ async def _generate_structured(
     model: ai.Model | None = None,
 ) -> StructuredOutput:
     provider: ai.Provider | None = None
-    structured_error: ValidationError | None = None
     try:
         if model is None:
             model, provider = _model()
 
-        generation_messages = messages
-        for attempt in range(2):
+        for attempt in range(_MAX_STRUCTURED_ATTEMPTS):
             try:
-                async with ai.stream(model, generation_messages, output_type=output_type) as stream:
-                    async for _ in stream:
-                        pass
-                    try:
-                        output = stream.output
-                    except ValidationError:
-                        # Some OpenAI-compatible local servers ignore structured-output
-                        # mode and wrap the otherwise valid JSON in a Markdown fence.
-                        output = parse_structured_output(stream.message.text, output_type)
-                break
-            except ValidationError as error:
-                structured_error = error
-                if attempt == 1:
-                    raise
-                generation_messages = [
-                    *messages,
-                    ai.user_message(
-                        "Your previous response did not match the required schema. "
-                        "Return only valid JSON matching the requested output type. "
-                        "Do not use Markdown, code fences, or explanatory text."
-                    ),
-                ]
-
-        if not isinstance(output, output_type):
-            raise AIModelError("Model returned an invalid structured response")
-        return output
+                return await _run_structured_stream(model, messages, output_type)
+            except (ValidationError, AIModelError) as error:
+                if attempt == _MAX_STRUCTURED_ATTEMPTS - 1:
+                    raise AIModelError(
+                        "Model returned an invalid structured response"
+                    ) from error
     except AIModelError:
         raise
-    except ValidationError as error:
-        raise AIModelError("Model returned an invalid structured response") from error
     except ai.AIError as error:
-        if structured_error is not None:
-            raise AIModelError("Model returned an invalid structured response") from structured_error
         raise AIModelError("AI provider request failed") from error
     except Exception as error:
-        if structured_error is not None:
-            raise AIModelError("Model returned an invalid structured response") from structured_error
         raise AIModelError("AI generation failed") from error
     finally:
         if provider is not None:
@@ -123,7 +132,9 @@ async def stream_structured_text(
         if model is None:
             model, provider = _model()
 
-        async with ai.stream(model, messages, output_type=output_type) as stream:
+        async with ai.stream(
+            model, messages, output_type=output_type, params=_inference_params()
+        ) as stream:
             async for event in stream:
                 if isinstance(event, ai.events.TextDelta):
                     yield event.chunk

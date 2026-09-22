@@ -10,7 +10,9 @@ import type {
 } from "@/interface/chat";
 import axiosInstance, { fetchAuthenticated } from "@/utils/axios";
 
-type ChatStreamUpdate = { type: "status"; message: string } | { type: "text"; delta: string };
+type ChatStreamUpdate =
+  | { type: "status"; message: string }
+  | { type: "text"; delta: string };
 
 type ChatStreamEvent =
   | ChatStreamUpdate

@@ -34,6 +34,7 @@ def test_generate_structured_rejects_non_structured_model_output() -> None:
         generate_structured(
             [ai.user_message("question")], ModelAnswer, model=model
         )
+    assert len(model.calls) == 2, "should retry once before failing"
 
 
 def test_generate_structured_accepts_json_markdown_fence() -> None:
