@@ -29,6 +29,7 @@ def search_knowledge(query: str, user_role: str) -> list[dict]:
     return [
         {
             "chunk_id": str(row["id"]),
+            "file_id": str(row["file_id"]),
             "title": search_repository.file_title(row["file_id"]),
             "heading": row["heading"],
             "snippet": row["content"][:300],

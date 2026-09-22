@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { ChevronsLeft, ChevronsRight, X } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 
@@ -39,6 +39,15 @@ export function WorkspaceSidebar({
   const visibleRoutes = Routes.filter((route) => user && route.roles.includes(user.role));
   const conversationsQuery = useListConversations(Boolean(user));
   const deleteConversation = useDeleteConversation();
+  const conversations = conversationsQuery.data?.pages.flatMap((page) => page.items);
+  const loadMoreConversations = useCallback(() => {
+    if (!conversationsQuery.hasNextPage || conversationsQuery.isFetchingNextPage) return;
+    void conversationsQuery.fetchNextPage();
+  }, [
+    conversationsQuery.fetchNextPage,
+    conversationsQuery.hasNextPage,
+    conversationsQuery.isFetchingNextPage,
+  ]);
   const displayName = user?.email.split("@")[0] ?? "Workspace";
   const initial = displayName.charAt(0).toUpperCase();
 
@@ -135,9 +144,13 @@ export function WorkspaceSidebar({
           })}
           {!collapsed && (
             <ConversationHistory
-              conversations={conversationsQuery.data}
-              error={conversationsQuery.isError}
+              conversations={conversations}
+              error={conversationsQuery.isError && !conversationsQuery.data}
               loading={conversationsQuery.isPending}
+              loadingMore={conversationsQuery.isFetchingNextPage}
+              hasMore={Boolean(conversationsQuery.hasNextPage)}
+              loadMoreError={conversationsQuery.isError && Boolean(conversationsQuery.data)}
+              onLoadMore={loadMoreConversations}
               onDelete={setConversationToDelete}
               pathname={pathname}
             />
@@ -188,9 +201,13 @@ export function WorkspaceSidebar({
               ))}
             </div>
             <ConversationHistory
-              conversations={conversationsQuery.data}
-              error={conversationsQuery.isError}
+              conversations={conversations}
+              error={conversationsQuery.isError && !conversationsQuery.data}
               loading={conversationsQuery.isPending}
+              loadingMore={conversationsQuery.isFetchingNextPage}
+              hasMore={Boolean(conversationsQuery.hasNextPage)}
+              loadMoreError={conversationsQuery.isError && Boolean(conversationsQuery.data)}
+              onLoadMore={loadMoreConversations}
               onDelete={setConversationToDelete}
               onNavigate={() => onMobileOpenChange(false)}
               pathname={pathname}

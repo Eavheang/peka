@@ -120,9 +120,11 @@ def set_access_level(file_id: UUID, access_level: str) -> dict | None:
     return files_repository.find_by_id(file_id)
 
 
-def find_file(file_id: UUID) -> tuple[dict, Path] | None:
+def find_file(
+    file_id: UUID, allowed_access_levels: tuple[str, ...]
+) -> tuple[dict, Path] | None:
     record = files_repository.find_by_id(file_id)
-    if record is None:
+    if record is None or record["access_level"] not in allowed_access_levels:
         return None
     storage_root = settings.file_storage_dir.resolve()
     path = (storage_root / record["path"]).resolve()

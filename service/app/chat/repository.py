@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Any, cast
 from uuid import UUID
 
@@ -73,12 +74,26 @@ class ChatRepository:
                 "messages": [cast(dict[str, Any], user_message), cast(dict[str, Any], assistant_message)],
             }
 
-    def list_owned(self, owner_id: UUID) -> list[dict[str, Any]]:
+    def list_owned(
+        self,
+        owner_id: UUID,
+        limit: int,
+        cursor: tuple[datetime, UUID] | None = None,
+    ) -> list[dict[str, Any]]:
         with get_connection() as connection:
-            rows = connection.execute(
+            query = (
                 "SELECT id, owner_id, title, created_at, updated_at FROM conversations "
-                "WHERE owner_id = %s ORDER BY updated_at DESC",
-                (owner_id,),
+                "WHERE owner_id = %s"
+            )
+            params: list[Any] = [owner_id]
+            if cursor is not None:
+                query += " AND (updated_at, id) < (%s, %s)"
+                params.extend(cursor)
+            query += " ORDER BY updated_at DESC, id DESC LIMIT %s"
+            params.append(limit)
+            rows = connection.execute(
+                query,
+                tuple(params),
             ).fetchall()
             return cast(list[dict[str, Any]], rows)
 

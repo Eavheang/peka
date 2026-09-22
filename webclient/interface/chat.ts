@@ -1,5 +1,6 @@
 export interface Citation {
   chunk_id?: string | null;
+  file_id?: string | null;
   title: string;
   heading: string;
   page: number | null;
@@ -10,6 +11,7 @@ export interface Citation {
 
 export interface SourcePreviewResponse {
   content: string;
+  file_id?: string | null;
 }
 
 export interface ChatRequest {
@@ -52,4 +54,9 @@ export interface Conversation {
 
 export interface ConversationDetail extends Conversation {
   messages: ChatMessage[];
+}
+
+export interface ConversationPage {
+  items: Conversation[];
+  next_cursor: string | null;
 }

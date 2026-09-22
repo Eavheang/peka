@@ -1,18 +1,16 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import type {
   ChatRequest,
   ChatResponse,
   Citation,
-  Conversation,
   ConversationDetail,
+  ConversationPage,
   SourcePreviewResponse,
 } from "@/interface/chat";
 import axiosInstance, { fetchAuthenticated } from "@/utils/axios";
 
-type ChatStreamUpdate =
-  | { type: "status"; message: string }
-  | { type: "text"; delta: string };
+type ChatStreamUpdate = { type: "status"; message: string } | { type: "text"; delta: string };
 
 type ChatStreamEvent =
   | ChatStreamUpdate
@@ -94,6 +92,16 @@ export async function sendChatMessageStream(
   return completedResponse;
 }
 
+export async function downloadCitation(fileId: string, filename: string): Promise<void> {
+  const response = await axiosInstance.get<Blob>(`/files/${fileId}`, { responseType: "blob" });
+  const url = URL.createObjectURL(response.data);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename.replaceAll("\\", "/").split("/").pop() || "source";
+  link.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
 function parseChatStreamEvent(value: unknown): ChatStreamEvent | undefined {
   if (!isRecord(value) || typeof value.type !== "string") return undefined;
   if (value.type === "status" && typeof value.message === "string") {
@@ -146,8 +154,14 @@ export function useSourcePreview(citation: Citation) {
   });
 }
 
-export async function listConversations(): Promise<Conversation[]> {
-  const response = await axiosInstance.get<Conversation[]>("/chat/conversations");
+export async function listConversations(
+  cursor?: string,
+  signal?: AbortSignal,
+): Promise<ConversationPage> {
+  const response = await axiosInstance.get<ConversationPage>("/chat/conversations", {
+    params: cursor ? { cursor } : undefined,
+    signal,
+  });
   return response.data;
 }
 
@@ -163,11 +177,13 @@ export async function deleteConversation(conversationId: string): Promise<void> 
 }
 
 export function useListConversations(enabled = true) {
-  return useQuery<Conversation[]>({
+  return useInfiniteQuery({
     queryKey: ["chat", "conversations"],
     enabled,
+    initialPageParam: null as string | null,
     staleTime: 30 * 1000,
-    queryFn: listConversations,
+    queryFn: ({ pageParam, signal }) => listConversations(pageParam ?? undefined, signal),
+    getNextPageParam: (lastPage) => lastPage.next_cursor,
   });
 }
 

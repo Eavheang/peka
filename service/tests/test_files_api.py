@@ -159,6 +159,46 @@ def test_access_level_patch_requires_admin(client, monkeypatch):
                         json={"access_level": "general"}).status_code == 404
 
 
+def test_download_hides_confidential_files_from_staff(client, monkeypatch, tmp_path):
+    staff = {"id": uuid4(), "email": "staff@example.com", "role": "staff",
+             "token_version": 0, "is_active": True}
+    admin = {"id": uuid4(), "email": "admin@example.com", "role": "admin",
+             "token_version": 0, "is_active": True}
+    file_id = uuid4()
+    record = {
+        "id": file_id,
+        "path": "pdf/private.pdf",
+        "content_type": "application/pdf",
+        "access_level": "confidential",
+    }
+    path = tmp_path / record["path"]
+    path.parent.mkdir()
+    path.write_bytes(b"private")
+
+    monkeypatch.setattr(
+        auth_routes,
+        "current_user",
+        lambda user_id: staff if user_id == staff["id"] else admin,
+    )
+    monkeypatch.setattr(service.settings, "file_storage_dir", tmp_path)
+    monkeypatch.setattr(
+        service.files_repository,
+        "find_by_id",
+        lambda target_id: record if target_id == file_id else None,
+    )
+
+    def token_for(account):
+        token = auth_routes.create_access_token(
+            str(account["id"]), account["role"], account["token_version"]
+        )
+        return {"Authorization": f"Bearer {token}"}
+
+    assert client.get(f"/files/{file_id}", headers=token_for(staff)).status_code == 404
+    download = client.get(f"/files/{file_id}", headers=token_for(admin))
+    assert download.status_code == 200
+    assert download.content == b"private"
+
+
 def test_upload_rejects_unsupported_files_without_saving(client, monkeypatch, tmp_path):
     account = {"id": uuid4(), "email": "user@example.com", "role": "staff",
                "token_version": 0, "is_active": True}
