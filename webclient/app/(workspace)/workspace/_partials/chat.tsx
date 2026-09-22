@@ -3,13 +3,14 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
-import { ArrowUp, BookOpen, Globe2, LoaderCircle } from "lucide-react";
+import { ArrowDown, ArrowUp, BookOpen, Globe2, LoaderCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ChatMessage, ChatResult } from "@/interface/chat";
 import { sendChatMessageStream, useGetConversation } from "@/services/chat";
 
@@ -36,27 +37,35 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
   const [requestError, setRequestError] = useState("");
   const [streamStatus, setStreamStatus] = useState("");
   const [streamingMessageId, setStreamingMessageId] = useState<string>();
+  const [showJumpToLatest, setShowJumpToLatest] = useState(false);
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
   const conversationRef = useRef<HTMLDivElement>(null);
   const queryInputRef = useRef<HTMLTextAreaElement>(null);
   const shouldAutoScroll = useRef(true);
+  const pendingStreamDelta = useRef("");
+  const streamFrame = useRef<number | null>(null);
+  const skipNextConversationLoad = useRef<string | false>(false);
   const conversationQuery = useGetConversation(conversationId);
+
+  useEffect(() => {
+    return () => {
+      if (streamFrame.current !== null) cancelAnimationFrame(streamFrame.current);
+    };
+  }, []);
 
   useEffect(() => {
     setWebSearchEnabled(window.localStorage.getItem(WEB_SEARCH_STORAGE_KEY) === "true");
   }, []);
 
   useEffect(() => {
-    setMessages([]);
-  }, [conversationId]);
-
-  useEffect(() => {
-    if (!conversationQuery.data) return;
-
+    if (conversationId && conversationId === skipNextConversationLoad.current) return;
+    skipNextConversationLoad.current = false;
     setMessages(
-      conversationQuery.data.messages.map((message) => toDisplayMessage(message, conversationId)),
+      conversationQuery.data?.messages.map((message) =>
+        toDisplayMessage(message, conversationId),
+      ) ?? [],
     );
-  }, [conversationQuery.data, conversationId]);
+  }, [conversationId, conversationQuery.data]);
 
   useEffect(() => {
     const conversation = conversationRef.current;
@@ -75,6 +84,40 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
 
   const trimmedQuery = query.trim();
 
+  function appendStreamDelta(messageId: string, delta: string) {
+    setMessages((current) =>
+      current.map((message) =>
+        message.id === messageId ? { ...message, text: message.text + delta } : message,
+      ),
+    );
+  }
+
+  function flushStreamDelta(messageId: string) {
+    if (streamFrame.current !== null) {
+      cancelAnimationFrame(streamFrame.current);
+      streamFrame.current = null;
+    }
+
+    const delta = pendingStreamDelta.current;
+    pendingStreamDelta.current = "";
+    if (delta) appendStreamDelta(messageId, delta);
+  }
+
+  function queueStreamDelta(messageId: string, delta: string) {
+    pendingStreamDelta.current += delta;
+    if (streamFrame.current === null) {
+      streamFrame.current = requestAnimationFrame(() => flushStreamDelta(messageId));
+    }
+  }
+
+  function discardStreamDelta() {
+    if (streamFrame.current !== null) {
+      cancelAnimationFrame(streamFrame.current);
+      streamFrame.current = null;
+    }
+    pendingStreamDelta.current = "";
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (isPending) return;
@@ -91,6 +134,8 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
 
     setValidationError("");
     setRequestError("");
+    shouldAutoScroll.current = true;
+    setShowJumpToLatest(false);
     const userMessage: DisplayMessage = {
       id: crypto.randomUUID(),
       role: "user",
@@ -102,6 +147,7 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
       userMessage,
       { id: assistantMessageId, role: "assistant", text: "" },
     ]);
+    pendingStreamDelta.current = "";
     setIsPending(true);
     setStreamingMessageId(assistantMessageId);
     setStreamStatus("Thinking...");
@@ -119,22 +165,16 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
             setStreamStatus(event.message);
             return;
           }
-          setMessages((current) =>
-            current.map((message) =>
-              message.id === assistantMessageId
-                ? { ...message, text: message.text + event.delta }
-                : message,
-            ),
-          );
+          queueStreamDelta(assistantMessageId, event.delta);
         },
       );
 
+      flushStreamDelta(assistantMessageId);
       setMessages((current) =>
         current.map((message) =>
           message.id === assistantMessageId
             ? {
                 ...message,
-                text: response.answer,
                 result: {
                   conversationId: response.conversation_id,
                   refused: response.refused,
@@ -145,7 +185,10 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
         ),
       );
       queryClient.invalidateQueries({ queryKey: ["chat", "conversations"] });
-      if (!conversationId) router.replace(`/workspace/${response.conversation_id}`);
+      if (!conversationId) {
+        skipNextConversationLoad.current = response.conversation_id;
+        router.replace(`/workspace/${response.conversation_id}`);
+      }
     } catch (error: unknown) {
       setMessages((current) => current.filter((message) => message.id !== assistantMessageId));
       setQuery((currentQuery) => currentQuery || trimmedQuery);
@@ -160,10 +203,22 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
           : "We could not save that conversation. Please try again.",
       );
     } finally {
+      discardStreamDelta();
       setIsPending(false);
       setStreamingMessageId(undefined);
       setStreamStatus("");
     }
+  }
+
+  function handleJumpToLatest() {
+    const conversation = conversationRef.current;
+    if (!conversation) return;
+
+    shouldAutoScroll.current = true;
+    conversation.scrollTo({
+      top: conversation.scrollHeight,
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+    });
   }
 
   return (
@@ -176,6 +231,7 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
           const conversation = event.currentTarget;
           shouldAutoScroll.current =
             conversation.scrollHeight - conversation.scrollTop - conversation.clientHeight < 80;
+          setShowJumpToLatest(!shouldAutoScroll.current);
         }}
       >
         <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col gap-8 px-4 pb-56 pt-8 sm:px-0">
@@ -215,6 +271,21 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
         className="absolute inset-x-0 bottom-0 z-20 bg-background px-4 pb-4 pt-3 sm:px-0"
         onSubmit={handleSubmit}
       >
+        {showJumpToLatest && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-full flex justify-center pb-2">
+            <Button
+              aria-label="Jump to latest response"
+              className="pointer-events-auto rounded-full border-border bg-background px-3 text-foreground shadow-[0_8px_30px_rgb(24_26_25/12%)] hover:bg-secondary"
+              size="sm"
+              type="button"
+              variant="outline"
+              onClick={handleJumpToLatest}
+            >
+              <ArrowDown aria-hidden="true" />
+              Jump to latest
+            </Button>
+          </div>
+        )}
         <div className="mx-auto max-w-3xl">
           <label className="sr-only" htmlFor="chat-question">
             Your question
@@ -243,30 +314,29 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
                 }}
               />
               <div className="flex items-center gap-3 px-3 pb-1 pt-2">
-                <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-medium text-copy">
-                  <input
-                    aria-describedby="web-search-help"
-                    aria-label="Allow web search"
-                    checked={webSearchEnabled}
-                    className="peer sr-only"
-                    role="switch"
-                    type="checkbox"
-                    onChange={(event) => {
-                      const enabled = event.target.checked;
-                      setWebSearchEnabled(enabled);
-                      window.localStorage.setItem(WEB_SEARCH_STORAGE_KEY, String(enabled));
-                    }}
-                  />
-                  <Globe2 aria-hidden="true" size={14} />
-                  Allow web search
-                  <span
-                    aria-hidden="true"
-                    className="relative h-5 w-9 rounded-full bg-border transition-colors after:absolute after:top-0.5 after:left-0.5 after:size-4 after:rounded-full after:bg-white after:shadow-sm after:transition-transform peer-checked:bg-primary peer-checked:after:translate-x-4 peer-focus-visible:ring-2 peer-focus-visible:ring-ring/50"
-                  />
-                </label>
-                <span id="web-search-help" className="text-[11px] text-muted">
-                  {webSearchEnabled ? "Public web enabled" : "Private knowledge only"}
-                </span>
+                <div className="inline-flex items-center gap-2 text-xs font-medium text-copy">
+                  <Tooltip>
+                    <TooltipTrigger
+                      aria-label={webSearchEnabled ? "Disable web search" : "Enable web search"}
+                      aria-pressed={webSearchEnabled}
+                      className="rounded-md p-1 text-muted transition-colors hover:bg-secondary hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 aria-pressed:bg-primary/10 aria-pressed:text-primary aria-pressed:ring-1 aria-pressed:ring-primary/30"
+                      type="button"
+                      onClick={() => {
+                        const enabled = !webSearchEnabled;
+                        setWebSearchEnabled(enabled);
+                        window.localStorage.setItem(WEB_SEARCH_STORAGE_KEY, String(enabled));
+                      }}
+                    >
+                      <Globe2 aria-hidden="true" size={14} />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {webSearchEnabled
+                        ? "Peka may search the public web when current information is needed."
+                        : "Click to allow Peka to search the public web when needed."}
+                    </TooltipContent>
+                  </Tooltip>
+                  <span>Web search</span>
+                </div>
               </div>
             </div>
             <Button
@@ -336,8 +406,8 @@ function ChatMessageBubble({
               </Markdown>
             </div>
           ))}
-        {streamingStatus && !message.text && (
-          <p className="flex items-center gap-2 text-sm text-muted">
+        {!isUser && streamingStatus && (
+          <p className="mt-2 flex items-center gap-2 text-sm text-muted">
             <LoaderCircle aria-hidden="true" className="animate-spin" size={14} />
             {streamingStatus}
           </p>
