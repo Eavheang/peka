@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, Upl
 from fastapi.responses import FileResponse as DownloadResponse
 
 from app.auth.routes import authenticated
+from app.engine.search.service import access_levels_for_role
 
 from app.files.schemas import AccessLevel, AccessLevelUpdate, FileResponse, OKFStatusResponse
 from app.files import service as files_service
@@ -76,8 +77,8 @@ def get_okf_status(file_id: UUID, user: dict = Depends(authenticated)) -> dict:
 
 
 @router.get("/{file_id}")
-def download_file(file_id: UUID, _: dict = Depends(authenticated)) -> DownloadResponse:
-    result = find_file(file_id)
+def download_file(file_id: UUID, user: dict = Depends(authenticated)) -> DownloadResponse:
+    result = find_file(file_id, access_levels_for_role(user["role"]))
     if result is None:
         raise HTTPException(status_code=404, detail="File not found")
     record, path = result

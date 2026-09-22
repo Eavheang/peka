@@ -58,6 +58,7 @@ def test_search_returns_results_for_authenticated_user(monkeypatch) -> None:
     assert response.status_code == 200
     body = response.json()
     assert len(body) == 1
+    assert body[0]["file_id"] == "00000000-0000-0000-0000-000000000001"
     assert body[0]["title"] == "policy.pdf"
     assert len(body[0]["snippet"]) == 300
     assert body[0]["score"] == 0.87

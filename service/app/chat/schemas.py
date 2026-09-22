@@ -21,6 +21,7 @@ class Citation(BaseModel):
     page: int | None = None
     source_locations: list[dict]
     chunk_id: UUID | None = None
+    file_id: UUID | None = None
     url: str | None = None
     excerpt: str | None = None
 
@@ -33,6 +34,7 @@ class SourcePreviewRequest(BaseModel):
 
 class SourcePreviewResponse(BaseModel):
     content: str
+    file_id: UUID | None = None
 
 
 class ChatMessage(BaseModel):
@@ -55,6 +57,11 @@ class Conversation(BaseModel):
 
 class ConversationDetail(Conversation):
     messages: list[ChatMessage]
+
+
+class ConversationPage(BaseModel):
+    items: list[Conversation]
+    next_cursor: str | None = None
 
 
 class ChatResponse(BaseModel):

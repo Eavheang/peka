@@ -65,8 +65,10 @@ def test_invalid_structured_answer_fails_closed(monkeypatch) -> None:
 
 
 def test_grounded_answer_carries_citations(monkeypatch) -> None:
+    file_id = uuid4()
     results = [
         {
+            "file_id": str(file_id),
             "title": "policy.pdf",
             "heading": "Refund rules",
             "snippet": "Refunds take 14 days.",
@@ -108,6 +110,7 @@ def test_grounded_answer_carries_citations(monkeypatch) -> None:
     assert len(response.citations) == 1
     assert response.citations[0].title == "policy.pdf"
     assert response.citations[0].page == 3
+    assert response.citations[0].file_id == file_id
 
 
 def test_invalid_source_is_dropped_without_retry(monkeypatch):

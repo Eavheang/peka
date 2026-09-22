@@ -1,9 +1,12 @@
 import asyncio
+import base64
+import binascii
 import json
 import logging
 import re
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
@@ -287,6 +290,7 @@ def _citations(results: list[dict]) -> list[Citation]:
                 page=min(pages) if pages else None,
                 source_locations=result["source_locations"],
                 chunk_id=result.get("chunk_id"),
+                file_id=result.get("file_id"),
                 url=result.get("url"),
                 excerpt=result.get("content") if result.get("url") else None,
             )
@@ -544,8 +548,34 @@ def persist_response(
     )
 
 
-def list_conversations(owner_id: UUID) -> list[dict]:
-    return chat_repository.list_owned(owner_id)
+def _encode_conversation_cursor(conversation: dict) -> str:
+    value = f"{conversation['updated_at'].isoformat()}|{conversation['id']}"
+    return base64.urlsafe_b64encode(value.encode()).decode().rstrip("=")
+
+
+def _decode_conversation_cursor(cursor: str) -> tuple[datetime, UUID]:
+    try:
+        padding = "=" * (-len(cursor) % 4)
+        value = base64.urlsafe_b64decode(cursor + padding).decode()
+        updated_at, conversation_id = value.split("|", 1)
+        return datetime.fromisoformat(updated_at), UUID(conversation_id)
+    except (ValueError, UnicodeDecodeError, binascii.Error) as error:
+        raise ValueError("Invalid conversation cursor") from error
+
+
+def list_conversations(
+    owner_id: UUID,
+    limit: int = 15,
+    cursor: str | None = None,
+) -> dict:
+    decoded_cursor = _decode_conversation_cursor(cursor) if cursor else None
+    rows = chat_repository.list_owned(owner_id, limit + 1, decoded_cursor)
+    has_more = len(rows) > limit
+    items = rows[:limit]
+    return {
+        "items": items,
+        "next_cursor": _encode_conversation_cursor(items[-1]) if has_more else None,
+    }
 
 
 def get_conversation(conversation_id: UUID, owner_id: UUID) -> dict | None:

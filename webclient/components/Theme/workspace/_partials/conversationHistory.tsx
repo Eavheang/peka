@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useRef } from "react";
 import { LoaderCircle, MessageSquare, Trash2 } from "lucide-react";
 
 import type { Conversation } from "@/interface/chat";
@@ -9,6 +10,10 @@ export function ConversationHistory({
   conversations,
   error,
   loading,
+  loadingMore,
+  hasMore,
+  loadMoreError,
+  onLoadMore,
   onDelete,
   onNavigate,
   pathname,
@@ -16,10 +21,32 @@ export function ConversationHistory({
   conversations?: Conversation[];
   error: boolean;
   loading: boolean;
+  loadingMore: boolean;
+  hasMore: boolean;
+  loadMoreError: boolean;
+  onLoadMore: () => void;
   onDelete: (conversation: Conversation) => void;
   onNavigate?: () => void;
   pathname: string;
 }) {
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const root = scrollContainerRef.current;
+    const target = loadMoreRef.current;
+    if (!root || !target || !hasMore || loadingMore || loadMoreError) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) onLoadMore();
+      },
+      { root, rootMargin: "0px 0px 120px" },
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [hasMore, loadMoreError, loadingMore, onLoadMore]);
+
   return (
     <section
       className="mt-6 flex min-h-0 flex-1 flex-col border-t border-white/10 pt-5"
@@ -28,7 +55,7 @@ export function ConversationHistory({
       <p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/45">
         Recent chats
       </p>
-      <div className="workspace-scrollbar min-h-0 flex-1 overflow-y-auto">
+      <div ref={scrollContainerRef} className="workspace-scrollbar min-h-0 flex-1 overflow-y-auto">
         {loading && (
           <p className="flex items-center gap-2 px-3 py-2 text-xs text-white/45">
             <LoaderCircle aria-hidden="true" className="animate-spin" size={13} />
@@ -52,6 +79,21 @@ export function ConversationHistory({
             />
           ))}
         </div>
+        {hasMore && (
+          <div ref={loadMoreRef} className="px-3 py-2 text-xs text-white/45">
+            {loadingMore && (
+              <span className="flex items-center gap-2" aria-live="polite">
+                <LoaderCircle aria-hidden="true" className="animate-spin" size={13} />
+                Loading older chats...
+              </span>
+            )}
+            {loadMoreError && (
+              <button className="hover:text-white" type="button" onClick={onLoadMore}>
+                Could not load older chats. Try again.
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </section>
   );

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ExternalLink, LoaderCircle } from "lucide-react";
+import { Download, ExternalLink, LoaderCircle } from "lucide-react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -15,7 +15,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import type { Citation } from "@/interface/chat";
-import { useSourcePreview } from "@/services/chat";
+import { downloadCitation, useSourcePreview } from "@/services/chat";
 
 export function SourcePreview({ citation, number }: { citation: Citation; number: number }) {
   const [open, setOpen] = useState(false);
@@ -81,33 +81,63 @@ export function SourcePreview({ citation, number }: { citation: Citation; number
 
 function SourcePreviewContent({ citation }: { citation: Citation }) {
   const preview = useSourcePreview(citation);
+  const fileId = citation.file_id ?? preview.data?.file_id;
+  const previewContent = preview.isPending ? (
+    <div className="flex min-h-0 items-center gap-2 py-8 text-sm text-muted" role="status">
+      <LoaderCircle aria-hidden="true" className="animate-spin" size={16} />
+      Loading source excerpt…
+    </div>
+  ) : preview.isError ? (
+    <div className="flex min-h-0 flex-col items-start gap-3 py-4">
+      <p className="text-sm text-copy" role="alert">
+        This excerpt could not be loaded. It may have changed, be unavailable, or no longer be
+        accessible.
+      </p>
+      <Button variant="outline" onClick={() => preview.refetch()}>
+        Try again
+      </Button>
+    </div>
+  ) : (
+    <div className="citation-scroll min-h-0 overflow-y-auto overscroll-contain border-t border-border pt-4 pr-4">
+      <CitationMarkdown content={preview.data.content} />
+    </div>
+  );
 
-  if (preview.isPending) {
-    return (
-      <div className="flex min-h-0 items-center gap-2 py-8 text-sm text-muted" role="status">
-        <LoaderCircle aria-hidden="true" className="animate-spin" size={16} />
-        Loading source excerpt…
-      </div>
-    );
-  }
+  return (
+    <>
+      {previewContent}
+      {fileId && <SourceDownloadButton fileId={fileId} filename={citation.title} />}
+    </>
+  );
+}
 
-  if (preview.isError) {
-    return (
-      <div className="flex min-h-0 flex-col items-start gap-3 py-4">
-        <p className="text-sm text-copy" role="alert">
-          This excerpt could not be loaded. It may have changed, be unavailable, or no longer be
-          accessible.
-        </p>
-        <Button variant="outline" onClick={() => preview.refetch()}>
-          Try again
-        </Button>
-      </div>
-    );
+function SourceDownloadButton({ fileId, filename }: { fileId: string; filename: string }) {
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState(false);
+
+  async function handleDownload() {
+    setIsDownloading(true);
+    setDownloadError(false);
+    try {
+      await downloadCitation(fileId, filename);
+    } catch {
+      setDownloadError(true);
+    } finally {
+      setIsDownloading(false);
+    }
   }
 
   return (
-    <div className="citation-scroll min-h-0 overflow-y-auto overscroll-contain border-t border-border pt-4 pr-4">
-      <CitationMarkdown content={preview.data.content} />
+    <div className="flex flex-wrap items-center gap-3 border-t border-border pt-4">
+      <Button disabled={isDownloading} onClick={handleDownload} variant="outline">
+        <Download aria-hidden="true" />
+        {isDownloading ? "Preparing download…" : "Download original file"}
+      </Button>
+      {downloadError && (
+        <p className="text-sm text-destructive" role="alert">
+          The file could not be downloaded. Please try again.
+        </p>
+      )}
     </div>
   );
 }

@@ -1,4 +1,5 @@
 from pydantic import BaseModel, Field
+from uuid import UUID
 
 
 class SearchRequest(BaseModel):
@@ -6,6 +7,7 @@ class SearchRequest(BaseModel):
 
 
 class SearchResponse(BaseModel):
+    file_id: UUID
     title: str
     heading: str
     snippet: str

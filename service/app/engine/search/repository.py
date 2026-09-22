@@ -49,7 +49,7 @@ class SearchRepository:
         allowed_access_levels: tuple[str, ...],
     ) -> dict[str, Any] | None:
         query = (
-            "SELECT kc.content FROM knowledge_chunks kc "
+            "SELECT kc.content, kc.file_id FROM knowledge_chunks kc "
             "JOIN chunk_sets cs ON cs.id = kc.chunk_set_id AND cs.status = 'active' "
             "JOIN files f ON f.id = kc.file_id "
             "WHERE f.access_level = ANY(%s) "

@@ -3,12 +3,12 @@ import json
 import logging
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from fastapi.responses import StreamingResponse
 
 from app.auth.routes import authenticated
 from app.chat.schemas import (
-    ChatRequest, ChatResponse, Conversation, ConversationDetail,
+    ChatRequest, ChatResponse, ConversationDetail, ConversationPage,
     SourcePreviewRequest, SourcePreviewResponse,
 )
 from app.chat import service as chat_service
@@ -19,7 +19,7 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 logger = logging.getLogger(__name__)
 
 
-@router.post("/source-preview", response_model=SourcePreviewResponse)
+@router.post("/source-preview", response_model=SourcePreviewResponse, response_model_exclude_none=True)
 def source_preview(payload: SourcePreviewRequest, user: dict = Depends(authenticated)) -> dict:
     result = chat_service.preview_source(payload, user["role"])
     if result is None or not result["content"].strip():
@@ -110,9 +110,16 @@ def _sse(payload: dict) -> str:
     return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
 
 
-@router.get("/conversations", response_model=list[Conversation])
-def conversations(user: dict = Depends(authenticated)) -> list[dict]:
-    return chat_service.list_conversations(user["id"])
+@router.get("/conversations", response_model=ConversationPage)
+def conversations(
+    user: dict = Depends(authenticated),
+    limit: int = Query(default=15, ge=1, le=50),
+    cursor: str | None = Query(default=None),
+) -> dict:
+    try:
+        return chat_service.list_conversations(user["id"], limit, cursor)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid conversation cursor") from None
 
 
 @router.get("/conversations/{conversation_id}", response_model=ConversationDetail)
