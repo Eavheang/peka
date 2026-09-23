@@ -8,7 +8,7 @@ from typing import Sequence, Union
 from alembic import op
 
 revision: str = "015_create_provider_settings"
-down_revision: Union[str, None] = "014_add_conversation_pagination_index"
+down_revision: Union[str, None] = "014_conv_pagination_idx"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

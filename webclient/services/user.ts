@@ -18,6 +18,15 @@ export const useUpdateUserActivation = () => {
   });
 };
 
+export const useUpdateUserRole = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, role }: Pick<UserResponse, 'id' | 'role'>) =>
+      (await axiosInstance.patch<UserResponse>(`/auth/users/${id}/role`, { role })).data,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users', 'list'] }),
+  });
+};
+
 export const useCreateUser = () => {
   const queryClient = useQueryClient();
   return useMutation({

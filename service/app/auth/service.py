@@ -17,6 +17,14 @@ class UserHasRelatedRecordsError(Exception):
     pass
 
 
+class IncorrectCurrentPasswordError(Exception):
+    pass
+
+
+class CannotChangeOwnAdminRoleError(Exception):
+    pass
+
+
 def authenticate(email: str, password: str) -> dict | None:
     user = auth_repository.find_by_email(email)
     # Keep unknown-email login timing comparable to a password verification.
@@ -28,7 +36,9 @@ def authenticate(email: str, password: str) -> dict | None:
 
 
 def create_user(data: UserCreate) -> dict:
-    return auth_repository.create(data.email, hash_password(data.password), data.role)
+    return auth_repository.create(
+        data.email, data.display_name, hash_password(data.password), data.role
+    )
 
 
 def current_user(user_id: UUID) -> dict | None:
@@ -43,6 +53,29 @@ def set_user_active(user_id: UUID, is_active: bool) -> dict:
     if user is None:
         raise UserNotFoundError
     return user
+
+
+def set_user_role(user_id: UUID, role: str, actor_id: UUID) -> dict:
+    if user_id == actor_id and role != "admin":
+        raise CannotChangeOwnAdminRoleError
+    user = auth_repository.set_role(user_id, role)
+    if user is None:
+        raise UserNotFoundError
+    return user
+
+
+def set_display_name(user_id: UUID, display_name: str) -> dict:
+    user = auth_repository.set_display_name(user_id, display_name.strip())
+    if user is None:
+        raise UserNotFoundError
+    return user
+
+
+def change_password(user_id: UUID, current_password: str, new_password: str) -> None:
+    existing_hash = auth_repository.password_hash(user_id)
+    if existing_hash is None or not verify_password(current_password, existing_hash):
+        raise IncorrectCurrentPasswordError
+    auth_repository.update_password(user_id, hash_password(new_password))
 
 
 def delete_user(user_id: UUID) -> None:

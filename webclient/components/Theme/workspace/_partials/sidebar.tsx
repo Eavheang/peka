@@ -48,7 +48,7 @@ export function WorkspaceSidebar({
     conversationsQuery.hasNextPage,
     conversationsQuery.isFetchingNextPage,
   ]);
-  const displayName = user?.email.split("@")[0] ?? "Workspace";
+  const displayName = user?.display_name || user?.email.split("@")[0] || "Workspace";
   const initial = displayName.charAt(0).toUpperCase();
 
   function handleLogout() {

@@ -18,6 +18,7 @@ class User(Base):
 
     id: Mapped[UUID] = mapped_column(PostgresUUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
     email: Mapped[str] = mapped_column(String(320), nullable=False)
+    display_name: Mapped[str] = mapped_column(String(100), nullable=False, server_default="")
     password_hash: Mapped[str] = mapped_column(Text, nullable=False)
     role: Mapped[str] = mapped_column(String(10), nullable=False, server_default="staff")
     token_version: Mapped[int] = mapped_column(nullable=False, server_default="0")

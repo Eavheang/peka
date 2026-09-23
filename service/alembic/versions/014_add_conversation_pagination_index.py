@@ -1,6 +1,6 @@
 """index conversations for cursor pagination
 
-Revision ID: 014_add_conversation_pagination_index
+Revision ID: 014_conv_pagination_idx
 Revises: 013_create_chat_tables
 """
 from typing import Sequence, Union
@@ -8,7 +8,7 @@ from typing import Sequence, Union
 from alembic import op
 
 
-revision: str = "014_add_conversation_pagination_index"
+revision: str = "014_conv_pagination_idx"
 down_revision: Union[str, None] = "013_create_chat_tables"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None

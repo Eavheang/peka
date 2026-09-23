@@ -6,7 +6,12 @@ import Alertdialog from "@/components/Alertdialog";
 import { useRouter } from "next/navigation";
 import { useGetCurrentUser } from "@/services/auth";
 import { Button } from "@/components/ui/button";
-import { useDeleteUser, useListUsers, useUpdateUserActivation } from "@/services/user";
+import {
+  useDeleteUser,
+  useListUsers,
+  useUpdateUserActivation,
+  useUpdateUserRole,
+} from "@/services/user";
 import { toast } from "@/components/ui/toast";
 import { getStoredToken } from "@/utils/auth-storage";
 import {
@@ -18,6 +23,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import CreateOrEdit from "./_partials/createOrEdit";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function AdminPage() {
   const router = useRouter();
@@ -30,6 +42,7 @@ export default function AdminPage() {
   const me = useGetCurrentUser(token);
   const users = useListUsers();
   const updateUser = useUpdateUserActivation();
+  const updateRole = useUpdateUserRole();
   const deleteUser = useDeleteUser();
 
   useEffect(() => setToken(getStoredToken("peka_access_token") ?? ""), []);
@@ -135,9 +148,35 @@ export default function AdminPage() {
               {users.data?.map((user) => (
                 <TableRow key={user.id} className="border-border hover:bg-secondary/40">
                   <TableCell className="px-5 py-4 font-medium text-foreground">
-                    {user.email}
+                    {user.display_name && <div>{user.display_name}</div>}
+                    <div className={user.display_name ? "text-xs font-normal text-muted" : ""}>
+                      {user.email}
+                    </div>
                   </TableCell>
-                  <TableCell className="px-5 py-4 capitalize text-muted">{user.role}</TableCell>
+                  <TableCell className="px-5 py-4">
+                    <Select
+                      value={user.role}
+                      disabled={user.id === me.data.id || updateRole.isPending}
+                      onValueChange={(role) =>
+                        updateRole.mutate(
+                          { id: user.id, role: role as typeof user.role },
+                          {
+                            onSuccess: () => toast.add({ title: "User role updated.", type: "success" }),
+                            onError: () => toast.add({ title: "Unable to update user role.", type: "error" }),
+                          },
+                        )
+                      }
+                    >
+                      <SelectTrigger aria-label={`Role for ${user.email}`}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="staff">Staff</SelectItem>
+                        <SelectItem value="senior">Senior</SelectItem>
+                        <SelectItem value="admin">Admin</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </TableCell>
                   <TableCell className="px-5 py-4">
                     <span
                       className={

@@ -11,28 +11,29 @@ class AuthRepository:
     def find_by_email(self, email: str) -> dict | None:
         with get_connection() as connection:
             return connection.execute(
-                "SELECT id, email, role, password_hash, token_version, is_active FROM users WHERE email = %s",
+                "SELECT id, email, display_name, role, password_hash, token_version, is_active FROM users WHERE email = %s",
                 (email,),
             ).fetchone()
 
     def find_by_id(self, user_id: UUID) -> dict | None:
         with get_connection() as connection:
             return connection.execute(
-                "SELECT id, email, role, token_version, is_active FROM users WHERE id = %s",
+                "SELECT id, email, display_name, role, token_version, is_active FROM users WHERE id = %s",
                 (user_id,),
             ).fetchone()
     def list(self) -> list[dict]:
         with get_connection() as connection:
             return connection.execute(
-                "SELECT id, email, role, is_active FROM users ORDER BY created_at",
+                "SELECT id, email, display_name, role, is_active FROM users ORDER BY created_at",
             ).fetchall()
 
-    def create(self, email: str, password_hash: str, role: str) -> dict:
+    def create(self, email: str, display_name: str, password_hash: str, role: str) -> dict:
         try:
             with get_connection() as connection:
                 return connection.execute(
-                    "INSERT INTO users (email, password_hash, role) VALUES (%s, %s, %s) "
-                    "RETURNING id, email, role, is_active", (email, password_hash, role),
+                    "INSERT INTO users (email, display_name, password_hash, role) VALUES (%s, %s, %s, %s) "
+                    "RETURNING id, email, display_name, role, is_active",
+                    (email, display_name, password_hash, role),
                 ).fetchone()
         except psycopg.errors.UniqueViolation:
             raise ValueError("duplicate email") from None
@@ -51,9 +52,42 @@ class AuthRepository:
                 "token_version = token_version + "
                 "CASE WHEN is_active IS DISTINCT FROM %s THEN 1 ELSE 0 END, "
                 "updated_at = CURRENT_TIMESTAMP WHERE id = %s "
-                "RETURNING id, email, role, token_version, is_active",
+                "RETURNING id, email, display_name, role, token_version, is_active",
                 (is_active, is_active, user_id),
             ).fetchone()
+
+    def set_role(self, user_id: UUID, role: str) -> dict | None:
+        with get_connection() as connection:
+            return connection.execute(
+                "UPDATE users SET role = %s, token_version = token_version + "
+                "CASE WHEN role IS DISTINCT FROM %s THEN 1 ELSE 0 END, "
+                "updated_at = CURRENT_TIMESTAMP WHERE id = %s "
+                "RETURNING id, email, display_name, role, token_version, is_active",
+                (role, role, user_id),
+            ).fetchone()
+
+    def set_display_name(self, user_id: UUID, display_name: str) -> dict | None:
+        with get_connection() as connection:
+            return connection.execute(
+                "UPDATE users SET display_name = %s, updated_at = CURRENT_TIMESTAMP "
+                "WHERE id = %s RETURNING id, email, display_name, role, is_active",
+                (display_name, user_id),
+            ).fetchone()
+
+    def password_hash(self, user_id: UUID) -> str | None:
+        with get_connection() as connection:
+            user = connection.execute(
+                "SELECT password_hash FROM users WHERE id = %s", (user_id,)
+            ).fetchone()
+            return user["password_hash"] if user else None
+
+    def update_password(self, user_id: UUID, password_hash: str) -> None:
+        with get_connection() as connection:
+            connection.execute(
+                "UPDATE users SET password_hash = %s, token_version = token_version + 1, "
+                "updated_at = CURRENT_TIMESTAMP WHERE id = %s",
+                (password_hash, user_id),
+            )
 
     def delete_deactivated(
         self, user_id: UUID

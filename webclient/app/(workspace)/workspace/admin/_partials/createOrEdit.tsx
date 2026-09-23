@@ -18,13 +18,13 @@ import {
 import type { UserRole } from "@/interface/auth";
 import { useCreateUser } from "@/services/user";
 
-type CreateUserValues = { email: string; password: string; role: UserRole };
+type CreateUserValues = { email: string; display_name: string; password: string; role: UserRole };
 type CreateOrEditProps = { open: boolean; onOpenChange: (open: boolean) => void };
 
 export default function CreateOrEdit({ open, onOpenChange }: CreateOrEditProps) {
   const createUser = useCreateUser();
   const { control, register, handleSubmit, reset } = useForm<CreateUserValues>({
-    defaultValues: { email: "", password: "", role: "staff" },
+    defaultValues: { email: "", display_name: "", password: "", role: "staff" },
   });
 
   function close(nextOpen: boolean) {
@@ -57,7 +57,13 @@ export default function CreateOrEdit({ open, onOpenChange }: CreateOrEditProps) 
           className="grid gap-3 border-t border-panel-foreground/15 p-6"
           onSubmit={handleSubmit(submit)}
         >
-          <Input type="email" placeholder="Email" {...register("email", { required: true })} />
+          <Input type="email" aria-label="Email" placeholder="Email" {...register("email", { required: true })} />
+          <Input
+            aria-label="Name"
+            placeholder="Name (optional)"
+            maxLength={100}
+            {...register("display_name")}
+          />
           <Input
             type="password"
             placeholder="Password (12+ characters)"

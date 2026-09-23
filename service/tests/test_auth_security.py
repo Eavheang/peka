@@ -1,7 +1,10 @@
+from uuid import uuid4
+
 import pytest
 from pydantic import SecretStr, ValidationError
 
 from app.auth.security import create_access_token, decode_access_token, hash_password, verify_password
+from app.auth import service
 from app.config import Settings
 
 
@@ -16,6 +19,25 @@ def test_password_hash_and_jwt_round_trip() -> None:
     assert claims["role"] == "admin"
     assert claims["ver"] == 0
     assert {"iss", "aud", "iat", "nbf", "exp", "jti"} <= claims.keys()
+
+
+def test_password_change_verifies_current_password_and_replaces_hash(monkeypatch) -> None:
+    user_id = uuid4()
+    old_hash = hash_password("old password")
+    updated = {}
+    monkeypatch.setattr(service.auth_repository, "password_hash", lambda _: old_hash)
+    monkeypatch.setattr(
+        service.auth_repository,
+        "update_password",
+        lambda _, password_hash: updated.update(password_hash=password_hash),
+    )
+
+    service.change_password(user_id, "old password", "a new password that is long")
+    assert verify_password("a new password that is long", updated["password_hash"])
+    assert not verify_password("old password", updated["password_hash"])
+
+    with pytest.raises(service.IncorrectCurrentPasswordError):
+        service.change_password(user_id, "wrong password", "another long password")
 
 
 def test_jwt_rejects_tampering() -> None:

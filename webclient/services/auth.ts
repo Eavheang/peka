@@ -42,3 +42,19 @@ export const useLogout = () => {
     },
   });
 };
+
+export const useUpdateProfile = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { display_name: string }) =>
+      (await axiosInstance.patch<UserResponse>('/auth/me', data)).data,
+    onSuccess: (user) => queryClient.setQueryData(['users', 'me'], user),
+  });
+};
+
+export const useChangePassword = () =>
+  useMutation({
+    mutationFn: async (data: { current_password: string; new_password: string }) => {
+      await axiosInstance.post('/auth/password', data);
+    },
+  });

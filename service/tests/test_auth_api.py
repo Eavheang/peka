@@ -109,9 +109,89 @@ def test_admin_can_create_each_user_role(client, monkeypatch, role):
 
     assert response.status_code == 201
     assert response.json() == {
-        "id": str(created["id"]), "email": created["email"], "role": role, "is_active": True
+        "id": str(created["id"]), "email": created["email"], "display_name": "",
+        "role": role, "is_active": True
     }
     assert captured["data"].role == role
+
+
+def test_admin_can_change_role_and_cannot_demote_self(client, monkeypatch):
+    admin = user("admin")
+    target = user("staff")
+    token = routes.create_access_token(str(admin["id"]), "admin", 0)
+    monkeypatch.setattr(routes, "current_user", lambda user_id: admin)
+    changed = {**target, "role": "senior", "display_name": ""}
+    monkeypatch.setattr(routes, "set_user_role", lambda user_id, role, actor_id: changed)
+
+    response = client.patch(
+        f"/auth/users/{target['id']}/role",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"role": "senior"},
+    )
+    assert response.status_code == 200
+    assert response.json()["role"] == "senior"
+
+    monkeypatch.setattr(
+        routes,
+        "set_user_role",
+        lambda user_id, role, actor_id: (_ for _ in ()).throw(service.CannotChangeOwnAdminRoleError()),
+    )
+    response = client.patch(
+        f"/auth/users/{admin['id']}/role",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"role": "staff"},
+    )
+    assert response.status_code == 409
+
+
+def test_user_can_change_name_and_password(client, monkeypatch):
+    account = user("staff")
+    token = routes.create_access_token(str(account["id"]), account["role"], 0)
+    headers = {"Authorization": f"Bearer {token}"}
+    monkeypatch.setattr(routes, "current_user", lambda user_id: account)
+    monkeypatch.setattr(
+        routes,
+        "set_display_name",
+        lambda user_id, display_name: {**account, "display_name": display_name},
+    )
+    profile = client.patch("/auth/me", headers=headers, json={"display_name": "  Ada  "})
+    assert profile.status_code == 200
+    assert profile.json()["display_name"] == "Ada"
+
+    changed = {}
+    monkeypatch.setattr(
+        routes,
+        "change_password",
+        lambda user_id, current_password, new_password: changed.update(
+            user_id=user_id, current=current_password, new=new_password
+        ),
+    )
+    response = client.post(
+        "/auth/password",
+        headers=headers,
+        json={"current_password": "old password", "new_password": "new password long"},
+    )
+    assert response.status_code == 204
+    assert changed["current"] == "old password"
+    assert changed["new"] == "new password long"
+
+
+def test_password_change_rejects_wrong_current_password(client, monkeypatch):
+    account = user()
+    token = routes.create_access_token(str(account["id"]), account["role"], 0)
+    monkeypatch.setattr(routes, "current_user", lambda user_id: account)
+    monkeypatch.setattr(
+        routes,
+        "change_password",
+        lambda *args: (_ for _ in ()).throw(service.IncorrectCurrentPasswordError()),
+    )
+
+    response = client.post(
+        "/auth/password",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"current_password": "wrong", "new_password": "new password long"},
+    )
+    assert response.status_code == 400
 
 
 def test_inactive_user_cannot_login(monkeypatch):

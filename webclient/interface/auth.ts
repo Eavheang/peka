@@ -20,6 +20,7 @@ export type UserRole = "admin" | "senior" | "staff";
 export interface UserResponse {
   id: string;
   email: string;
+  display_name: string;
   role: UserRole;
   is_active: boolean;
 }

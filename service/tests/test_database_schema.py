@@ -12,6 +12,7 @@ def test_user_model_describes_users_table() -> None:
     assert {column.name for column in table.columns} == {
         "id",
         "email",
+        "display_name",
         "password_hash",
         "role",
         "token_version",
