@@ -8,6 +8,7 @@ import ai
 from pydantic import BaseModel, ValidationError
 
 from app.config import settings
+from app.workspace_settings import provider_config
 
 logger = logging.getLogger(__name__)
 
@@ -21,15 +22,16 @@ class AIModelError(RuntimeError):
 
 
 def _model() -> tuple[ai.Model, ai.Provider]:
-    if not settings.llm_api_key.get_secret_value():
+    config = provider_config()
+    if not config["llm_api_key"]:
         raise AIModelError("LLM_API_KEY is not configured")
 
     provider = ai.get_provider(
         "openai",
-        base_url=settings.llm_base_url,
-        api_key=settings.llm_api_key.get_secret_value(),
+        base_url=config["llm_base_url"],
+        api_key=config["llm_api_key"],
     )
-    return ai.Model(id=settings.llm_model, provider=provider), provider
+    return ai.Model(id=config["llm_model"], provider=provider), provider
 
 
 def _inference_params() -> ai.InferenceRequestParams:

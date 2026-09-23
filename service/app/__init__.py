@@ -7,6 +7,7 @@ from app.engine.chunks.chunk_model import KnowledgeChunk  # noqa: F401 - registe
 from app.engine.chunks.chunk_set_model import ChunkSet  # noqa: F401 - register table in shared metadata
 from app.engine.search.routes import router as search_router
 from app.chat.routes import router as chat_router
+from app.workspace_settings import router as workspace_settings_router
 from app.chat.model import ChatMessage, Conversation  # noqa: F401 - register chat tables in shared metadata
 
 routers = [
@@ -14,4 +15,5 @@ routers = [
     files_router,
     search_router,
     chat_router,
+    workspace_settings_router,
 ]
