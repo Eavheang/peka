@@ -5,16 +5,18 @@ from urllib.parse import urlparse
 import httpx
 
 from app.config import settings
+from app.workspace_settings import provider_config
 
 
 def web_search(query: str) -> list[dict[str, Any]]:
-    if settings.exa_api_key is None or not settings.exa_api_key.get_secret_value().strip():
+    config = provider_config()
+    if not config["exa_api_key"] or not config["exa_api_key"].strip():
         raise RuntimeError("Web search is not configured")
 
     try:
         response = httpx.post(
-            f"{settings.exa_base_url.rstrip('/')}/search",
-            headers={"Authorization": f"Bearer {settings.exa_api_key.get_secret_value()}"},
+            f"{config['exa_base_url'].rstrip('/')}/search",
+            headers={"Authorization": f"Bearer {config['exa_api_key']}"},
             json={
                 "query": query,
                 "type": "auto",
