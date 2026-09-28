@@ -95,8 +95,8 @@ def store_files(
         raise
 
 
-def list_files() -> list[dict]:
-    return files_repository.list_all()
+def list_files(allowed_access_levels: tuple[str, ...]) -> list[dict]:
+    return files_repository.list_all(allowed_access_levels)
 
 
 def retry_okf(file_id: UUID, user_id: UUID, is_admin: bool = False) -> dict | None:

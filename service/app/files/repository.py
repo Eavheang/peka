@@ -25,13 +25,16 @@ class FilesRepository:
                 created.append(record)
         return created
 
-    def list_all(self) -> list[dict]:
+    def list_all(self, allowed_access_levels: tuple[str, ...]) -> list[dict]:
         with get_connection() as connection:
             rows = connection.execute(
                 "SELECT files.id, files.path, files.content_type, files.sha256, files.author_id, "
                 "files.access_level, files.created_at, jobs.status AS okf_status, "
                 "jobs.attempts AS okf_attempts, jobs.last_error AS okf_error FROM files "
-                "JOIN okf_jobs jobs ON jobs.file_id = files.id ORDER BY files.created_at DESC"
+                "JOIN okf_jobs jobs ON jobs.file_id = files.id "
+                "WHERE files.access_level = ANY(%s) "
+                "ORDER BY files.created_at DESC",
+                (list(allowed_access_levels),),
             ).fetchall()
             return cast(list[dict[str, Any]], rows)
 

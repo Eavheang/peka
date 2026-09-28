@@ -46,8 +46,8 @@ def upload_files(
 
 
 @router.get("", response_model=list[FileResponse])
-def get_files(_: dict = Depends(authenticated)) -> list[dict]:
-    return list_files()
+def get_files(user: dict = Depends(authenticated)) -> list[dict]:
+    return list_files(access_levels_for_role(user["role"]))
 
 
 @router.post("/{file_id}/retry-okf", response_model=FileResponse)

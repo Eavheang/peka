@@ -37,7 +37,11 @@ def test_files_require_login_and_support_upload_list_download(client, monkeypatc
     monkeypatch.setattr(service.settings, "file_storage_dir", tmp_path)
     monkeypatch.setattr(service.files_repository, "create_many", create_many)
     monkeypatch.setattr(service.files_repository, "exists_by_sha256", lambda sha256: False)
-    monkeypatch.setattr(service.files_repository, "list_all", lambda: records)
+    monkeypatch.setattr(
+        service.files_repository,
+        "list_all",
+        lambda allowed: [record for record in records if record["access_level"] in allowed],
+    )
     monkeypatch.setattr(
         service.files_repository,
         "find_by_id",
@@ -197,6 +201,67 @@ def test_download_hides_confidential_files_from_staff(client, monkeypatch, tmp_p
     download = client.get(f"/files/{file_id}", headers=token_for(admin))
     assert download.status_code == 200
     assert download.content == b"private"
+
+
+def test_list_hides_confidential_files_from_staff(client, monkeypatch):
+    staff = {"id": uuid4(), "email": "staff@example.com", "role": "staff",
+             "token_version": 0, "is_active": True}
+    admin = {"id": uuid4(), "email": "admin@example.com", "role": "admin",
+             "token_version": 0, "is_active": True}
+    senior = {"id": uuid4(), "email": "senior@example.com", "role": "senior",
+              "token_version": 0, "is_active": True}
+    accounts = {staff["id"]: staff, admin["id"]: admin, senior["id"]: senior}
+    records = [
+        {
+            "id": uuid4(),
+            "path": "pdf/public.pdf",
+            "content_type": "application/pdf",
+            "sha256": "a" * 64,
+            "author_id": admin["id"],
+            "access_level": "general",
+            "created_at": datetime.now(timezone.utc),
+            "okf_status": "completed",
+            "okf_attempts": 1,
+            "okf_error": None,
+        },
+        {
+            "id": uuid4(),
+            "path": "pdf/private.pdf",
+            "content_type": "application/pdf",
+            "sha256": "b" * 64,
+            "author_id": admin["id"],
+            "access_level": "confidential",
+            "created_at": datetime.now(timezone.utc),
+            "okf_status": "completed",
+            "okf_attempts": 1,
+            "okf_error": None,
+        },
+    ]
+
+    monkeypatch.setattr(auth_routes, "current_user", lambda user_id: accounts[user_id])
+    monkeypatch.setattr(
+        service.files_repository,
+        "list_all",
+        lambda allowed: [record for record in records if record["access_level"] in allowed],
+    )
+
+    def token_for(account):
+        token = auth_routes.create_access_token(
+            str(account["id"]), account["role"], account["token_version"]
+        )
+        return {"Authorization": f"Bearer {token}"}
+
+    staff_list = client.get("/files", headers=token_for(staff))
+    assert staff_list.status_code == 200
+    assert [item["path"] for item in staff_list.json()] == ["pdf/public.pdf"]
+
+    for account in (admin, senior):
+        visible = client.get("/files", headers=token_for(account))
+        assert visible.status_code == 200
+        assert [item["path"] for item in visible.json()] == [
+            "pdf/public.pdf",
+            "pdf/private.pdf",
+        ]
 
 
 def test_upload_rejects_unsupported_files_without_saving(client, monkeypatch, tmp_path):
