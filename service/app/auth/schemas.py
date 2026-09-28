@@ -48,12 +48,15 @@ class UserRoleUpdate(BaseModel):
 
 
 class UserProfileUpdate(BaseModel):
-    display_name: str = Field(max_length=100)
+    display_name: str = Field(min_length=1, max_length=100)
 
     @field_validator("display_name")
     @classmethod
     def normalize_display_name(cls, value: str) -> str:
-        return value.strip()
+        value = value.strip()
+        if not value:
+            raise ValueError("display_name must not be blank")
+        return value
 
 
 class PasswordChange(BaseModel):

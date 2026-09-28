@@ -156,7 +156,11 @@ export default function ProfileSettingsPage() {
                     id="display-name"
                     maxLength={100}
                     autoComplete="name"
-                    {...profileForm.register("display_name", { maxLength: 100 })}
+                    {...profileForm.register("display_name", {
+                      required: true,
+                      minLength: 1,
+                      maxLength: 100,
+                    })}
                   />
                 </label>
                 <div className="flex flex-wrap items-center gap-4">
