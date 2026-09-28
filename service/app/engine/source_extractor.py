@@ -7,7 +7,7 @@ import re
 from datetime import UTC, datetime
 from pathlib import Path
 
-import fitz
+import pymupdf
 from docx import Document
 from docx.table import Table
 from docx.text.paragraph import Paragraph
@@ -41,7 +41,7 @@ def source_id_for(path: Path) -> str:
 
 def extract_pdf(path: Path) -> list[dict[str, object]]:
     sections = []
-    with fitz.open(path) as document:
+    with pymupdf.open(path) as document:
         for number, page in enumerate(document, start=1):
             text = clean_text(page.get_text())
             if text:
