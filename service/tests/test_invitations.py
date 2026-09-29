@@ -79,7 +79,9 @@ def test_invite_user_stores_only_a_token_hash_and_builds_the_link(monkeypatch):
         service.invitation_repository, "create",
         lambda email, role, token_hash, invited_by, expires_at: stored.update(token_hash=token_hash) or invitation(email, role),
     )
-    monkeypatch.setattr(service, "send_invitation", lambda to, url, days: sent.update(to=to, url=url) or True)
+    monkeypatch.setattr(
+        service, "send_invitation", lambda to, url, days, role: sent.update(to=to, url=url) or True
+    )
     monkeypatch.setattr(settings, "app_base_url", "https://peka.example/")
 
     result = service.invite_user("new@example.com", "staff", uuid4())
@@ -212,19 +214,31 @@ def configure_smtp(monkeypatch):
 def test_mailer_sends_link_over_starttls(monkeypatch):
     configure_smtp(monkeypatch)
 
-    assert mailer.send_invitation("dara@example.com", "http://app/accept-invite?token=t", 7) is True
+    assert mailer.send_invitation("dara@example.com", "http://app/accept-invite?token=t", 7, "senior") is True
 
     server = FakeSMTP.instances[0]
     assert (server.host, server.port, server.tls) == ("smtp.gmail.com", 587, True)
     assert server.login_args == ("sender@gmail.com", "app-password")
     message = server.messages[0]
     assert message["To"] == "dara@example.com" and message["From"] == "sender@gmail.com"
-    assert "http://app/accept-invite?token=t" in message.get_content()
+    plain = message.get_body(preferencelist=("plain",)).get_content()
+    html = message.get_body(preferencelist=("html",)).get_content()
+    assert "http://app/accept-invite?token=t" in plain and "senior" in plain
+    assert 'href="http://app/accept-invite?token=t"' in html
+    assert "Senior" in html and "expires in 7 days" in html
+    assert "#e96243" in html  # the app's primary colour on the button
+
+
+def test_invitation_html_escapes_untrusted_values():
+    html = mailer._invitation_html('http://x/?a=1&b="2"', 7, "<b>staff</b>")
+
+    assert '&amp;b=&quot;2&quot;' in html
+    assert "<B>" not in html and "&lt;B&gt;Staff&lt;/B&gt;" in html
 
 
 def test_mailer_skips_when_unconfigured_and_survives_failures(monkeypatch):
     monkeypatch.setattr(settings, "smtp_host", None)
-    assert mailer.send_invitation("dara@example.com", "http://x", 7) is False
+    assert mailer.send_invitation("dara@example.com", "http://x", 7, "staff") is False
 
     configure_smtp(monkeypatch)
 
@@ -232,4 +246,4 @@ def test_mailer_skips_when_unconfigured_and_survives_failures(monkeypatch):
         raise OSError("network down")
 
     monkeypatch.setattr(mailer.smtplib, "SMTP", refuse)
-    assert mailer.send_invitation("dara@example.com", "http://x", 7) is False
+    assert mailer.send_invitation("dara@example.com", "http://x", 7, "staff") is False

@@ -57,7 +57,9 @@ def _expires_at() -> datetime:
 
 def _deliver(invitation: dict, token: str) -> dict:
     invite_url = f"{settings.app_base_url.rstrip('/')}/accept-invite?token={token}"
-    email_sent = send_invitation(invitation["email"], invite_url, settings.invitation_expire_days)
+    email_sent = send_invitation(
+        invitation["email"], invite_url, settings.invitation_expire_days, invitation["role"]
+    )
     return {**invitation, "invite_url": invite_url, "email_sent": email_sent}
 
 
