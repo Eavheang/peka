@@ -1,6 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import type { LoginRequest, TokenResponse, UserResponse } from "@/interface/auth";
+import type {
+  AcceptInvitationRequest,
+  InvitationPreview,
+  LoginRequest,
+  TokenResponse,
+  UserResponse,
+} from "@/interface/auth";
 import axiosInstance from "@/utils/axios";
 
 export const useLogin = () => {
@@ -11,6 +17,22 @@ export const useLogin = () => {
     },
   });
 };
+
+export const useInvitationPreview = (token: string | null) =>
+  useQuery<InvitationPreview>({
+    queryKey: ["invitations", "preview"],
+    enabled: Boolean(token),
+    retry: false,
+    refetchOnWindowFocus: false,
+    queryFn: async () =>
+      (await axiosInstance.post<InvitationPreview>("/auth/invitations/lookup", { token })).data,
+  });
+
+export const useAcceptInvitation = () =>
+  useMutation({
+    mutationFn: async (data: AcceptInvitationRequest) =>
+      (await axiosInstance.post<TokenResponse>("/auth/invitations/accept", data)).data,
+  });
 
 export const useGetCurrentUser = (accessToken: string) => {
   return useQuery<UserResponse>({
@@ -47,14 +69,14 @@ export const useUpdateProfile = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (data: { display_name: string }) =>
-      (await axiosInstance.patch<UserResponse>('/auth/me', data)).data,
-    onSuccess: (user) => queryClient.setQueryData(['users', 'me'], user),
+      (await axiosInstance.patch<UserResponse>("/auth/me", data)).data,
+    onSuccess: (user) => queryClient.setQueryData(["users", "me"], user),
   });
 };
 
 export const useChangePassword = () =>
   useMutation({
     mutationFn: async (data: { current_password: string; new_password: string }) => {
-      await axiosInstance.post('/auth/password', data);
+      await axiosInstance.post("/auth/password", data);
     },
   });

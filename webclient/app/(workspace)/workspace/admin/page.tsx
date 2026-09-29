@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import Alertdialog from "@/components/Alertdialog";
 import { useRouter } from "next/navigation";
 import { useGetCurrentUser } from "@/services/auth";
+import type { InvitationResponse } from "@/interface/auth";
 import { Button } from "@/components/ui/button";
 import {
   useDeleteUser,
@@ -22,7 +23,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import CreateOrEdit from "./_partials/createOrEdit";
+import InviteResult from "./_partials/inviteResult";
+import InviteUser from "./_partials/inviteUser";
+import PendingInvitations from "./_partials/pendingInvitations";
 import {
   Select,
   SelectContent,
@@ -34,7 +37,8 @@ import {
 export default function AdminPage() {
   const router = useRouter();
   const [token, setToken] = useState("");
-  const [addOpen, setAddOpen] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [invitation, setInvitation] = useState<InvitationResponse | null>(null);
   const [confirmAction, setConfirmAction] = useState<{
     type: "deactivate" | "delete";
     id: string;
@@ -89,7 +93,7 @@ export default function AdminPage() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">User management</h1>
-          <p className="mt-1 text-sm text-muted">Create and manage workspace users.</p>
+          <p className="mt-1 text-sm text-muted">Invite and manage workspace users.</p>
         </div>
         <div className="flex gap-2">
           <Button
@@ -100,12 +104,14 @@ export default function AdminPage() {
           >
             Workspace settings
           </Button>
-          <Button className="px-4 py-2" type="button" onClick={() => setAddOpen(true)}>
-            Add user
+          <Button className="px-4 py-2" type="button" onClick={() => setInviteOpen(true)}>
+            Invite user
           </Button>
         </div>
       </div>
-      <CreateOrEdit open={addOpen} onOpenChange={setAddOpen} />
+      <InviteUser open={inviteOpen} onOpenChange={setInviteOpen} onInvited={setInvitation} />
+      <InviteResult invitation={invitation} onClose={() => setInvitation(null)} />
+      <PendingInvitations onResent={setInvitation} />
 
       <Alertdialog
         open={confirmAction !== null}
@@ -161,8 +167,10 @@ export default function AdminPage() {
                         updateRole.mutate(
                           { id: user.id, role: role as typeof user.role },
                           {
-                            onSuccess: () => toast.add({ title: "User role updated.", type: "success" }),
-                            onError: () => toast.add({ title: "Unable to update user role.", type: "error" }),
+                            onSuccess: () =>
+                              toast.add({ title: "User role updated.", type: "success" }),
+                            onError: () =>
+                              toast.add({ title: "Unable to update user role.", type: "error" }),
                           },
                         )
                       }
