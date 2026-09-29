@@ -5,6 +5,7 @@ from collections.abc import AsyncIterator
 from typing import TypeVar
 
 import ai
+from ai.providers.openai import OpenAIChatCompletionsProtocol
 from pydantic import BaseModel, ValidationError
 
 from app.config import settings
@@ -30,6 +31,8 @@ def _model() -> tuple[ai.Model, ai.Provider]:
         "openai",
         base_url=config["llm_base_url"],
         api_key=config["llm_api_key"],
+        # Responses API (the "openai" default) breaks on llama.cpp with history.
+        protocol=OpenAIChatCompletionsProtocol(),
     )
     return ai.Model(id=config["llm_model"], provider=provider), provider
 
