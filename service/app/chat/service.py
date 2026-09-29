@@ -360,10 +360,14 @@ def _search_plan(
     history: list[dict] | None,
     web_search: bool,
 ) -> SearchPlan:
-    plan = generate_structured(
-        _conversation_messages(query, history, _retrieval_prompt(web_search)),
-        SearchPlan,
-    )
+    try:
+        plan = generate_structured(
+            _conversation_messages(query, history, _retrieval_prompt(web_search)),
+            SearchPlan,
+        )
+    except AIModelError:
+        logger.warning("Retrieval router failed, answering without search", exc_info=True)
+        return SearchPlan(tool="none")
     if plan.tool == "web_search" and not web_search:
         return SearchPlan(tool="none")
     if plan.tool != "none" and not plan.query:
