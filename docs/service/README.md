@@ -100,7 +100,7 @@ Documented in `service/.env.example`. Field names map to `app/config.py` (case-i
 | `JWT_ISSUER` / `JWT_AUDIENCE` | no | Defaults `peka-service` / `peka-api` |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | both or neither | First-admin bootstrap |
 | `MAX_UPLOAD_BYTES` | no | Default 25×1024×1024 |
-| `APP_BASE_URL` | no | Default `http://localhost:3000`; base of the link in invitation emails |
+| `APP_BASE_URL` | no | Default `http://localhost:3000`. Fallback base for invitation links. Normally the link uses the admin's own browser address (the request `Origin`), so it matches localhost, a LAN address or a tunnel without any switching; this value is used only when a request carries no valid `Origin` (e.g. curl) |
 | `INVITATION_EXPIRE_DAYS` | no | 1–30, default 7 |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` / `SMTP_FROM` | no | Invitation email over STARTTLS (default port 587). Gmail: `smtp.gmail.com` plus an app password. Empty host disables sending; admins can still copy the invite link |
 

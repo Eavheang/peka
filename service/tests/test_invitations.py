@@ -36,7 +36,7 @@ def test_admin_invites_user_and_gets_link(client, monkeypatch):
     headers = admin_headers(monkeypatch)
     captured = {}
 
-    def fake_invite(email, role, invited_by):
+    def fake_invite(email, role, invited_by, base_url=None):
         captured.update(email=email, role=role)
         return {**invitation(email, role), "invite_url": "http://app/accept-invite?token=t", "email_sent": True}
 
@@ -48,6 +48,59 @@ def test_admin_invites_user_and_gets_link(client, monkeypatch):
     assert captured == {"email": "new@example.com", "role": "senior"}
     assert response.json()["invite_url"] == "http://app/accept-invite?token=t"
     assert response.json()["email_sent"] is True
+
+
+@pytest.mark.parametrize(
+    "origin, expected",
+    [
+        ("https://abc.ngrok-free.dev", "https://abc.ngrok-free.dev"),
+        ("http://localhost:3000", "http://localhost:3000"),
+        (None, None),
+        ("null", None),
+        ("javascript://evil", None),
+        ("https://abc.ngrok-free.dev/path", None),
+        ("ftp://host", None),
+    ],
+)
+def test_invite_link_uses_the_browser_origin_when_valid(client, monkeypatch, origin, expected):
+    headers = admin_headers(monkeypatch)
+    seen = {}
+    monkeypatch.setattr(
+        routes, "invite_user",
+        lambda email, role, invited_by, base_url=None: seen.update(base_url=base_url) or {
+            **invitation(email, role), "invite_url": "u", "email_sent": False,
+        },
+    )
+    if origin is not None:
+        headers["Origin"] = origin
+
+    assert client.post("/auth/invitations", headers=headers, json={"email": "a@b.co"}).status_code == 201
+    assert seen["base_url"] == expected
+
+
+def test_resend_uses_the_browser_origin(client, monkeypatch):
+    headers = {**admin_headers(monkeypatch), "Origin": "https://abc.ngrok-free.dev"}
+    seen = {}
+    monkeypatch.setattr(
+        routes, "resend_invitation",
+        lambda id, base_url=None: seen.update(base_url=base_url) or {
+            **invitation(), "invite_url": "u", "email_sent": False,
+        },
+    )
+
+    assert client.post(f"/auth/invitations/{uuid4()}/resend", headers=headers).status_code == 200
+    assert seen["base_url"] == "https://abc.ngrok-free.dev"
+
+
+def test_deliver_prefers_the_given_base_url_over_the_configured_one(monkeypatch):
+    monkeypatch.setattr(service, "send_invitation", lambda *args: False)
+    monkeypatch.setattr(settings, "app_base_url", "http://configured:3000/")
+    item = invitation()
+
+    assert service._deliver(item, "T", "https://abc.ngrok-free.dev")["invite_url"] == (
+        "https://abc.ngrok-free.dev/accept-invite?token=T"
+    )
+    assert service._deliver(item, "T", None)["invite_url"] == "http://configured:3000/accept-invite?token=T"
 
 
 @pytest.mark.parametrize(
@@ -167,7 +220,9 @@ def test_resend_and_revoke(client, monkeypatch):
     invitation_id = uuid4()
     monkeypatch.setattr(
         routes, "resend_invitation",
-        lambda id: {**invitation(), "invite_url": "http://app/accept-invite?token=new", "email_sent": False},
+        lambda id, base_url=None: {
+            **invitation(), "invite_url": "http://app/accept-invite?token=new", "email_sent": False,
+        },
     )
     monkeypatch.setattr(routes, "revoke_invitation", lambda id: None)
 
