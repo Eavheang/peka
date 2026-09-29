@@ -24,7 +24,9 @@ export default function ProfileSettingsPage() {
   const updateProfile = useUpdateProfile();
   const changePassword = useChangePassword();
   const profileForm = useForm<ProfileForm>({ defaultValues: { display_name: "" } });
-  const passwordForm = useForm<PasswordForm>();
+  const passwordForm = useForm<PasswordForm>({
+    defaultValues: { current_password: "", new_password: "", confirm_password: "" },
+  });
 
   useEffect(() => setToken(getStoredToken("peka_access_token") ?? ""), []);
   useEffect(() => {
@@ -204,7 +206,11 @@ export default function ProfileSettingsPage() {
                     type="password"
                     autoComplete="new-password"
                     minLength={12}
-                    {...passwordForm.register("new_password", { required: true, minLength: 12 })}
+                    {...passwordForm.register("new_password", {
+                      required: true,
+                      minLength: 12,
+                      deps: ["confirm_password"],
+                    })}
                   />
                   <span className="text-xs font-normal text-muted">
                     Use at least 12 characters.
