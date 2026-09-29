@@ -33,15 +33,6 @@ class TokenResponse(BaseModel):
 
 class RefreshRequest(BaseModel):
     refresh_token: str = Field(min_length=1)
-class UserCreate(LoginRequest):
-    password: str = Field(min_length=12, max_length=1024)
-    display_name: str = Field(default="", max_length=100)
-    role: Role = "staff"
-
-    @field_validator("display_name")
-    @classmethod
-    def normalize_display_name(cls, value: str) -> str:
-        return value.strip()
 
 
 class UserActivationUpdate(BaseModel):

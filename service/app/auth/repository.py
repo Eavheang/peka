@@ -28,17 +28,6 @@ class AuthRepository:
                 "SELECT id, email, display_name, role, is_active FROM users ORDER BY created_at",
             ).fetchall()
 
-    def create(self, email: str, display_name: str, password_hash: str, role: str) -> dict:
-        try:
-            with get_connection() as connection:
-                return connection.execute(
-                    "INSERT INTO users (email, display_name, password_hash, role) VALUES (%s, %s, %s, %s) "
-                    "RETURNING id, email, display_name, role, is_active",
-                    (email, display_name, password_hash, role),
-                ).fetchone()
-        except psycopg.errors.UniqueViolation:
-            raise ValueError("duplicate email") from None
-
     def revoke(self, user_id: UUID) -> None:
         with get_connection() as connection:
             connection.execute(

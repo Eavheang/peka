@@ -32,7 +32,6 @@ Roles: `admin` | `senior` | `staff`.
 | `PATCH` | `/auth/me` | bearer | `{ display_name }` | `UserResponse` |
 | `POST` | `/auth/password` | bearer | `{ current_password, new_password }` | 204 |
 | `GET` | `/auth/users` | admin | — | `UserResponse[]` |
-| `POST` | `/auth/users` | admin | `{ email, password, display_name?, role? }` | `UserResponse` 201; 409 duplicate |
 | `POST` | `/auth/invitations` | admin | `{ email, role? }` | `InvitationResponse` 201; 409 user exists or invite pending |
 | `GET` | `/auth/invitations` | admin | pending invitations | `InvitationSummary[]` |
 | `POST` | `/auth/invitations/{id}/resend` | admin | new token and expiry; old link stops working | `InvitationResponse`; 404 |

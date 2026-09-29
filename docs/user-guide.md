@@ -92,7 +92,8 @@ Path: `/workspace/knowledge`.
 
 | Task | Behavior |
 |------|----------|
-| Create user | Email, optional display name, password (≥12), role |
+| Invite user | Email and role. The person gets an email with a link, chooses their name and a password (≥12 characters) and is signed in. If email is not configured, copy the invite link from the dialog and send it yourself |
+| Pending invitations | Resend (issues a new link; the old one stops working) or revoke. Links are single-use and expire after 7 days |
 | Change role | `admin` / `senior` / `staff` |
 | Activate / deactivate | Inactive users cannot authenticate usefully; tokens invalidated on change |
 | Delete | Only when inactive; blocked if related records prevent delete |

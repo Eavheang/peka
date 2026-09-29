@@ -8,7 +8,7 @@ from app.auth.repository import auth_repository
 from app.auth.schemas import (
     InvitationAccept, InvitationCreate, InvitationPreview, InvitationResponse, InvitationSummary,
     InvitationToken, LoginRequest, PasswordChange, RefreshRequest, TokenResponse,
-    UserActivationUpdate, UserCreate, UserProfileUpdate, UserResponse, UserRoleUpdate,
+    UserActivationUpdate, UserProfileUpdate, UserResponse, UserRoleUpdate,
 )
 from app.auth.security import create_access_token, create_refresh_token, decode_access_token, decode_refresh_token
 from app.auth.service import (
@@ -23,7 +23,6 @@ from app.auth.service import (
     accept_invitation,
     authenticate,
     change_password,
-    create_user,
     current_user,
     delete_user,
     invite_user,
@@ -127,14 +126,6 @@ def update_password(data: PasswordChange, user: dict = Depends(authenticated)) -
 @router.get("/users", response_model=list[UserResponse])
 def get_users(_: dict = Depends(admin_only)) -> list[dict]:
     return list_users()
-
-
-@router.post("/users", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-def users(data: UserCreate, _: dict = Depends(admin_only)) -> dict:
-    try:
-        return create_user(data)
-    except ValueError:
-        raise HTTPException(status_code=409, detail="Email already exists") from None
 
 
 @router.post("/invitations", response_model=InvitationResponse, status_code=status.HTTP_201_CREATED)
