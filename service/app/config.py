@@ -31,6 +31,13 @@ class Settings(BaseSettings):
     jwt_audience: str = "peka-api"
     admin_email: str | None = None
     admin_password: SecretStr | None = None
+    app_base_url: str = "http://localhost:3000"
+    invitation_expire_days: int = 7
+    smtp_host: str | None = None
+    smtp_port: int = 587
+    smtp_user: str | None = None
+    smtp_password: SecretStr | None = None
+    smtp_from: str | None = None
 
     @model_validator(mode="after")
     def validate_auth(self) -> "Settings":
@@ -44,6 +51,8 @@ class Settings(BaseSettings):
             raise ValueError("ADMIN_EMAIL and ADMIN_PASSWORD must be supplied together")
         if self.admin_password is not None and not 12 <= len(self.admin_password.get_secret_value()) <= 1024:
             raise ValueError("ADMIN_PASSWORD must be between 12 and 1024 characters")
+        if not 1 <= self.invitation_expire_days <= 30:
+            raise ValueError("INVITATION_EXPIRE_DAYS must be between 1 and 30")
         return self
 
     @field_validator("jwt_secret_key")

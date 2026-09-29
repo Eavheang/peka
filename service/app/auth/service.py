@@ -1,8 +1,13 @@
+import secrets
+from datetime import datetime, timedelta, timezone
+from hashlib import sha256
 from uuid import UUID
 
-from app.auth.repository import auth_repository
+from app.auth.mailer import send_invitation
+from app.auth.repository import auth_repository, invitation_repository
 from app.auth.security import dummy_password_hash, hash_password, verify_password
 from app.auth.schemas import UserCreate
+from app.config import settings
 
 
 class UserNotFoundError(Exception):
@@ -23,6 +28,79 @@ class IncorrectCurrentPasswordError(Exception):
 
 class CannotChangeOwnAdminRoleError(Exception):
     pass
+
+
+class EmailAlreadyRegisteredError(Exception):
+    pass
+
+
+class InvitationPendingError(Exception):
+    pass
+
+
+class InvitationNotFoundError(Exception):
+    pass
+
+
+def _hash_token(token: str) -> str:
+    return sha256(token.encode()).hexdigest()
+
+
+def _new_token() -> tuple[str, str]:
+    token = secrets.token_urlsafe(32)
+    return token, _hash_token(token)
+
+
+def _expires_at() -> datetime:
+    return datetime.now(timezone.utc) + timedelta(days=settings.invitation_expire_days)
+
+
+def _deliver(invitation: dict, token: str) -> dict:
+    invite_url = f"{settings.app_base_url.rstrip('/')}/accept-invite?token={token}"
+    email_sent = send_invitation(invitation["email"], invite_url, settings.invitation_expire_days)
+    return {**invitation, "invite_url": invite_url, "email_sent": email_sent}
+
+
+def invite_user(email: str, role: str, invited_by: UUID) -> dict:
+    if auth_repository.find_by_email(email) is not None:
+        raise EmailAlreadyRegisteredError
+    token, token_hash = _new_token()
+    try:
+        invitation = invitation_repository.create(email, role, token_hash, invited_by, _expires_at())
+    except ValueError:
+        raise InvitationPendingError from None
+    return _deliver(invitation, token)
+
+
+def list_invitations() -> list[dict]:
+    return invitation_repository.list_pending()
+
+
+def resend_invitation(invitation_id: UUID) -> dict:
+    token, token_hash = _new_token()
+    invitation = invitation_repository.replace_token(invitation_id, token_hash, _expires_at())
+    if invitation is None:
+        raise InvitationNotFoundError
+    return _deliver(invitation, token)
+
+
+def revoke_invitation(invitation_id: UUID) -> None:
+    if not invitation_repository.delete_pending(invitation_id):
+        raise InvitationNotFoundError
+
+
+def lookup_invitation(token: str) -> dict:
+    invitation = invitation_repository.find_valid(_hash_token(token))
+    if invitation is None:
+        raise InvitationNotFoundError
+    return invitation
+
+
+def accept_invitation(token: str, display_name: str, password: str) -> dict:
+    user = invitation_repository.accept(_hash_token(token), display_name, hash_password(password))
+    if user is None:
+        raise InvitationNotFoundError
+    return user
 
 
 def authenticate(email: str, password: str) -> dict | None:
