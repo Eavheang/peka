@@ -6,7 +6,6 @@ from uuid import UUID
 from app.auth.mailer import send_invitation
 from app.auth.repository import auth_repository, invitation_repository
 from app.auth.security import dummy_password_hash, hash_password, verify_password
-from app.auth.schemas import UserCreate
 from app.config import settings
 
 
@@ -113,12 +112,6 @@ def authenticate(email: str, password: str) -> dict | None:
         return None
     password_valid = verify_password(password, user["password_hash"])
     return user if user["is_active"] and password_valid else None
-
-
-def create_user(data: UserCreate) -> dict:
-    return auth_repository.create(
-        data.email, data.display_name, hash_password(data.password), data.role
-    )
 
 
 def current_user(user_id: UUID) -> dict | None:
