@@ -1,4 +1,4 @@
-.PHONY: setup up down migrate
+.PHONY: setup up down migrate llm llm-down
 
 setup:
 	@test -f .env || cp .env.example .env
@@ -18,3 +18,9 @@ migrate:
 
 down:
 	docker compose -f compose.yaml -f compose.dev.yaml down
+
+llm:
+	docker compose -f compose.yaml --profile llama up -d llama
+
+llm-down:
+	docker compose -f compose.yaml --profile llama stop llama

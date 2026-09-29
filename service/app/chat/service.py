@@ -59,7 +59,7 @@ class AnswerBlock(BaseModel):
     model_config = ConfigDict(extra="ignore", str_strip_whitespace=True)
     kind: Literal["general", "grounded"]
     text: str = Field(min_length=1)
-    source_ids: list[str]
+    source_ids: list[str] = Field(default_factory=list)
 
 
 class ModelAnswer(BaseModel):
