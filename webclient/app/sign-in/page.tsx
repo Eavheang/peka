@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import Image from "next/image";
 import { ArrowLeft, ArrowRight, Eye, EyeOff } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -27,9 +28,12 @@ export default function SignInPage() {
     defaultValues: { rememberMe: false },
   });
   const login = useLogin();
+  const queryClient = useQueryClient();
   function submit({ rememberMe, ...credentials }: SignInFormValues) {
     login.mutate(credentials, {
       onSuccess: (tokens) => {
+        // Drop cached profile and chat data so a different user never sees the previous user's.
+        queryClient.clear();
         storeAuthTokens(tokens, rememberMe);
         toast.add({ title: "Signed in.", type: "success" });
         const next = new URLSearchParams(window.location.search).get("next");
