@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Literal
 
 from uuid import UUID
@@ -116,4 +117,75 @@ class AuthRepository:
                 )
 
 
+INVITATION_COLUMNS = "id, email, role, expires_at, created_at"
+
+
+class InvitationRepository:
+    def create(self, email: str, role: str, token_hash: str, invited_by: UUID, expires_at: datetime) -> dict:
+        try:
+            with get_connection() as connection:
+                return connection.execute(
+                    "INSERT INTO invitations (email, role, token_hash, invited_by, expires_at) "
+                    f"VALUES (%s, %s, %s, %s, %s) RETURNING {INVITATION_COLUMNS}",
+                    (email, role, token_hash, invited_by, expires_at),
+                ).fetchone()
+        except psycopg.errors.UniqueViolation:
+            raise ValueError("pending invitation exists") from None
+
+    def list_pending(self) -> list[dict]:
+        with get_connection() as connection:
+            return connection.execute(
+                f"SELECT {INVITATION_COLUMNS} FROM invitations WHERE accepted_at IS NULL "
+                "ORDER BY created_at DESC"
+            ).fetchall()
+
+    def replace_token(self, invitation_id: UUID, token_hash: str, expires_at: datetime) -> dict | None:
+        with get_connection() as connection:
+            return connection.execute(
+                "UPDATE invitations SET token_hash = %s, expires_at = %s "
+                f"WHERE id = %s AND accepted_at IS NULL RETURNING {INVITATION_COLUMNS}",
+                (token_hash, expires_at, invitation_id),
+            ).fetchone()
+
+    def delete_pending(self, invitation_id: UUID) -> bool:
+        with get_connection() as connection:
+            return connection.execute(
+                "DELETE FROM invitations WHERE id = %s AND accepted_at IS NULL", (invitation_id,)
+            ).rowcount > 0
+
+    def find_valid(self, token_hash: str) -> dict | None:
+        with get_connection() as connection:
+            return connection.execute(
+                "SELECT email, role FROM invitations "
+                "WHERE token_hash = %s AND accepted_at IS NULL AND expires_at > CURRENT_TIMESTAMP",
+                (token_hash,),
+            ).fetchone()
+
+    def accept(self, token_hash: str, display_name: str, password_hash: str) -> dict | None:
+        """Create the invited user and consume the invitation in one transaction."""
+        try:
+            with get_connection() as connection:
+                invitation = connection.execute(
+                    "SELECT id, email, role FROM invitations "
+                    "WHERE token_hash = %s AND accepted_at IS NULL AND expires_at > CURRENT_TIMESTAMP "
+                    "FOR UPDATE",
+                    (token_hash,),
+                ).fetchone()
+                if invitation is None:
+                    return None
+                user = connection.execute(
+                    "INSERT INTO users (email, display_name, password_hash, role) VALUES (%s, %s, %s, %s) "
+                    "RETURNING id, email, display_name, role, token_version, is_active",
+                    (invitation["email"], display_name, password_hash, invitation["role"]),
+                ).fetchone()
+                connection.execute(
+                    "UPDATE invitations SET accepted_at = CURRENT_TIMESTAMP WHERE id = %s",
+                    (invitation["id"],),
+                )
+                return user
+        except psycopg.errors.UniqueViolation:
+            raise ValueError("email already registered") from None
+
+
 auth_repository = AuthRepository()
+invitation_repository = InvitationRepository()

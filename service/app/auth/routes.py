@@ -6,22 +6,32 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.auth.repository import auth_repository
 from app.auth.schemas import (
-    LoginRequest, PasswordChange, RefreshRequest, TokenResponse, UserActivationUpdate,
-    UserCreate, UserProfileUpdate, UserResponse, UserRoleUpdate,
+    InvitationAccept, InvitationCreate, InvitationPreview, InvitationResponse, InvitationSummary,
+    InvitationToken, LoginRequest, PasswordChange, RefreshRequest, TokenResponse,
+    UserActivationUpdate, UserCreate, UserProfileUpdate, UserResponse, UserRoleUpdate,
 )
 from app.auth.security import create_access_token, create_refresh_token, decode_access_token, decode_refresh_token
 from app.auth.service import (
     UserHasRelatedRecordsError,
     CannotChangeOwnAdminRoleError,
+    EmailAlreadyRegisteredError,
     IncorrectCurrentPasswordError,
+    InvitationNotFoundError,
+    InvitationPendingError,
     UserMustBeInactiveError,
     UserNotFoundError,
+    accept_invitation,
     authenticate,
     change_password,
     create_user,
     current_user,
     delete_user,
+    invite_user,
+    list_invitations,
     list_users,
+    lookup_invitation,
+    resend_invitation,
+    revoke_invitation,
     set_user_active,
     set_user_role,
     set_display_name,
@@ -125,6 +135,62 @@ def users(data: UserCreate, _: dict = Depends(admin_only)) -> dict:
         return create_user(data)
     except ValueError:
         raise HTTPException(status_code=409, detail="Email already exists") from None
+
+
+@router.post("/invitations", response_model=InvitationResponse, status_code=status.HTTP_201_CREATED)
+def create_invitation(data: InvitationCreate, admin: dict = Depends(admin_only)) -> dict:
+    try:
+        return invite_user(data.email, data.role, admin["id"])
+    except EmailAlreadyRegisteredError:
+        raise HTTPException(status_code=409, detail="A user with this email already exists") from None
+    except InvitationPendingError:
+        raise HTTPException(status_code=409, detail="This email already has a pending invitation") from None
+
+
+@router.get("/invitations", response_model=list[InvitationSummary])
+def get_invitations(_: dict = Depends(admin_only)) -> list[dict]:
+    return list_invitations()
+
+
+@router.post("/invitations/lookup", response_model=InvitationPreview)
+def lookup_invitation_token(data: InvitationToken) -> dict:
+    # POST keeps the token out of URLs and access logs.
+    try:
+        return lookup_invitation(data.token)
+    except InvitationNotFoundError:
+        raise _invalid_invitation() from None
+
+
+@router.post("/invitations/accept", response_model=TokenResponse)
+def accept_invitation_token(data: InvitationAccept) -> dict:
+    try:
+        user = accept_invitation(data.token, data.display_name, data.password)
+    except InvitationNotFoundError:
+        raise _invalid_invitation() from None
+    except ValueError:
+        raise HTTPException(status_code=409, detail="A user with this email already exists") from None
+    return _token_response(user)
+
+
+@router.post("/invitations/{invitation_id}/resend", response_model=InvitationResponse)
+def resend_invitation_email(invitation_id: UUID, _: dict = Depends(admin_only)) -> dict:
+    try:
+        return resend_invitation(invitation_id)
+    except InvitationNotFoundError:
+        raise HTTPException(status_code=404, detail="Invitation not found") from None
+
+
+@router.delete("/invitations/{invitation_id}", status_code=status.HTTP_204_NO_CONTENT)
+def revoke_pending_invitation(invitation_id: UUID, _: dict = Depends(admin_only)) -> Response:
+    try:
+        revoke_invitation(invitation_id)
+    except InvitationNotFoundError:
+        raise HTTPException(status_code=404, detail="Invitation not found") from None
+    return Response(status_code=204)
+
+
+def _invalid_invitation() -> HTTPException:
+    return HTTPException(status_code=404, detail="This invitation is invalid or has expired")
 
 
 @router.patch("/users/{user_id}/role", response_model=UserResponse)

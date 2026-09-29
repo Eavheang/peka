@@ -1,5 +1,5 @@
 from app.database import Base
-from app.auth.model import User
+from app.auth.model import Invitation, User
 from app.files.model import StoredFile
 from app.engine.okf.job_model import OKFJob
 from app.engine.chunks.chunk_model import KnowledgeChunk
@@ -24,6 +24,21 @@ def test_user_model_describes_users_table() -> None:
                     if constraint.name == "users_role_check").sqltext) == (
         "role IN ('admin', 'senior', 'staff')"
     )
+
+
+def test_invitation_model_stores_a_token_hash_not_the_token() -> None:
+    table = Base.metadata.tables[Invitation.__tablename__]
+
+    assert {column.name for column in table.columns} == {
+        "id",
+        "email",
+        "role",
+        "token_hash",
+        "invited_by",
+        "expires_at",
+        "accepted_at",
+        "created_at",
+    }
 
 
 def test_file_model_keeps_minimal_metadata() -> None:

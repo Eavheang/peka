@@ -33,12 +33,19 @@ Roles: `admin` | `senior` | `staff`.
 | `POST` | `/auth/password` | bearer | `{ current_password, new_password }` | 204 |
 | `GET` | `/auth/users` | admin | — | `UserResponse[]` |
 | `POST` | `/auth/users` | admin | `{ email, password, display_name?, role? }` | `UserResponse` 201; 409 duplicate |
+| `POST` | `/auth/invitations` | admin | `{ email, role? }` | `InvitationResponse` 201; 409 user exists or invite pending |
+| `GET` | `/auth/invitations` | admin | pending invitations | `InvitationSummary[]` |
+| `POST` | `/auth/invitations/{id}/resend` | admin | new token and expiry; old link stops working | `InvitationResponse`; 404 |
+| `DELETE` | `/auth/invitations/{id}` | admin | revoke a pending invitation | 204; 404 |
+| `POST` | `/auth/invitations/lookup` | none | `{ token }` (POST keeps the token out of URLs/logs) | `{ email, role }`; 404 invalid/expired |
+| `POST` | `/auth/invitations/accept` | none | `{ token, display_name, password }` (≥12 chars) | `TokenResponse` (signed in); 404 invalid/expired; 409 email taken |
 | `PATCH` | `/auth/users/{user_id}/role` | admin | `{ role }` | `UserResponse`; 409 demoting self |
 | `PATCH` | `/auth/users/{user_id}` | admin | `{ is_active }` | `UserResponse` |
 | `DELETE` | `/auth/users/{user_id}` | admin | user must be inactive | 204; 409 if FK refs |
 
 **TokenResponse:** `access_token`, `refresh_token`, `token_type`, `expires_in`  
-**UserResponse:** `id`, `email`, `display_name`, `role`, `is_active`
+**UserResponse:** `id`, `email`, `display_name`, `role`, `is_active`  
+**InvitationResponse:** `id`, `email`, `role`, `expires_at`, `created_at`, `invite_url`, `email_sent`. `invite_url` is returned only when an invitation is created or resent (only a hash is stored); `email_sent` is `false` when SMTP is unconfigured or sending failed, so the admin can copy the link instead.
 
 ---
 
