@@ -1,7 +1,8 @@
+from urllib.parse import urlparse
 from uuid import UUID
 
 import jwt
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.auth.repository import auth_repository
@@ -129,9 +130,11 @@ def get_users(_: dict = Depends(admin_only)) -> list[dict]:
 
 
 @router.post("/invitations", response_model=InvitationResponse, status_code=status.HTTP_201_CREATED)
-def create_invitation(data: InvitationCreate, admin: dict = Depends(admin_only)) -> dict:
+def create_invitation(
+    data: InvitationCreate, request: Request, admin: dict = Depends(admin_only)
+) -> dict:
     try:
-        return invite_user(data.email, data.role, admin["id"])
+        return invite_user(data.email, data.role, admin["id"], _browser_origin(request))
     except EmailAlreadyRegisteredError:
         raise HTTPException(status_code=409, detail="A user with this email already exists") from None
     except InvitationPendingError:
@@ -164,9 +167,11 @@ def accept_invitation_token(data: InvitationAccept) -> dict:
 
 
 @router.post("/invitations/{invitation_id}/resend", response_model=InvitationResponse)
-def resend_invitation_email(invitation_id: UUID, _: dict = Depends(admin_only)) -> dict:
+def resend_invitation_email(
+    invitation_id: UUID, request: Request, _: dict = Depends(admin_only)
+) -> dict:
     try:
-        return resend_invitation(invitation_id)
+        return resend_invitation(invitation_id, _browser_origin(request))
     except InvitationNotFoundError:
         raise HTTPException(status_code=404, detail="Invitation not found") from None
 
@@ -178,6 +183,16 @@ def revoke_pending_invitation(invitation_id: UUID, _: dict = Depends(admin_only)
     except InvitationNotFoundError:
         raise HTTPException(status_code=404, detail="Invitation not found") from None
     return Response(status_code=204)
+
+
+def _browser_origin(request: Request) -> str | None:
+    """The address the admin's browser is using, so invite links match however the app is reached
+    (localhost, LAN, tunnel). None when absent or malformed; APP_BASE_URL is the fallback."""
+    origin = request.headers.get("origin", "")
+    parsed = urlparse(origin)
+    if parsed.scheme in {"http", "https"} and parsed.netloc and origin == f"{parsed.scheme}://{parsed.netloc}":
+        return origin
+    return None
 
 
 def _invalid_invitation() -> HTTPException:

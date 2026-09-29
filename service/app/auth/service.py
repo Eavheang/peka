@@ -54,15 +54,15 @@ def _expires_at() -> datetime:
     return datetime.now(timezone.utc) + timedelta(days=settings.invitation_expire_days)
 
 
-def _deliver(invitation: dict, token: str) -> dict:
-    invite_url = f"{settings.app_base_url.rstrip('/')}/accept-invite?token={token}"
+def _deliver(invitation: dict, token: str, base_url: str | None) -> dict:
+    invite_url = f"{(base_url or settings.app_base_url).rstrip('/')}/accept-invite?token={token}"
     email_sent = send_invitation(
         invitation["email"], invite_url, settings.invitation_expire_days, invitation["role"]
     )
     return {**invitation, "invite_url": invite_url, "email_sent": email_sent}
 
 
-def invite_user(email: str, role: str, invited_by: UUID) -> dict:
+def invite_user(email: str, role: str, invited_by: UUID, base_url: str | None = None) -> dict:
     if auth_repository.find_by_email(email) is not None:
         raise EmailAlreadyRegisteredError
     token, token_hash = _new_token()
@@ -70,19 +70,19 @@ def invite_user(email: str, role: str, invited_by: UUID) -> dict:
         invitation = invitation_repository.create(email, role, token_hash, invited_by, _expires_at())
     except ValueError:
         raise InvitationPendingError from None
-    return _deliver(invitation, token)
+    return _deliver(invitation, token, base_url)
 
 
 def list_invitations() -> list[dict]:
     return invitation_repository.list_pending()
 
 
-def resend_invitation(invitation_id: UUID) -> dict:
+def resend_invitation(invitation_id: UUID, base_url: str | None = None) -> dict:
     token, token_hash = _new_token()
     invitation = invitation_repository.replace_token(invitation_id, token_hash, _expires_at())
     if invitation is None:
         raise InvitationNotFoundError
-    return _deliver(invitation, token)
+    return _deliver(invitation, token, base_url)
 
 
 def revoke_invitation(invitation_id: UUID) -> None:
