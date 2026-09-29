@@ -1,5 +1,6 @@
 "use client";
 
+import axios from "axios";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "@/components/ui/toast";
 
@@ -15,16 +16,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { UserRole } from "@/interface/auth";
-import { useCreateUser } from "@/services/user";
+import type { InvitationResponse, UserRole } from "@/interface/auth";
+import { useInviteUser } from "@/services/user";
 
-type CreateUserValues = { email: string; display_name: string; password: string; role: UserRole };
-type CreateOrEditProps = { open: boolean; onOpenChange: (open: boolean) => void };
+type InviteUserValues = { email: string; role: UserRole };
+type InviteUserProps = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onInvited: (invitation: InvitationResponse) => void;
+};
 
-export default function CreateOrEdit({ open, onOpenChange }: CreateOrEditProps) {
-  const createUser = useCreateUser();
-  const { control, register, handleSubmit, reset } = useForm<CreateUserValues>({
-    defaultValues: { email: "", display_name: "", password: "", role: "staff" },
+export default function InviteUser({ open, onOpenChange, onInvited }: InviteUserProps) {
+  const inviteUser = useInviteUser();
+  const { control, register, handleSubmit, reset } = useForm<InviteUserValues>({
+    defaultValues: { email: "", role: "staff" },
   });
 
   function close(nextOpen: boolean) {
@@ -32,13 +37,19 @@ export default function CreateOrEdit({ open, onOpenChange }: CreateOrEditProps) 
     onOpenChange(nextOpen);
   }
 
-  function submit(values: CreateUserValues) {
-    createUser.mutate(values, {
-      onSuccess: () => {
-        toast.add({ title: "User created.", type: "success" });
+  function submit(values: InviteUserValues) {
+    inviteUser.mutate(values, {
+      onSuccess: (invitation) => {
         close(false);
+        onInvited(invitation);
       },
-      onError: () => toast.add({ title: "Unable to create user.", type: "error" }),
+      onError: (error) => {
+        const detail = axios.isAxiosError(error) ? error.response?.data?.detail : undefined;
+        toast.add({
+          title: typeof detail === "string" ? detail : "Unable to send invitation.",
+          type: "error",
+        });
+      },
     });
   }
 
@@ -47,35 +58,29 @@ export default function CreateOrEdit({ open, onOpenChange }: CreateOrEditProps) 
       <DialogContent className="w-[calc(100%-2rem)] max-w-md gap-0 overflow-hidden rounded-2xl border-border bg-panel p-0 text-panel-foreground shadow-2xl">
         <div className="p-6">
           <DialogTitle className="text-lg font-semibold tracking-tight text-panel-foreground">
-            Add user
+            Invite user
           </DialogTitle>
           <DialogDescription className="mt-2 text-sm leading-6 text-panel-foreground/70">
-            Create a new workspace user.
+            They receive a link to choose their own password and are signed in automatically.
           </DialogDescription>
         </div>
         <form
           className="grid gap-3 border-t border-panel-foreground/15 p-6"
           onSubmit={handleSubmit(submit)}
         >
-          <Input type="email" aria-label="Email" placeholder="Email" {...register("email", { required: true })} />
           <Input
-            aria-label="Name"
-            placeholder="Name (optional)"
-            maxLength={100}
-            {...register("display_name")}
-          />
-          <Input
-            type="password"
-            placeholder="Password (12+ characters)"
-            minLength={12}
-            {...register("password", { required: true, minLength: 12 })}
+            type="email"
+            aria-label="Email"
+            placeholder="Email"
+            autoComplete="off"
+            {...register("email", { required: true })}
           />
           <Controller
             control={control}
             name="role"
             render={({ field }) => (
               <Select value={field.value} onValueChange={field.onChange}>
-                <SelectTrigger>
+                <SelectTrigger aria-label="Role">
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
                 <SelectContent>
@@ -91,10 +96,10 @@ export default function CreateOrEdit({ open, onOpenChange }: CreateOrEditProps) 
           />
           <Button
             className="mt-2 px-5 py-3 text-base"
-            disabled={createUser.isPending}
+            disabled={inviteUser.isPending}
             type="submit"
           >
-            {createUser.isPending ? "Creating..." : "Create user"}
+            {inviteUser.isPending ? "Sending..." : "Send invitation"}
           </Button>
         </form>
       </DialogContent>

@@ -1,6 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import type { LoginRequest, UserResponse } from "@/interface/auth";
+import type {
+  InvitationResponse,
+  InvitationSummary,
+  UserResponse,
+  UserRole,
+} from "@/interface/auth";
 import axiosInstance from "@/utils/axios";
 
 export const useListUsers = () =>
@@ -21,18 +26,41 @@ export const useUpdateUserActivation = () => {
 export const useUpdateUserRole = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, role }: Pick<UserResponse, 'id' | 'role'>) =>
+    mutationFn: async ({ id, role }: Pick<UserResponse, "id" | "role">) =>
       (await axiosInstance.patch<UserResponse>(`/auth/users/${id}/role`, { role })).data,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users', 'list'] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["users", "list"] }),
   });
 };
 
-export const useCreateUser = () => {
+export const useListInvitations = () =>
+  useQuery<InvitationSummary[]>({
+    queryKey: ["users", "invitations"],
+    queryFn: async () => (await axiosInstance.get<InvitationSummary[]>("/auth/invitations")).data,
+  });
+
+export const useInviteUser = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: LoginRequest & { role: UserResponse["role"] }) =>
-      (await axiosInstance.post<UserResponse>("/auth/users", data)).data,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["users", "list"] }),
+    mutationFn: async (data: { email: string; role: UserRole }) =>
+      (await axiosInstance.post<InvitationResponse>("/auth/invitations", data)).data,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["users", "invitations"] }),
+  });
+};
+
+export const useResendInvitation = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) =>
+      (await axiosInstance.post<InvitationResponse>(`/auth/invitations/${id}/resend`)).data,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["users", "invitations"] }),
+  });
+};
+
+export const useRevokeInvitation = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => axiosInstance.delete(`/auth/invitations/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["users", "invitations"] }),
   });
 };
 
