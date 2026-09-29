@@ -371,7 +371,8 @@ def _search_plan(
     if plan.tool == "web_search" and not web_search:
         return SearchPlan(tool="none")
     if plan.tool != "none" and not plan.query:
-        raise AIModelError("Model returned an invalid retrieval plan")
+        logger.warning("Retrieval router returned no query, answering without search")
+        return SearchPlan(tool="none")
     return plan
 
 

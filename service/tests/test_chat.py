@@ -42,6 +42,28 @@ def test_general_question_does_not_search(monkeypatch) -> None:
     assert response.refused is False
 
 
+def test_search_plan_without_query_answers_without_search(monkeypatch) -> None:
+    def no_search(*args):
+        raise AssertionError("A plan without a query must not search")
+
+    monkeypatch.setattr(chat_service, "search_knowledge", no_search)
+    monkeypatch.setattr(
+        chat_service,
+        "generate_structured",
+        lambda messages, output_type: (
+            _search_plan("search_knowledge_base", None)
+            if output_type is chat_service.SearchPlan
+            else chat_service.ModelAnswer(
+                blocks=[{"kind": "general", "text": "Hello", "source_ids": []}]
+            )
+        ),
+    )
+
+    response = chat_service.answer_from_knowledge("hi", "staff")
+    assert response.answer == "Hello"
+    assert response.citations == []
+
+
 def test_answer_rejects_json_with_model_preamble_and_trailing_text(monkeypatch) -> None:
     def invalid_output(messages, output_type):
         raise chat_service.AIModelError("Model returned an invalid structured response")
