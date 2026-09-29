@@ -28,7 +28,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+    // suppressHydrationWarning: some browsers (e.g. Chrome on iOS adds __gcrremoteframetoken) and
+    // extensions add attributes to <html> before React loads. It only silences this element's
+    // attribute mismatch, not its children's.
+    <html
+      lang="en"
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
+    >
       <body className="min-h-full flex flex-col">
         <TooltipProvider>
           <Providers>{children}</Providers>
