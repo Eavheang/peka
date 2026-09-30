@@ -15,6 +15,7 @@ import {
 import type { AccessLevel } from "@/interface/files";
 import { useUploadFiles } from "@/services/files";
 import { useGetCurrentUser } from "@/services/auth";
+import { getApiErrorMessage } from "@/utils/api-error";
 import { getStoredToken } from "@/utils/auth-storage";
 
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
@@ -140,7 +141,7 @@ export function Upload() {
         setBulkAccessLevel("");
       },
       onError: (error) => {
-        setUploadError(error instanceof Error ? error.message : "Upload failed.");
+        setUploadError(getApiErrorMessage(error, "Upload failed."));
       },
     });
   }
