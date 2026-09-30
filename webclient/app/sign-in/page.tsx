@@ -36,10 +36,15 @@ export default function SignInPage() {
         queryClient.clear();
         storeAuthTokens(tokens, rememberMe);
         toast.add({ title: "Signed in.", type: "success" });
-        const next = new URLSearchParams(window.location.search).get("next");
-        const redirectTarget =
-          next?.startsWith("/") && !next.startsWith("//") ? next : "/workspace";
-        router.push(redirectTarget);
+        // Full page load, not router.push: a prefetch of /workspace made while signed out is cached
+        // as a redirect to /sign-in, which would bounce the user straight back here.
+        const next = new URL(
+          new URLSearchParams(window.location.search).get("next") ?? "/workspace",
+          window.location.origin,
+        );
+        window.location.assign(
+          next.origin === window.location.origin ? next.pathname + next.search : "/workspace",
+        );
       },
       onError: () => toast.add({ title: "Invalid email or password.", type: "error" }),
     });
