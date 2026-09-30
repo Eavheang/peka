@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
@@ -16,7 +15,6 @@ import { storeAuthTokens } from "@/utils/auth-storage";
 type AcceptInviteValues = { display_name: string; password: string; confirm_password: string };
 
 export default function AcceptInvitePage() {
-  const router = useRouter();
   const queryClient = useQueryClient();
   // undefined until the URL is read; null when the link has no token.
   const [token, setToken] = useState<string | null | undefined>(undefined);
@@ -52,7 +50,8 @@ export default function AcceptInvitePage() {
           queryClient.clear();
           storeAuthTokens(tokens, false);
           toast.add({ title: "Welcome to PEKA.", type: "success" });
-          router.replace("/workspace");
+          // Full page load so a cached signed-out redirect for /workspace cannot bounce the user back.
+          window.location.replace("/workspace");
         },
         onError: (error) => {
           const detail = axios.isAxiosError(error) ? error.response?.data?.detail : undefined;
