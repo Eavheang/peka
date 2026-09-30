@@ -1,4 +1,5 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import axios from "axios";
 
 import type {
   ChatRequest,
@@ -192,6 +193,11 @@ export function useGetConversation(conversationId?: string) {
     queryKey: ["chat", "conversations", conversationId],
     enabled: Boolean(conversationId),
     queryFn: () => getConversation(conversationId as string),
+    // A missing (404) or malformed (422) conversation will not appear on retry, so fail at once
+    // instead of showing "Loading…" through the default three delayed retries. Network and 5xx
+    // errors are still retried.
+    retry: (failureCount, error) =>
+      failureCount < 2 && !(axios.isAxiosError(error) && (error.response?.status ?? 500) < 500),
   });
 }
 
