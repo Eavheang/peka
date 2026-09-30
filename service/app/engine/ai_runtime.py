@@ -41,6 +41,62 @@ def _inference_params() -> ai.InferenceRequestParams:
     return ai.InferenceRequestParams(output=ai.OutputParams(max_tokens=settings.llm_max_tokens))
 
 
+def first_error_line(error: ValidationError) -> str:
+    """The parser's own message (e.g. "Invalid JSON: expected `,` or `}` at line 1 column 109")."""
+    return " ".join(str(error).split("\n")[1:3]).strip()[:200]
+
+
+def _skip_space(text: str, i: int) -> int:
+    while i < len(text) and text[i] in " \t\r\n":
+        i += 1
+    return i
+
+
+def _ends_json_string(text: str, after: int) -> bool:
+    """Whether a quote followed by text[after:] closes a JSON string rather than being content."""
+    i = _skip_space(text, after)
+    if i >= len(text) or text[i] in "}]":
+        return True
+    if text[i] == ",":  # a comma leads to the next key or value
+        i = _skip_space(text, i + 1)
+        return i < len(text) and text[i] in '"{['
+    if text[i] == ":":  # a key is followed by a value, not by more prose
+        i = _skip_space(text, i + 1)
+        return text.startswith(('"', "{", "[", "-", "true", "false", "null"), i) or text[i:i + 1].isdigit()
+    return False
+
+
+def _repair_json_strings(text: str) -> str:
+    """Escape quotes and control characters that were left raw inside JSON strings.
+
+    A quote inside a string only ends it when what follows is structural: `:`, `}`, `]`, the end
+    of the text, or a `,` leading to the next key or value. Any other quote is content and is
+    escaped, as are raw newlines and tabs. Already-escaped sequences are kept as written.
+    """
+    out: list[str] = []
+    in_string, i, n = False, 0, len(text)
+    while i < n:
+        char = text[i]
+        if not in_string:
+            out.append(char)
+            in_string = char == '"'
+        elif char == "\\" and i + 1 < n:
+            out.append(text[i:i + 2])
+            i += 1
+        elif char == '"':
+            if _ends_json_string(text, i + 1):
+                out.append(char)
+                in_string = False
+            else:
+                out.append('\\"')
+        elif char in "\n\r\t":
+            out.append({"\n": "\\n", "\r": "\\r", "\t": "\\t"}[char])
+        else:
+            out.append(char)
+        i += 1
+    return "".join(out)
+
+
 def parse_structured_output(
     raw_output: str,
     output_type: type[StructuredOutput],
@@ -52,13 +108,23 @@ def parse_structured_output(
 
     try:
         return output_type.model_validate_json(candidate)
-    except ValidationError:
+    except ValidationError as error:
         # Also tolerate a short preamble or trailing note around an otherwise
         # valid JSON object from an OpenAI-compatible local server.
         start, end = candidate.find("{"), candidate.rfind("}")
         if start < 0 or end <= start:
             raise
-        return output_type.model_validate_json(candidate[start:end + 1])
+        candidate = candidate[start:end + 1]
+        try:
+            return output_type.model_validate_json(candidate)
+        except ValidationError:
+            pass
+        # Weaker models often leave quotes ("like this") or line breaks unescaped inside a
+        # long markdown string, which breaks otherwise complete JSON.
+        try:
+            return output_type.model_validate_json(_repair_json_strings(candidate))
+        except ValidationError:
+            raise error from None
 
 
 async def _run_structured_stream(
@@ -78,10 +144,11 @@ async def _run_structured_stream(
             # mode and wrap the otherwise valid JSON in a Markdown fence.
             try:
                 output = parse_structured_output(stream.message.text, output_type)
-            except ValidationError:
+            except ValidationError as error:
+                text = stream.message.text
                 logger.warning(
-                    "Model returned invalid structured output for %s: %r",
-                    output_type.__name__, stream.message.text[:2000],
+                    "Model returned invalid structured output for %s (%d chars): %s | start: %r | end: %r",
+                    output_type.__name__, len(text), first_error_line(error), text[:300], text[-300:],
                 )
                 raise
 

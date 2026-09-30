@@ -4,8 +4,16 @@ import json
 import ai
 import pytest
 
+from pydantic import ValidationError
+
 from app.chat.service import ModelAnswer
-from app.engine.ai_runtime import AIModelError, generate_structured, stream_structured_text
+from app.engine.ai_runtime import (
+    AIModelError,
+    _repair_json_strings,
+    generate_structured,
+    parse_structured_output,
+    stream_structured_text,
+)
 
 
 def test_generate_structured_returns_validated_pydantic_output() -> None:
@@ -157,3 +165,55 @@ def test_generate_structured_retries_a_provider_failure(monkeypatch) -> None:
 
     assert result.blocks[0].text == "Answer"
     assert calls == ["fail", "ok"]
+
+
+QUOTED = 'Systems moved toward "agentic" workflows and use "reranking" to sort.'
+
+
+def _raw(*texts: str, ids: str = "[]") -> str:
+    blocks = ",".join(f'{{"kind":"general","text":"{t}","source_ids":{ids}}}' for t in texts)
+    return '{"blocks":[' + blocks + "]}"
+
+
+def test_parse_repairs_unescaped_quotes_inside_text() -> None:
+    result = parse_structured_output(_raw(QUOTED, ids='["source-1"]'), ModelAnswer)
+
+    assert result.blocks[0].text == QUOTED
+    assert result.blocks[0].source_ids == ["source-1"]
+
+
+def test_parse_repairs_every_block_and_keeps_the_structure() -> None:
+    result = parse_structured_output(_raw('First "one".', 'Second "two", then more.'), ModelAnswer)
+
+    assert [b.text for b in result.blocks] == ['First "one".', 'Second "two", then more.']
+
+
+def test_parse_repairs_raw_line_breaks_inside_text() -> None:
+    raw = '{"blocks":[{"kind":"general","text":"line one\nline two\tend","source_ids":[]}]}'
+
+    assert parse_structured_output(raw, ModelAnswer).blocks[0].text == "line one\nline two\tend"
+
+
+def test_parse_repairs_a_quote_before_a_colon_or_comma_in_prose() -> None:
+    text = 'The "Naive RAG": a baseline, he said "hi", then left.'
+
+    assert parse_structured_output(_raw(text), ModelAnswer).blocks[0].text == text
+
+
+def test_parse_repairs_broken_json_inside_a_markdown_fence() -> None:
+    fenced = "```json\n" + _raw(QUOTED) + "\n```"
+
+    assert parse_structured_output(fenced, ModelAnswer).blocks[0].text == QUOTED
+
+
+def test_repair_leaves_valid_json_untouched() -> None:
+    valid = json.dumps({"blocks": [{"kind": "general", "text": 'He said "hi"\nand left', "source_ids": []}]})
+
+    assert _repair_json_strings(valid) == valid
+    assert parse_structured_output(valid, ModelAnswer).blocks[0].text == 'He said "hi"\nand left'
+
+
+@pytest.mark.parametrize("raw", ["Just a plain prose answer.", '{"blocks": [', '{"blocks": []}'])
+def test_parse_still_rejects_output_that_cannot_be_repaired(raw: str) -> None:
+    with pytest.raises(ValidationError):
+        parse_structured_output(raw, ModelAnswer)

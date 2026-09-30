@@ -17,6 +17,7 @@ from app.chat.repository import chat_repository
 from app.chat.schemas import ChatMessage, ChatResponse, Citation, SourcePreviewRequest
 from app.engine.ai_runtime import (
     AIModelError,
+    first_error_line,
     generate_structured,
     parse_structured_output,
     stream_structured_text,
@@ -251,6 +252,25 @@ class _JsonTextStreamParser:
                 self._used_source_ids.append(source_id)
             markers.append(f" [{self._used_source_ids.index(source_id) + 1}]")
         return ["".join(dict.fromkeys(markers))] if markers else []
+
+# Citation markers the model wrote itself ("[1]", "[1, 2]", stray {"source-1"} fragments). The server
+# adds real ones, so unattached markers are meaningless in a fallback answer.
+_MODEL_CITATION_MARKERS = re.compile(r"\s*\[\d+(?:\s*,\s*\d+)*\]|\s*\{\s*\"?source-[^{}\n]*\}?")
+
+
+def _plain_text_fallback(raw: str) -> str | None:
+    """A usable answer from output the model wrote as plain markdown instead of the JSON format.
+
+    None when there is nothing to show or the output looks like JSON or code, which a user should not see.
+    """
+    text = raw.strip()
+    if not text or text.startswith(("{", "[", "```")):
+        return None
+    text = _MODEL_CITATION_MARKERS.sub("", text).strip()
+    if not text:
+        return None
+    return f"{text}\n\n_Sources could not be attached to this answer._"
+
 
 def _normalize_answer_markdown(text: str) -> str:
     normalizer = _MarkdownTextNormalizer()
@@ -515,15 +535,26 @@ async def stream_answer_from_knowledge(
         answer = _normalize_model_answer(
             parse_structured_output("".join(raw_output), ModelAnswer), sources
         )
-    except (AIModelError, ValidationError):
+    except (AIModelError, ValidationError) as error:
+        raw = "".join(raw_output)
         logger.warning(
-            "Streamed structured output was invalid, regenerating: %r",
-            "".join(raw_output)[:2000],
+            "Streamed structured output was invalid, regenerating: %s | %d chars | start: %r | end: %r",
+            first_error_line(error) if isinstance(error, ValidationError) else error,
+            len(raw), raw[:300], raw[-300:],
         )
         yield ChatStreamStatus("Retrying response...")
-        answer = _normalize_model_answer(
-            await asyncio.to_thread(generate_structured, messages, ModelAnswer), sources
-        )
+        try:
+            answer = _normalize_model_answer(
+                await asyncio.to_thread(generate_structured, messages, ModelAnswer), sources
+            )
+        except AIModelError:
+            fallback = _plain_text_fallback(raw)
+            if fallback is None:
+                raise
+            logger.warning("Showing the model's plain-text answer without citations")
+            yield ChatStreamText(fallback)
+            yield ChatStreamCompleted(ChatResponse(answer=fallback, refused=False, citations=[]))
+            return
         response = _response_from_model_answer(answer, sources)
         yield ChatStreamText(response.answer)
         yield ChatStreamCompleted(response)
