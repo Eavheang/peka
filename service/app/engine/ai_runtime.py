@@ -109,6 +109,11 @@ async def _generate_structured(
                     raise AIModelError(
                         "Model returned an invalid structured response"
                     ) from error
+            except ai.AIError:
+                # Providers (free tiers especially) sometimes abort a call; retry once.
+                if attempt == _MAX_STRUCTURED_ATTEMPTS - 1:
+                    raise
+                logger.warning("AI provider request failed, retrying", exc_info=True)
     except AIModelError:
         raise
     except ai.AIError as error:
@@ -137,12 +142,23 @@ async def stream_structured_text(
         if model is None:
             model, provider = _model()
 
-        async with ai.stream(
-            model, messages, output_type=output_type, params=_inference_params()
-        ) as stream:
-            async for event in stream:
-                if isinstance(event, ai.events.TextDelta):
-                    yield event.chunk
+        for attempt in range(_MAX_STRUCTURED_ATTEMPTS):
+            emitted = False
+            try:
+                async with ai.stream(
+                    model, messages, output_type=output_type, params=_inference_params()
+                ) as stream:
+                    async for event in stream:
+                        if isinstance(event, ai.events.TextDelta):
+                            emitted = True
+                            yield event.chunk
+                return
+            except ai.AIError:
+                # Retry a provider failure once, but only if nothing was streamed yet: after
+                # that a retry would repeat text the caller has already shown.
+                if emitted or attempt == _MAX_STRUCTURED_ATTEMPTS - 1:
+                    raise
+                logger.warning("AI provider request failed, retrying", exc_info=True)
     except AIModelError:
         raise
     except ai.AIError as error:
