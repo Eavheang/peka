@@ -26,6 +26,11 @@ function fileName(file: StoredFile) {
   return file.path.split("/").pop() ?? file.path;
 }
 
+function fileType(file: StoredFile) {
+  const ext = fileName(file).split(".").pop();
+  return ext && ext !== fileName(file) ? ext.toUpperCase() : "File";
+}
+
 function statusLabel(status: StoredFile["okf_status"]) {
   return { queued: "Queued", processing: "Indexing", completed: "Indexed", failed: "Failed" }[
     status
@@ -182,7 +187,7 @@ export function KnowledgeTable({
                 {new Date(file.created_at).toLocaleDateString()}
               </TableCell>
               <TableCell className="px-5 py-4">
-                {file.content_type?.split("/").pop()?.toUpperCase() ?? "File"}
+                {fileType(file)}
               </TableCell>
               <TableCell className="px-5 py-4">
                 <Badge variant="outline">{file.access_level}</Badge>
