@@ -17,6 +17,21 @@ jobs:
     defaults:
       run:
         working-directory: service
+    # A real PostgreSQL with pgvector for the tests that check the search SQL (tests/test_search_database.py).
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: peka
+          POSTGRES_PASSWORD: peka_test_password
+          POSTGRES_DB: peka_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U peka -d peka_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -31,3 +46,5 @@ jobs:
 
       - name: Run tests
         run: python -m pytest
+        env:
+          TEST_DATABASE_URL: postgresql://peka:peka_test_password@localhost:5432/peka_test
