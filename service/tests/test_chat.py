@@ -750,3 +750,63 @@ def test_endpoint_authorizes_history_before_calling_model(monkeypatch, found):
         app.dependency_overrides.clear()
     assert response.status_code == (200 if found else 404)
     assert seen == ([history] if found else [])
+
+
+def _stream_events(monkeypatch, chunks: list[str], regenerate_error: bool = True):
+    async def stream_text(*args, **kwargs):
+        for chunk in chunks:
+            yield chunk
+
+    def generate(messages, output_type):
+        if output_type is chat_service.SearchPlan:
+            return _search_plan()
+        if regenerate_error:
+            raise chat_service.AIModelError("Model returned an invalid structured response")
+        pytest.fail("A repairable answer must not be regenerated")
+
+    monkeypatch.setattr(chat_service, "stream_structured_text", stream_text)
+    monkeypatch.setattr(chat_service, "generate_structured", generate)
+
+    async def collect():
+        return [event async for event in chat_service.stream_answer_from_knowledge("hello", "staff")]
+
+    return asyncio.run(collect())
+
+
+def test_stream_repairs_unescaped_quotes_without_regenerating(monkeypatch) -> None:
+    broken = (
+        '{"blocks":[{"kind":"general","text":"Systems use "reranking" to sort.","source_ids":[]}]}'
+    )
+
+    events = _stream_events(monkeypatch, [broken[:40], broken[40:]], regenerate_error=False)
+    completed = next(e for e in events if isinstance(e, chat_service.ChatStreamCompleted))
+
+    assert completed.response.answer == 'Systems use "reranking" to sort.'
+
+
+def test_stream_falls_back_to_the_plain_text_answer_when_regeneration_fails(monkeypatch) -> None:
+    prose = "RAG evolved in three stages [1]. Advanced systems rerank results [1, 2]."
+
+    events = _stream_events(monkeypatch, [prose])
+    completed = next(e for e in events if isinstance(e, chat_service.ChatStreamCompleted))
+    shown = "".join(e.delta for e in events if isinstance(e, chat_service.ChatStreamText))
+
+    assert "RAG evolved in three stages." in completed.response.answer
+    assert "[1" not in completed.response.answer
+    assert "Sources could not be attached" in completed.response.answer
+    assert completed.response.citations == [] and completed.response.refused is False
+    assert shown == completed.response.answer
+
+
+def test_stream_still_fails_when_the_output_is_broken_json_and_regeneration_fails(monkeypatch) -> None:
+    with pytest.raises(chat_service.AIModelError):
+        _stream_events(monkeypatch, ['{"blocks":[{"kind":"general","text":"cut off'])
+
+
+def test_plain_text_fallback_cleans_markers_and_rejects_json_and_empty() -> None:
+    cleaned = chat_service._plain_text_fallback('Answer [1] here {"source-1"} and {"source-2, source-3} more [2, 3].')
+
+    assert cleaned.startswith("Answer here and more.")
+    assert "source-" not in cleaned and "[" not in cleaned.split("\n\n")[0]
+    for unusable in ("", "   ", '{"blocks":[]}', "```json\n{}\n```", "[1]"):
+        assert chat_service._plain_text_fallback(unusable) is None
