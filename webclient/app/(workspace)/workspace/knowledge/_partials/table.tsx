@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/select";
 import type { AccessLevel, StoredFile } from "@/interface/files";
 import { useUpdateFileAccessLevel } from "@/services/files";
+import { getApiErrorMessage } from "@/utils/api-error";
 import {
   Table,
   TableBody,
@@ -92,7 +93,7 @@ export function KnowledgeTable({
       setSelectedFiles(new Set());
       setBulkAccessLevel("");
     } catch (error) {
-      setAccessError(error instanceof Error ? error.message : "Unable to update access level.");
+      setAccessError(getApiErrorMessage(error, "Unable to update access level."));
     }
   }
 
