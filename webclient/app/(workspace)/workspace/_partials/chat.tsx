@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ChatMessage, ChatResult } from "@/interface/chat";
 import { sendChatMessageStream, useGetConversation } from "@/services/chat";
+import { getApiErrorMessage } from "@/utils/api-error";
 
 const MAX_QUERY_LENGTH = 4000;
 const WEB_SEARCH_STORAGE_KEY = "peka_web_search_enabled";
@@ -242,7 +243,7 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
             </div>
           ) : conversationId && conversationQuery.isError ? (
             <p className="flex flex-1 items-center justify-center py-16 text-sm text-danger">
-              We could not load this conversation.
+              {getApiErrorMessage(conversationQuery.error, "We could not load this conversation.")}
             </p>
           ) : messages.length === 0 ? (
             <div className="flex min-h-full flex-col items-center justify-center py-16 text-center">
