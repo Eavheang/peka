@@ -3,31 +3,30 @@
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { Menu } from "lucide-react";
-import { useRouter } from "next/navigation";
 
 import type { UserResponse } from "@/interface/auth";
-import { clearAuthStorage, getStoredToken } from "@/utils/auth-storage";
+import { endSession, getStoredToken } from "@/utils/auth-storage";
 import { useGetCurrentUser } from "@/services/auth";
 
 import { WorkspaceSidebar } from "./_partials/sidebar";
 
 export default function WorkspaceLayout({ children }: Readonly<{ children: ReactNode }>) {
-  const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [accessToken, setAccessToken] = useState("");
 
   useEffect(() => {
-    setAccessToken(getStoredToken("peka_access_token") ?? "");
+    const stored = getStoredToken("peka_access_token");
+    // No token means no session, e.g. a workspace page rendered from the browser's cache.
+    if (!stored) return endSession();
+    setAccessToken(stored);
   }, []);
 
   const userQuery = useGetCurrentUser(accessToken);
 
   useEffect(() => {
-    if (!userQuery.isError) return;
-    clearAuthStorage();
-    router.replace("/sign-in");
-  }, [router, userQuery.isError]);
+    if (userQuery.isError) endSession();
+  }, [userQuery.isError]);
 
   const user: UserResponse | undefined = userQuery.data;
 

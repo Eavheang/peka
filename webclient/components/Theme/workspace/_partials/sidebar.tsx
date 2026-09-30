@@ -13,7 +13,7 @@ import type { UserResponse } from "@/interface/auth";
 import type { Conversation } from "@/interface/chat";
 import { useLogout } from "@/services/auth";
 import { useDeleteConversation, useListConversations } from "@/services/chat";
-import { clearAuthStorage, getStoredToken } from "@/utils/auth-storage";
+import { endSession, getStoredToken } from "@/utils/auth-storage";
 import { ROUTE, Routes } from "@/variables/routes";
 import { ConversationHistory } from "./conversationHistory";
 import { ProfileMenu } from "./profileMenu";
@@ -54,17 +54,11 @@ export function WorkspaceSidebar({
   function handleLogout() {
     const accessToken = getStoredToken("peka_access_token");
     if (!accessToken) {
-      clearAuthStorage();
-      router.replace("/sign-in");
+      endSession();
       return;
     }
 
-    logout.mutate(accessToken, {
-      onSettled: () => {
-        clearAuthStorage();
-        router.replace("/sign-in");
-      },
-    });
+    logout.mutate(accessToken, { onSettled: endSession });
   }
 
   function handleDeleteConversation() {

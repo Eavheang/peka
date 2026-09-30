@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import Link from "next/link";
 
@@ -9,14 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
 import { useChangePassword, useGetCurrentUser, useUpdateProfile } from "@/services/auth";
-import { clearAuthStorage, getStoredToken } from "@/utils/auth-storage";
+import { endSession, getStoredToken } from "@/utils/auth-storage";
 
 type ProfileForm = { display_name: string };
 type PasswordForm = { current_password: string; new_password: string; confirm_password: string };
 type SettingsSection = "profile" | "security";
 
 export default function ProfileSettingsPage() {
-  const router = useRouter();
   const [token, setToken] = useState("");
   const [activeSection, setActiveSection] = useState<SettingsSection>("profile");
   const [passwordError, setPasswordError] = useState("");
@@ -56,8 +54,8 @@ export default function ProfileSettingsPage() {
             title: "Password updated. Sign in with your new password.",
             type: "success",
           });
-          clearAuthStorage();
-          router.replace("/sign-in");
+          // Let the toast be read before the full page load that ends the session.
+          window.setTimeout(endSession, 1500);
         },
         onError: () => setPasswordError("Current password is incorrect or the change failed."),
       },

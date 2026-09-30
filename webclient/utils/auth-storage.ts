@@ -47,3 +47,12 @@ export function clearAuthStorage() {
   localStorage.removeItem(REMEMBER_ME_KEY);
   document.cookie = "peka_access_token=; Max-Age=0; Path=/; SameSite=Lax";
 }
+
+// End the session with a full page load. A soft router.replace keeps the client router cache and
+// React Query cache, so the next visit to /workspace could render a cached signed-in page.
+export function endSession() {
+  if (typeof window === "undefined") return;
+
+  clearAuthStorage();
+  window.location.replace("/sign-in");
+}
