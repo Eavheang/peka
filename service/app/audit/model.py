@@ -9,7 +9,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
 
 
-class AuditEvent(Base):
+class AuditEventRecord(Base):
     __tablename__ = "audit_events"
     __table_args__ = (
         CheckConstraint("type IN ('sync', 'query', 'system')", name="audit_events_type_check"),

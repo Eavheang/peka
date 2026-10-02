@@ -5,6 +5,7 @@ import jwt
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from app.audit.writer import record
 from app.auth.repository import auth_repository
 from app.auth.schemas import (
     InvitationAccept, InvitationCreate, InvitationPreview, InvitationResponse, InvitationSummary,
@@ -63,9 +64,12 @@ def authenticated(credentials: HTTPAuthorizationCredentials | None = Depends(bea
 
 def admin_only(request: Request, user: dict = Depends(authenticated)) -> dict:
     if user["role"] != "admin":
-        from app.audit.writer import record
-
-        record("system", "Admin gate deny", actor_id=user["id"], metadata={"path": request.url.path})
+        record(
+            "system",
+            "Admin gate deny",
+            actor_id=user["id"],
+            metadata={"event": "admin_gate_deny", "path": request.url.path},
+        )
         raise HTTPException(status_code=403, detail="Admin role required")
     return user
 
@@ -84,9 +88,7 @@ def login(data: LoginRequest) -> dict:
     user = authenticate(data.email, data.password)
     if user is None:
         raise unauthorized()
-    from app.audit.writer import record
-
-    record("system", "Login success", actor_id=user["id"])
+    record("system", "Login success", actor_id=user["id"], metadata={"event": "login_success"})
     return _token_response(user)
 
 

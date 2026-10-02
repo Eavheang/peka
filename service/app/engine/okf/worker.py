@@ -2,6 +2,7 @@ import json
 import logging
 import threading
 import time
+from app.audit.writer import record
 from app.config import settings
 from app.engine.source_extractor import source_id_for
 from app.engine.chunks.chunker import parse_okf_chunks
@@ -32,9 +33,11 @@ def process_next_job() -> bool:
         knowledge_chunks_repository.swap_active_set(job["file_id"], chunks, vectors)
     except Exception as error:
         logger.exception("OKF conversion failed for file %s", job["file_id"])
-        okf_jobs_repository.fail(job["file_id"], str(error) or type(error).__name__)
+        status = okf_jobs_repository.fail(job["file_id"], str(error) or type(error).__name__)
+        _record_sync_end(job["file_id"], status)
     else:
         okf_jobs_repository.complete(job["file_id"])
+        _record_sync_end(job["file_id"], "completed")
     return True
 
 
@@ -47,6 +50,16 @@ def run_worker(stop: threading.Event | None = None) -> None:
                 time.sleep(1)
             else:
                 stop.wait(1)
+
+
+def _record_sync_end(file_id, status: str) -> None:
+    if status == "completed":
+        summary = "Sync completed"
+    elif status == "failed":
+        summary = "Sync failed"
+    else:
+        return
+    record("sync", summary, metadata={"file_id": str(file_id), "status": status})
 
 
 if __name__ == "__main__":

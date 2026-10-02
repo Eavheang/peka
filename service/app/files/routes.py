@@ -1,9 +1,10 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Response, UploadFile, status
 from fastapi.responses import FileResponse as DownloadResponse
 
+from app.audit.writer import record
 from app.auth.routes import authenticated
 from app.engine.search.service import access_levels_for_role
 
@@ -87,14 +88,20 @@ def download_file(file_id: UUID, user: dict = Depends(authenticated)) -> Downloa
 
 @router.patch("/{file_id}/access-level", response_model=FileResponse)
 def change_file_access_level(
-    file_id: UUID, payload: AccessLevelUpdate, user: dict = Depends(authenticated)
+    file_id: UUID, payload: AccessLevelUpdate, request: Request, user: dict = Depends(authenticated)
 ) -> dict:
     if user["role"] != "admin":
+        record(
+            "system",
+            "Admin gate deny",
+            actor_id=user["id"],
+            metadata={"event": "admin_gate_deny", "path": request.url.path},
+        )
         raise HTTPException(status_code=403, detail="Only admins can change file access level")
-    record = set_access_level(file_id, payload.access_level)
-    if record is None:
+    updated = set_access_level(file_id, payload.access_level)
+    if updated is None:
         raise HTTPException(status_code=404, detail="File not found")
-    return record
+    return updated
 
 
 @router.delete("/{file_id}", status_code=status.HTTP_204_NO_CONTENT)

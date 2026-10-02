@@ -96,6 +96,20 @@ Lines of the form `data: <payload>`. Event kinds: `status`, `text`, `done`, `err
 
 ---
 
+## Audit events — `/admin/audit-events`
+
+| Method | Path | Auth | Query | Response |
+|--------|------|------|-------|----------|
+| `GET` | `/admin/audit-events` | admin | `type` (`sync` \| `query` \| `system`), `limit` (1–100, default 50), `cursor` | `{ items, next_cursor }` |
+
+**AuditEvent:** `id`, `type`, `actor_id`, `summary`, `metadata`, `created_at`
+
+`next_cursor` is a keyset token of `created_at` and `id` (`created_at DESC, id DESC`). An invalid cursor is 400. System events set `metadata.event` to `login_success` or `admin_gate_deny`. Query events store `metadata.conversation_id` only (no prompt or message body). Sync events store `metadata.file_id` and `metadata.status` (`completed` \| `failed`).
+
+Writers are fail-open: a database error while recording does not fail chat, sync, or login.
+
+---
+
 ## Admin provider settings — `/admin/settings/providers`
 
 | Method | Path | Auth | Notes | Response |

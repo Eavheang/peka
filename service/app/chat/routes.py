@@ -43,13 +43,9 @@ def chat(payload: ChatRequest, user: dict = Depends(authenticated)) -> ChatRespo
         if payload.web_search:
             answer = answer_from_knowledge(
                 payload.query, user["role"], history, web_search=True,
-                conversation_id=payload.conversation_id, actor_id=user["id"],
             )
         else:
-            answer = answer_from_knowledge(
-                payload.query, user["role"], history,
-                conversation_id=payload.conversation_id, actor_id=user["id"],
-            )
+            answer = answer_from_knowledge(payload.query, user["role"], history)
         return chat_service.persist_response(
             payload.query,
             user["id"],
@@ -77,14 +73,14 @@ async def chat_stream(payload: ChatRequest, user: dict = Depends(authenticated))
                 user["role"],
                 history,
                 web_search=payload.web_search,
-                conversation_id=payload.conversation_id,
-                actor_id=user["id"],
             ):
                 if isinstance(event, chat_service.ChatStreamStatus):
                     yield _sse({"type": "status", "message": event.message})
                 elif isinstance(event, chat_service.ChatStreamText):
                     yield _sse({"type": "text", "delta": event.delta})
                 else:
+                    # persist_response writes the chat audit row. Keep that insert
+                    # off the event loop so a slow database does not stall the stream.
                     response = await asyncio.to_thread(
                         chat_service.persist_response,
                         payload.query,

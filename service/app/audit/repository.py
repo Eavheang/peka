@@ -1,62 +1,31 @@
-import base64
-import binascii
 from datetime import datetime
 from typing import Any
 from uuid import UUID
 
 from psycopg.types.json import Jsonb
 
+from app.audit.schemas import AuditEventType
 from app.database import get_connection
-
-
-def _encode_cursor(row: dict) -> str:
-    value = f"{row['created_at'].isoformat()}|{row['id']}"
-    return base64.urlsafe_b64encode(value.encode()).decode().rstrip("=")
-
-
-def _decode_cursor(cursor: str) -> tuple[datetime, UUID]:
-    try:
-        padding = "=" * (-len(cursor) % 4)
-        value = base64.urlsafe_b64decode(cursor + padding).decode()
-        created_at, event_id = value.split("|", 1)
-        return datetime.fromisoformat(created_at), UUID(event_id)
-    except (ValueError, UnicodeDecodeError, binascii.Error) as error:
-        raise ValueError("Invalid audit cursor") from error
 
 
 class AuditRepository:
     def insert(
         self,
-        event_type: str,
+        event_type: AuditEventType,
         summary: str,
-        actor_id: UUID | None = None,
-        metadata: dict | None = None,
+        actor_id: UUID | None,
+        metadata: dict,
     ) -> None:
         with get_connection() as connection:
             connection.execute(
                 "INSERT INTO audit_events (type, actor_id, summary, metadata) "
                 "VALUES (%s, %s, %s, %s)",
-                (event_type, actor_id, summary, Jsonb(metadata or {})),
+                (event_type, actor_id, summary, Jsonb(metadata)),
             )
 
-    def list_events(
+    def fetch(
         self,
-        event_type: str | None,
-        limit: int,
-        cursor: str | None,
-    ) -> dict:
-        decoded = _decode_cursor(cursor) if cursor else None
-        rows = self._fetch(event_type, limit + 1, decoded)
-        has_more = len(rows) > limit
-        items = rows[:limit]
-        return {
-            "items": items,
-            "next_cursor": _encode_cursor(items[-1]) if has_more else None,
-        }
-
-    def _fetch(
-        self,
-        event_type: str | None,
+        event_type: AuditEventType | None,
         limit: int,
         cursor: tuple[datetime, UUID] | None,
     ) -> list[dict[str, Any]]:

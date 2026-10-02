@@ -513,9 +513,7 @@ def test_chat_endpoint_returns_answer(monkeypatch) -> None:
     monkeypatch.setattr(
         chat_routes,
         "answer_from_knowledge",
-        lambda query, role, history, **_kwargs: chat_service.ChatResponse(
-            answer="ok [1]", refused=False, citations=[]
-        ),
+        lambda query, role, history: chat_service.ChatResponse(answer="ok [1]", refused=False, citations=[]),
     )
     monkeypatch.setattr(chat_service, "persist_response", lambda query, user_id, response, conversation_id=None: response)
     _override_admin()
@@ -694,7 +692,7 @@ def test_first_message_is_persisted_and_returned(monkeypatch) -> None:
             }
 
     conversation_id_for_test = conversation_id
-    monkeypatch.setattr(chat_routes, "answer_from_knowledge", lambda query, role, history, **_kwargs: chat_service.ChatResponse(
+    monkeypatch.setattr(chat_routes, "answer_from_knowledge", lambda query, role, history: chat_service.ChatResponse(
         answer="grounded answer [1]",
         refused=False,
         citations=[{"title": "policy.pdf", "heading": "Refunds", "page": 2, "source_locations": [{"page": 2}]}],
@@ -738,7 +736,7 @@ def test_endpoint_authorizes_history_before_calling_model(monkeypatch, found):
         assert owner_id == "u1"
         return {"messages": history} if found else None
 
-    def answer(query, role, context, **_kwargs):
+    def answer(query, role, context):
         seen.append(context)
         return chat_service.ChatResponse(answer="Details", refused=False, citations=[])
 

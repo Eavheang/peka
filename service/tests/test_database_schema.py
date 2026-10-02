@@ -1,5 +1,5 @@
 from app.database import Base
-from app.audit.model import AuditEvent
+from app.audit.model import AuditEventRecord
 from app.auth.model import Invitation, User
 from app.files.model import StoredFile
 from app.engine.okf.job_model import OKFJob
@@ -28,7 +28,7 @@ def test_user_model_describes_users_table() -> None:
 
 
 def test_audit_event_model_describes_audit_events_table() -> None:
-    table = Base.metadata.tables[AuditEvent.__tablename__]
+    table = Base.metadata.tables[AuditEventRecord.__tablename__]
 
     assert {column.name for column in table.columns} == {
         "id",
