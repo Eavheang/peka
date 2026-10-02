@@ -1,4 +1,10 @@
-export type AuditEventType = "sync" | "query" | "system";
+export const AUDIT_EVENT_TYPE_LABELS = {
+  sync: "Sync",
+  query: "Query",
+  system: "System",
+} as const;
+
+export type AuditEventType = keyof typeof AUDIT_EVENT_TYPE_LABELS;
 
 export interface AuditEvent {
   id: string;

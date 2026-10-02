@@ -4,23 +4,23 @@ import axios from "axios";
 import type { AuditEventType, AuditEventsResponse } from "@/interface/audit";
 import axiosInstance from "@/utils/axios";
 
-const DEFAULT_LIMIT = 50;
+export function isAuditEventsForbidden(error: unknown) {
+  return axios.isAxiosError(error) && error.response?.status === 403;
+}
 
 export const useListAuditEvents = ({
   type,
-  limit = DEFAULT_LIMIT,
   enabled = true,
 }: {
   type?: AuditEventType;
-  limit?: number;
   enabled?: boolean;
 } = {}) =>
   useInfiniteQuery({
-    queryKey: ["audit-events", "list", type ?? "all", limit],
+    queryKey: ["audit-events", "list", type ?? "all"],
     enabled,
     initialPageParam: null as string | null,
     queryFn: async ({ pageParam, signal }) => {
-      const params: Record<string, string | number> = { limit };
+      const params: Record<string, string> = {};
       if (type) params.type = type;
       if (pageParam) params.cursor = pageParam;
       return (
@@ -31,6 +31,5 @@ export const useListAuditEvents = ({
       ).data;
     },
     getNextPageParam: (lastPage) => lastPage.next_cursor,
-    retry: (failureCount, error) =>
-      failureCount < 3 && !(axios.isAxiosError(error) && error.response?.status === 403),
+    retry: (failureCount, error) => failureCount < 3 && !isAuditEventsForbidden(error),
   });
