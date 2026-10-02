@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import type { AuditEventType } from "@/interface/audit";
-import { useListAuditEvents } from "@/services/audit";
+import { isAuditEventsForbidden, useListAuditEvents } from "@/services/audit";
 import AuditEventsSkeleton from "./auditEventsSkeleton";
 import AuditEventsTable from "./auditEventsTable";
 
@@ -12,6 +12,7 @@ export default function AuditEventsPanel({ type }: { type?: AuditEventType }) {
   const showSkeleton = eventsQuery.isPending || (eventsQuery.isFetching && !eventsQuery.data);
 
   if (showSkeleton) return <AuditEventsSkeleton />;
+  if (isAuditEventsForbidden(eventsQuery.error)) return null;
 
   if (eventsQuery.isError && !eventsQuery.data) {
     return (
