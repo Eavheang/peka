@@ -3,6 +3,10 @@
 @theme inline {
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+}
+
+/* Colors are not inline so utilities read the vars and [data-theme] can override them. */
+@theme {
   --color-background: #f4f0e8;
   --color-foreground: #181a19;
   --color-primary: #e96243;
@@ -20,6 +24,55 @@
   --color-panel: #202523;
   --color-panel-elevated: #303131;
   --color-panel-foreground: #f3f1ea;
+}
+
+/* Theme ids must match THEMES in utils/theme.ts. */
+[data-theme="daylight"] {
+  --color-background: #faf9f6;
+  --color-foreground: #1b1d1f;
+  --color-primary: #6b8fc4;
+  --color-secondary: #f0eee9;
+  --color-secondary-foreground: #1b1d1f;
+  --color-muted: #77797a;
+  --color-muted-foreground: #696c6e;
+  --color-copy: #5a5e62;
+  --color-border: #e3e0d9;
+  --color-panel: #23262a;
+  --color-panel-elevated: #323539;
+  --color-panel-foreground: #f4f3ef;
+}
+
+[data-theme="sage"] {
+  --color-background: #f1f2eb;
+  --color-foreground: #1c201b;
+  --color-primary: #7d9a6f;
+  --color-secondary: #e6e8de;
+  --color-secondary-foreground: #1c201b;
+  --color-muted: #747870;
+  --color-muted-foreground: #676b63;
+  --color-copy: #585d55;
+  --color-border: #d6d9cc;
+  --color-panel: #222723;
+  --color-panel-elevated: #313632;
+  --color-panel-foreground: #f1f2eb;
+}
+
+[data-theme="midnight"] {
+  color-scheme: dark;
+  --color-background: #16181a;
+  --color-foreground: #ecebe6;
+  --color-primary: #f07a5c;
+  --color-secondary: #23262a;
+  --color-secondary-foreground: #ecebe6;
+  --color-muted: #9a9d97;
+  --color-muted-foreground: #a6a9a3;
+  --color-copy: #b8bab4;
+  --color-danger: #f0605a;
+  --color-success: #6f9a64;
+  --color-border: #33373b;
+  --color-panel: #0e1011;
+  --color-panel-elevated: #1f2224;
+  --color-panel-foreground: #ecebe6;
 }
 @layer base {
   html {
@@ -65,7 +118,7 @@
   }
 
   p {
-    color: #5c605a;
+    color: var(--color-copy);
     font-size: 1rem;
     line-height: 1.5;
   }
@@ -82,7 +135,7 @@
   }
 
   :focus-visible {
-    outline: 2px solid #e96243;
+    outline: 2px solid var(--color-primary);
     outline-offset: 2px;
   }
 }
