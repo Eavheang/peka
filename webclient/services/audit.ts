@@ -1,0 +1,36 @@
+import { useInfiniteQuery } from "@tanstack/react-query";
+import axios from "axios";
+
+import type { AuditEventType, AuditEventsResponse } from "@/interface/audit";
+import axiosInstance from "@/utils/axios";
+
+const DEFAULT_LIMIT = 50;
+
+export const useListAuditEvents = ({
+  type,
+  limit = DEFAULT_LIMIT,
+  enabled = true,
+}: {
+  type?: AuditEventType;
+  limit?: number;
+  enabled?: boolean;
+} = {}) =>
+  useInfiniteQuery({
+    queryKey: ["audit-events", "list", type ?? "all", limit],
+    enabled,
+    initialPageParam: null as string | null,
+    queryFn: async ({ pageParam, signal }) => {
+      const params: Record<string, string | number> = { limit };
+      if (type) params.type = type;
+      if (pageParam) params.cursor = pageParam;
+      return (
+        await axiosInstance.get<AuditEventsResponse>("/admin/audit-events", {
+          params,
+          signal,
+        })
+      ).data;
+    },
+    getNextPageParam: (lastPage) => lastPage.next_cursor,
+    retry: (failureCount, error) =>
+      failureCount < 3 && !(axios.isAxiosError(error) && error.response?.status === 403),
+  });

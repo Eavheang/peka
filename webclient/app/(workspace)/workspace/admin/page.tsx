@@ -95,7 +95,7 @@ export default function AdminPage() {
           <h1 className="text-2xl font-semibold">User management</h1>
           <p className="mt-1 text-sm text-muted">Invite and manage workspace users.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap justify-end gap-2">
           <Button
             className="border-border"
             type="button"
@@ -103,6 +103,14 @@ export default function AdminPage() {
             onClick={() => router.push("/workspace/admin/settings")}
           >
             Workspace settings
+          </Button>
+          <Button
+            className="border-border"
+            type="button"
+            variant="outline"
+            onClick={() => router.push("/workspace/admin/audit")}
+          >
+            Audit events
           </Button>
           <Button className="px-4 py-2" type="button" onClick={() => setInviteOpen(true)}>
             Invite user
