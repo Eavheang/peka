@@ -38,6 +38,7 @@ class OKFJobsRepository:
                 "updated_at = CURRENT_TIMESTAMP WHERE file_id = %s",
                 (file_id,),
             )
+        _record_sync_end(file_id, "completed")
 
     def fail(self, file_id: UUID, error: str) -> str:
         with get_connection() as connection:
@@ -47,7 +48,10 @@ class OKFJobsRepository:
                 "RETURNING status",
                 (error[:2000], file_id),
             ).fetchone()
-            return cast(dict[str, str], row)["status"] if row else "failed"
+            status = cast(dict[str, str], row)["status"] if row else "failed"
+        if row is not None:
+            _record_sync_end(file_id, status)
+        return status
 
     def retry_failed(self, file_id: UUID) -> bool:
         with get_connection() as connection:
@@ -57,6 +61,18 @@ class OKFJobsRepository:
                 "RETURNING file_id",
                 (file_id,),
             ).fetchone() is not None
+
+
+def _record_sync_end(file_id: UUID, status: str) -> None:
+    from app.audit.writer import record
+
+    if status == "completed":
+        summary = "Sync completed"
+    elif status == "failed":
+        summary = "Sync failed"
+    else:
+        return
+    record("sync", summary, metadata={"file_id": str(file_id), "status": status})
 
 
 okf_jobs_repository = OKFJobsRepository()

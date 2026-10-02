@@ -43,9 +43,13 @@ def chat(payload: ChatRequest, user: dict = Depends(authenticated)) -> ChatRespo
         if payload.web_search:
             answer = answer_from_knowledge(
                 payload.query, user["role"], history, web_search=True,
+                conversation_id=payload.conversation_id, actor_id=user["id"],
             )
         else:
-            answer = answer_from_knowledge(payload.query, user["role"], history)
+            answer = answer_from_knowledge(
+                payload.query, user["role"], history,
+                conversation_id=payload.conversation_id, actor_id=user["id"],
+            )
         return chat_service.persist_response(
             payload.query,
             user["id"],
@@ -73,6 +77,8 @@ async def chat_stream(payload: ChatRequest, user: dict = Depends(authenticated))
                 user["role"],
                 history,
                 web_search=payload.web_search,
+                conversation_id=payload.conversation_id,
+                actor_id=user["id"],
             ):
                 if isinstance(event, chat_service.ChatStreamStatus):
                     yield _sse({"type": "status", "message": event.message})

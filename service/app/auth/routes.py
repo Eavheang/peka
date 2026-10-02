@@ -61,8 +61,11 @@ def authenticated(credentials: HTTPAuthorizationCredentials | None = Depends(bea
     return user
 
 
-def admin_only(user: dict = Depends(authenticated)) -> dict:
+def admin_only(request: Request, user: dict = Depends(authenticated)) -> dict:
     if user["role"] != "admin":
+        from app.audit.writer import record
+
+        record("system", "Admin gate deny", actor_id=user["id"], metadata={"path": request.url.path})
         raise HTTPException(status_code=403, detail="Admin role required")
     return user
 
@@ -81,6 +84,9 @@ def login(data: LoginRequest) -> dict:
     user = authenticate(data.email, data.password)
     if user is None:
         raise unauthorized()
+    from app.audit.writer import record
+
+    record("system", "Login success", actor_id=user["id"])
     return _token_response(user)
 
 

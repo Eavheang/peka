@@ -457,12 +457,27 @@ def _response_from_model_answer(
     )
 
 
+def _audit_chat_turn(conversation_id: UUID | None, actor_id: UUID | None) -> None:
+    from app.audit.writer import record
+
+    record(
+        "query",
+        "Chat turn",
+        actor_id=actor_id,
+        metadata={"conversation_id": None if conversation_id is None else str(conversation_id)},
+    )
+
+
 def answer_from_knowledge(
     query: str,
     user_role: str,
     history: list[dict] | None = None,
     web_search: bool = False,
+    *,
+    conversation_id: UUID | None = None,
+    actor_id: UUID | None = None,
 ) -> ChatResponse:
+    _audit_chat_turn(conversation_id, actor_id)
     search_plan = _search_plan(query, history, web_search)
     sources = {}
     messages = _conversation_messages(query, history, _SYSTEM_PROMPT)
@@ -494,8 +509,12 @@ async def stream_answer_from_knowledge(
     user_role: str,
     history: list[dict] | None = None,
     web_search: bool = False,
+    *,
+    conversation_id: UUID | None = None,
+    actor_id: UUID | None = None,
 ) -> AsyncIterator[ChatStreamEvent]:
     """Generate and stream one answer while validating its final metadata."""
+    _audit_chat_turn(conversation_id, actor_id)
     yield ChatStreamStatus("Thinking...")
     search_plan = await asyncio.to_thread(_search_plan, query, history, web_search)
     sources: dict[str, dict] = {}
