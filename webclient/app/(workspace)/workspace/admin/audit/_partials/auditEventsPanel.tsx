@@ -2,16 +2,16 @@
 
 import { Button } from "@/components/ui/button";
 import type { AuditEventType } from "@/interface/audit";
-import { isAuditEventsForbidden, useListAuditEvents } from "@/services/audit";
-import AuditEventsTable, { AuditEventsEmpty, AuditEventsSkeleton } from "./auditEventsTable";
+import { useListAuditEvents } from "@/services/audit";
+import AuditEventsSkeleton from "./auditEventsSkeleton";
+import AuditEventsTable from "./auditEventsTable";
 
 export default function AuditEventsPanel({ type }: { type?: AuditEventType }) {
   const eventsQuery = useListAuditEvents({ type });
   const events = eventsQuery.data?.pages.flatMap((page) => page.items) ?? [];
+  const showSkeleton = eventsQuery.isPending || (eventsQuery.isFetching && !eventsQuery.data);
 
-  if (eventsQuery.isLoading) return <AuditEventsSkeleton />;
-
-  if (isAuditEventsForbidden(eventsQuery.error)) return null;
+  if (showSkeleton) return <AuditEventsSkeleton />;
 
   if (eventsQuery.isError && !eventsQuery.data) {
     return (
@@ -20,8 +20,6 @@ export default function AuditEventsPanel({ type }: { type?: AuditEventType }) {
       </p>
     );
   }
-
-  if (events.length === 0) return <AuditEventsEmpty />;
 
   return (
     <div className="flex flex-col gap-4">

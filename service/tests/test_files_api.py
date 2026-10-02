@@ -149,7 +149,7 @@ def test_access_level_patch_requires_admin(client, monkeypatch):
 
     assert client.patch(f"/files/{file_id}/access-level", headers=token_for(staff),
                         json={"access_level": "confidential"}).status_code == 403
-    assert client.patch(f"/files/{file_id}/access-level", headers=token_for(staff),
+    assert client.patch(f"/files/{file_id}/access-level", headers=token_for(admin),
                         json={"access_level": "secret"}).status_code == 422
 
     changed = client.patch(f"/files/{file_id}/access-level", headers=token_for(admin),

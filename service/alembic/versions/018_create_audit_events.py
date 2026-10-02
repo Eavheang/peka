@@ -38,6 +38,4 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.execute("DROP INDEX IF EXISTS audit_events_created_at_idx")
-    op.execute("DROP INDEX IF EXISTS audit_events_type_created_at_idx")
     op.drop_table("audit_events")

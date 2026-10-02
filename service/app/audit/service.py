@@ -1,14 +1,40 @@
 import base64
-import binascii
+import logging
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from app.audit.repository import audit_repository
 from app.audit.schemas import AuditEventType
 
+logger = logging.getLogger(__name__)
+
+AuditEventName = Literal["sync_completed", "sync_failed", "chat_turn", "login_success", "admin_gate_deny"]
+
+AUDIT_EVENTS: dict[AuditEventName, tuple[AuditEventType, str]] = {
+    "sync_completed": ("sync", "Sync completed"),
+    "sync_failed": ("sync", "Sync failed"),
+    "chat_turn": ("query", "Chat turn"),
+    "login_success": ("system", "Login success"),
+    "admin_gate_deny": ("system", "Admin gate deny"),
+}
+
 
 class InvalidAuditCursor(Exception):
     """The list cursor is not a valid created_at and id keyset token."""
+
+
+def record_audit_event(
+    event: AuditEventName,
+    actor_id: UUID | None = None,
+    metadata: dict | None = None,
+) -> None:
+    """Persist one audit event. Failures are logged and never raised to callers."""
+    event_type, summary = AUDIT_EVENTS[event]
+    try:
+        audit_repository.insert(event_type, summary, actor_id, {"event": event, **(metadata or {})})
+    except Exception:
+        logger.exception("Failed to record audit event %s", event)
 
 
 def list_events(
@@ -27,15 +53,12 @@ def list_events(
 
 
 def _encode_cursor(row: dict) -> str:
-    value = f"{row['created_at'].isoformat()}|{row['id']}"
-    return base64.urlsafe_b64encode(value.encode()).decode().rstrip("=")
+    return base64.urlsafe_b64encode(f"{row['created_at'].isoformat()}|{row['id']}".encode()).decode()
 
 
 def _decode_cursor(cursor: str) -> tuple[datetime, UUID]:
     try:
-        padding = "=" * (-len(cursor) % 4)
-        value = base64.urlsafe_b64decode(cursor + padding).decode()
-        created_at, event_id = value.split("|", 1)
+        created_at, event_id = base64.urlsafe_b64decode(cursor).decode().split("|", 1)
         return datetime.fromisoformat(created_at), UUID(event_id)
-    except (ValueError, UnicodeDecodeError, binascii.Error) as error:
+    except ValueError as error:  # binascii.Error and UnicodeDecodeError are ValueErrors
         raise InvalidAuditCursor("Invalid audit cursor") from error

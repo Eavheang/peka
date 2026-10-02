@@ -108,7 +108,7 @@ def test_sync_complete_and_terminal_fail_write_rows(database, monkeypatch, tmp_p
     )
     assert len(completed) == 1
     assert completed[0]["summary"] == "Sync completed"
-    assert set(completed[0]["metadata"]) == {"file_id", "status"}
+    assert completed[0]["metadata"] == {"event": "sync_completed", "file_id": str(file_id), "status": "completed"}
 
     execute(
         "UPDATE okf_jobs SET status = 'queued', attempts = 2, last_error = NULL WHERE file_id = %s",
@@ -140,7 +140,7 @@ def test_chat_turn_writes_the_created_conversation_id(database):
     assert len(rows) == 1
     assert rows[0]["summary"] == "Chat turn"
     assert rows[0]["actor_id"] == owner["id"]
-    assert rows[0]["metadata"] == {"conversation_id": str(saved.conversation_id)}
+    assert rows[0]["metadata"] == {"event": "chat_turn", "conversation_id": str(saved.conversation_id)}
     assert prompt not in json.dumps(rows[0]["metadata"])
     stored = execute("SELECT id FROM conversations WHERE id = %s", (saved.conversation_id,))
     assert stored[0]["id"] == saved.conversation_id

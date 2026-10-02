@@ -18,10 +18,6 @@ const FILTERS: { value: AuditTypeFilterValue; label: string }[] = [
   ),
 ];
 
-function isAuditTypeFilter(value: unknown): value is AuditTypeFilterValue {
-  return FILTERS.some((filter) => filter.value === value);
-}
-
 export default function AuditTypeFilter({
   value,
   onChange,
@@ -34,12 +30,7 @@ export default function AuditTypeFilter({
       <span id="audit-type-label" className="text-sm text-muted">
         Type
       </span>
-      <Select
-        value={value}
-        onValueChange={(next) => {
-          if (isAuditTypeFilter(next)) onChange(next);
-        }}
-      >
+      <Select value={value} onValueChange={(next) => onChange(next as AuditTypeFilterValue)}>
         <SelectTrigger aria-labelledby="audit-type-label" className="w-40">
           <SelectValue />
         </SelectTrigger>

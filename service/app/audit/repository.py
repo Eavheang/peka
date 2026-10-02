@@ -43,7 +43,7 @@ class AuditRepository:
         query += " ORDER BY created_at DESC, id DESC LIMIT %s"
         params.append(limit)
         with get_connection() as connection:
-            return list(connection.execute(query, tuple(params)).fetchall())
+            return connection.execute(query, tuple(params)).fetchall()
 
 
 audit_repository = AuditRepository()

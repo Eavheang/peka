@@ -4,7 +4,7 @@ from uuid import UUID, uuid4
 
 from app.audit.repository import audit_repository
 from app.audit.service import _encode_cursor, list_events
-from app.audit.writer import record
+from app.audit.service import record_audit_event
 from app.auth import routes as auth_routes
 from app.auth.security import create_access_token
 from app.chat import service as chat_service
@@ -211,13 +211,13 @@ def test_admin_list_includes_sync_query_login_and_admin_deny(client, monkeypatch
     assert {"Sync completed", "Sync failed", "Chat turn", "Login success", "Admin gate deny"} <= summaries
     sync_events = [item for item in body["items"] if item["type"] == "sync"]
     assert [item["summary"] for item in sync_events].count("Sync failed") == 1
-    assert all(set(item["metadata"]) == {"file_id", "status"} for item in sync_events)
+    assert all(set(item["metadata"]) == {"event", "file_id", "status"} for item in sync_events)
     assert {item["metadata"]["status"] for item in sync_events} == {"completed", "failed"}
     query_events = [item for item in body["items"] if item["type"] == "query"]
     assert len(query_events) == 1
     item = query_events[0]
     assert item["summary"] == "Chat turn"
-    assert item["metadata"] == {"conversation_id": str(conversation_id)}
+    assert item["metadata"] == {"event": "chat_turn", "conversation_id": str(conversation_id)}
     assert item["actor_id"] == str(staff["id"])
     dumped = json.dumps(item)
     assert prompt not in dumped
@@ -239,9 +239,9 @@ def test_type_query_param_filters_events(client, monkeypatch):
     install_store(monkeypatch)
     admin = account("admin")
     use_accounts(monkeypatch, admin)
-    record("sync", "Sync completed", metadata={"file_id": str(uuid4()), "status": "completed"})
-    record("query", "Chat turn", metadata={"conversation_id": str(uuid4())})
-    record("system", "Login success", actor_id=admin["id"], metadata={"event": "login_success"})
+    record_audit_event("sync_completed", metadata={"file_id": str(uuid4()), "status": "completed"})
+    record_audit_event("chat_turn", metadata={"conversation_id": str(uuid4())})
+    record_audit_event("login_success", actor_id=admin["id"])
 
     response = client.get("/admin/audit-events", headers=bearer(admin), params={"type": "query"})
 
@@ -312,7 +312,7 @@ def test_first_chat_turn_records_the_created_conversation_id(monkeypatch):
     assert len(query_events) == 1
     assert query_events[0]["metadata"]["conversation_id"] == str(conversation_id)
     assert prompt not in json.dumps(query_events[0]["metadata"])
-    assert set(query_events[0]["metadata"]) == {"conversation_id"}
+    assert set(query_events[0]["metadata"]) == {"event", "conversation_id"}
 
 
 def test_record_is_fail_open(client, monkeypatch):
@@ -320,7 +320,7 @@ def test_record_is_fail_open(client, monkeypatch):
         raise RuntimeError("database unavailable")
 
     monkeypatch.setattr(audit_repository, "insert", unavailable)
-    record("system", "Login success", actor_id=uuid4(), metadata={"event": "login_success"})
+    record_audit_event("login_success", actor_id=uuid4())
 
     admin = account("admin")
     monkeypatch.setattr(auth_routes, "authenticate", lambda email, password: admin)

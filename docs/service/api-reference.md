@@ -104,7 +104,7 @@ Lines of the form `data: <payload>`. Event kinds: `status`, `text`, `done`, `err
 
 **AuditEvent:** `id`, `type`, `actor_id`, `summary`, `metadata`, `created_at`
 
-`next_cursor` is a keyset token of `created_at` and `id` (`created_at DESC, id DESC`). An invalid cursor is 400. System events set `metadata.event` to `login_success` or `admin_gate_deny`. Query events store `metadata.conversation_id` only (no prompt or message body). Sync events store `metadata.file_id` and `metadata.status` (`completed` \| `failed`).
+`next_cursor` is a keyset token of `created_at` and `id` (`created_at DESC, id DESC`). An invalid cursor is 400. Every event sets `metadata.event`: `sync_completed` / `sync_failed` (sync, plus `file_id` and `status`), `chat_turn` (query, plus `conversation_id` only — no prompt or message body), `login_success` / `admin_gate_deny` (system; deny adds `path`).
 
 Writers are fail-open: a database error while recording does not fail chat, sync, or login.
 

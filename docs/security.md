@@ -35,8 +35,8 @@ D-02 is closed on the service: admins can list `audit_events`, and FR10 is no lo
 
 | Event | `type` | When | Metadata |
 |-------|--------|------|----------|
-| Sync completed / Sync failed | `sync` | OKF worker finishes a job (re-queue is not logged) | `file_id`, `status` |
-| Chat turn | `query` | After the conversation row exists, including the first turn | `conversation_id` only |
+| Sync completed / Sync failed | `sync` | OKF worker finishes a job (re-queue is not logged) | `event=sync_completed` / `sync_failed`, `file_id`, `status` |
+| Chat turn | `query` | After the conversation row exists, including the first turn | `event=chat_turn`, `conversation_id` only |
 | Login success | `system` | Successful login | `event=login_success` |
 | Admin gate deny | `system` | Authenticated non-admin hits `admin_only`, or a non-admin changes a file access level | `event=admin_gate_deny`, `path` |
 
