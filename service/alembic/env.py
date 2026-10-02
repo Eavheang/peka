@@ -11,6 +11,7 @@ from app.config import settings
 from app.database import Base
 from app.auth import model  # noqa: F401 - registers User with Base.metadata
 from app.chat import model as chat_model  # noqa: F401 - registers chat tables with Base.metadata
+from app.audit import model as audit_model  # noqa: F401 - registers audit events with Base.metadata
 
 
 config = context.config

@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
 from fastapi.responses import FileResponse as DownloadResponse
 
-from app.auth.routes import authenticated
+from app.auth.routes import admin_only, authenticated
 from app.engine.search.service import access_levels_for_role
 
 from app.files.schemas import AccessLevel, AccessLevelUpdate, FileResponse, OKFStatusResponse
@@ -87,10 +87,8 @@ def download_file(file_id: UUID, user: dict = Depends(authenticated)) -> Downloa
 
 @router.patch("/{file_id}/access-level", response_model=FileResponse)
 def change_file_access_level(
-    file_id: UUID, payload: AccessLevelUpdate, user: dict = Depends(authenticated)
+    file_id: UUID, payload: AccessLevelUpdate, _: dict = Depends(admin_only)
 ) -> dict:
-    if user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="Only admins can change file access level")
     record = set_access_level(file_id, payload.access_level)
     if record is None:
         raise HTTPException(status_code=404, detail="File not found")

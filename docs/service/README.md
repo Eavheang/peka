@@ -32,6 +32,7 @@ service/
 │   ├── database.py             # Base, get_connection()
 │   ├── workspace_settings.py   # Admin provider settings router
 │   ├── auth/                   # login, users, JWT
+│   ├── audit/                  # FR10 audit log: routes → service → repository
 │   ├── files/                  # upload, list, download, OKF status
 │   ├── chat/                   # chat, stream, conversations, preview
 │   └── engine/
@@ -41,7 +42,7 @@ service/
 │       ├── chunks/             # chunker, embeddings, models
 │       ├── search/             # vector search API
 │       └── web_search/         # Exa client
-├── alembic/versions/           # 002…016
+├── alembic/versions/           # 002…018
 ├── storage/                    # uploads, extracted JSON, knowledge_base
 ├── tests/
 ├── Dockerfile

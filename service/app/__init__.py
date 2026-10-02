@@ -1,5 +1,7 @@
 from app.auth.routes import router as auth_router
 from app.auth.model import Invitation, User  # noqa: F401 - register tables in shared metadata
+from app.audit.model import AuditEventRecord  # noqa: F401 - register table in shared metadata
+from app.audit.routes import router as audit_router
 from app.files.routes import router as files_router
 from app.files.model import StoredFile  # noqa: F401 - register table in shared metadata
 from app.engine.okf.job_model import OKFJob  # noqa: F401 - register table in shared metadata
@@ -16,4 +18,5 @@ routers = [
     search_router,
     chat_router,
     workspace_settings_router,
+    audit_router,
 ]

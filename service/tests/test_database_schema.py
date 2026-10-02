@@ -1,4 +1,5 @@
 from app.database import Base
+from app.audit.model import AuditEventRecord
 from app.auth.model import Invitation, User
 from app.files.model import StoredFile
 from app.engine.okf.job_model import OKFJob
@@ -24,6 +25,28 @@ def test_user_model_describes_users_table() -> None:
                     if constraint.name == "users_role_check").sqltext) == (
         "role IN ('admin', 'senior', 'staff')"
     )
+
+
+def test_audit_event_model_describes_audit_events_table() -> None:
+    table = Base.metadata.tables[AuditEventRecord.__tablename__]
+
+    assert {column.name for column in table.columns} == {
+        "id",
+        "type",
+        "actor_id",
+        "summary",
+        "metadata",
+        "created_at",
+    }
+    assert table.c.actor_id.nullable
+    assert str(next(constraint for constraint in table.constraints
+                    if constraint.name == "audit_events_type_check").sqltext) == (
+        "type IN ('sync', 'query', 'system')"
+    )
+    assert {index.name for index in table.indexes} == {
+        "audit_events_type_created_at_idx",
+        "audit_events_created_at_idx",
+    }
 
 
 def test_invitation_model_stores_a_token_hash_not_the_token() -> None:

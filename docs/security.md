@@ -29,6 +29,19 @@
 
 Only admins may set/upload `confidential` and change a file's access level after upload.
 
+## Audit log (FR10 / D-02)
+
+D-02 is closed on the service: admins can list `audit_events`, and FR10 is no longer partial for the backend.
+
+| Event | `type` | When | Metadata |
+|-------|--------|------|----------|
+| Sync completed / Sync failed | `sync` | OKF worker finishes a job (re-queue is not logged) | `event=sync_completed` / `sync_failed`, `file_id`, `status` |
+| Chat turn | `query` | After the conversation row exists, including the first turn | `event=chat_turn`, `conversation_id` only |
+| Login success | `system` | Successful login | `event=login_success` |
+| Admin gate deny | `system` | Authenticated non-admin hits `admin_only`, or a non-admin changes a file access level | `event=admin_gate_deny`, `path` |
+
+Recording never blocks the caller. Prompt and message bodies are not stored. `GET /admin/audit-events` is admin-only.
+
 ## Frontend gates
 
 1. **Edge**: `webclient/proxy.ts` redirects unauthenticated `/workspace/*` to `/sign-in?next=…` based on cookie `peka_access_token`

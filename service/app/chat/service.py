@@ -13,6 +13,7 @@ from uuid import UUID
 import ai
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from app.audit.service import record_audit_event
 from app.chat.repository import chat_repository
 from app.chat.schemas import ChatMessage, ChatResponse, Citation, SourcePreviewRequest
 from app.engine.ai_runtime import (
@@ -575,6 +576,9 @@ def persist_response(
         query=query,
         response=response,
         conversation_id=conversation_id,
+    )
+    record_audit_event(
+        "chat_turn", actor_id=user_id, metadata={"conversation_id": str(persisted["conversation"]["id"])}
     )
     return response.model_copy(
         update={

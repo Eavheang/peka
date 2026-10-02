@@ -79,6 +79,8 @@ async def chat_stream(payload: ChatRequest, user: dict = Depends(authenticated))
                 elif isinstance(event, chat_service.ChatStreamText):
                     yield _sse({"type": "text", "delta": event.delta})
                 else:
+                    # persist_response writes the chat audit row. Keep that insert
+                    # off the event loop so a slow database does not stall the stream.
                     response = await asyncio.to_thread(
                         chat_service.persist_response,
                         payload.query,

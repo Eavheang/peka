@@ -15,6 +15,7 @@ Postgres with the `vector` extension (pgvector). Schema is owned by Alembic; do 
 | `conversations` | Owned chat threads (`owner_id`, title, timestamps) |
 | `messages` | `role` `user` \| `assistant`; content; citations JSONB |
 | `provider_settings` | Single row `id=1`, JSONB `value` for LLM/Exa overrides |
+| `audit_events` | Admin audit log: `type` (`sync` \| `query` \| `system`), nullable `actor_id`, `summary`, `metadata` JSONB, `created_at`. Indexes `(type, created_at DESC)` and `(created_at DESC)`. List order is `created_at DESC, id DESC` |
 
 Conversation list uses index `(owner_id, updated_at DESC, id DESC)` for cursor pagination.
 
@@ -37,6 +38,7 @@ Conversation list uses index `(owner_id, updated_at DESC, id DESC)` for cursor p
 | `015_create_provider_settings` | provider_settings |
 | `016_add_user_display_name` | `display_name` |
 | `017_create_invitations` | invitations |
+| `018_create_audit_events` | `audit_events` (FR10 / D-02) |
 
 Apply:
 
