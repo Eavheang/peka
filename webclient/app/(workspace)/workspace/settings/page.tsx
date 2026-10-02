@@ -9,15 +9,17 @@ import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
 import { useChangePassword, useGetCurrentUser, useUpdateProfile } from "@/services/auth";
 import { endSession, getStoredToken } from "@/utils/auth-storage";
+import { THEMES, type ThemeId, getTheme, setTheme } from "@/utils/theme";
 
 type ProfileForm = { display_name: string };
 type PasswordForm = { current_password: string; new_password: string; confirm_password: string };
-type SettingsSection = "profile" | "security";
+type SettingsSection = "profile" | "security" | "appearance";
 
 export default function ProfileSettingsPage() {
   const [token, setToken] = useState("");
   const [activeSection, setActiveSection] = useState<SettingsSection>("profile");
   const [passwordError, setPasswordError] = useState("");
+  const [theme, setThemeState] = useState<ThemeId>("clay");
   const me = useGetCurrentUser(token);
   const updateProfile = useUpdateProfile();
   const changePassword = useChangePassword();
@@ -27,6 +29,12 @@ export default function ProfileSettingsPage() {
   });
 
   useEffect(() => setToken(getStoredToken("peka_access_token") ?? ""), []);
+  useEffect(() => setThemeState(getTheme()), []);
+
+  function chooseTheme(id: ThemeId) {
+    setTheme(id);
+    setThemeState(id);
+  }
   useEffect(() => {
     if (me.data) profileForm.reset({ display_name: me.data.display_name });
   }, [me.data, profileForm]);
@@ -77,36 +85,28 @@ export default function ProfileSettingsPage() {
       <div className="grid gap-8 lg:grid-cols-[15rem_minmax(0,1fr)]">
         <aside className="space-y-5">
           <nav aria-label="Account settings sections" className="grid gap-1">
-            <button
-              aria-pressed={activeSection === "profile"}
-              className={`rounded-lg border px-4 py-3 text-left text-sm font-medium transition-colors ${
-                activeSection === "profile"
-                  ? "border-border bg-background text-foreground"
-                  : "border-transparent text-foreground hover:bg-secondary"
-              }`}
-              type="button"
-              onClick={() => setActiveSection("profile")}
-            >
-              Profile
-              <span className="mt-1 block text-xs font-normal text-muted">
-                Name and account details
-              </span>
-            </button>
-            <button
-              aria-pressed={activeSection === "security"}
-              className={`rounded-lg border px-4 py-3 text-left text-sm font-medium transition-colors ${
-                activeSection === "security"
-                  ? "border-border bg-background text-foreground"
-                  : "border-transparent text-foreground hover:bg-secondary"
-              }`}
-              type="button"
-              onClick={() => setActiveSection("security")}
-            >
-              Security
-              <span className="mt-1 block text-xs font-normal text-muted">
-                Password and sessions
-              </span>
-            </button>
+            {(
+              [
+                ["profile", "Profile", "Name and account details"],
+                ["security", "Security", "Password and sessions"],
+                ["appearance", "Appearance", "Theme for this browser"],
+              ] as const
+            ).map(([id, label, hint]) => (
+              <button
+                key={id}
+                aria-pressed={activeSection === id}
+                className={`rounded-lg border px-4 py-3 text-left text-sm font-medium transition-colors ${
+                  activeSection === id
+                    ? "border-border bg-background text-foreground"
+                    : "border-transparent text-foreground hover:bg-secondary"
+                }`}
+                type="button"
+                onClick={() => setActiveSection(id)}
+              >
+                {label}
+                <span className="mt-1 block text-xs font-normal text-muted">{hint}</span>
+              </button>
+            ))}
           </nav>
           {me.data.role === "admin" && (
             <div className="rounded-xl border border-border bg-secondary/50 p-4">
@@ -125,7 +125,45 @@ export default function ProfileSettingsPage() {
         </aside>
 
         <div className="min-w-0 space-y-6">
-          {activeSection === "profile" ? (
+          {activeSection === "appearance" ? (
+            <section
+              id="appearance"
+              className="rounded-xl border border-border bg-background p-5 sm:p-7"
+            >
+              <div className="mb-6 border-b border-border pb-5">
+                <h2 className="text-lg font-semibold">Appearance</h2>
+                <p className="mt-1 text-sm text-muted">
+                  Pick a theme. It applies right away and is saved on this browser.
+                </p>
+              </div>
+              <div role="radiogroup" aria-label="Theme" className="grid gap-3 sm:grid-cols-2">
+                {THEMES.map((option) => (
+                  <button
+                    key={option.id}
+                    role="radio"
+                    aria-checked={theme === option.id}
+                    className={`flex items-center gap-4 rounded-lg border p-4 text-left transition-colors ${
+                      theme === option.id
+                        ? "border-primary ring-1 ring-primary"
+                        : "border-border hover:bg-secondary"
+                    }`}
+                    type="button"
+                    onClick={() => chooseTheme(option.id)}
+                  >
+                    <span className="flex shrink-0 overflow-hidden rounded-md border border-border">
+                      {option.swatch.map((color) => (
+                        <span key={color} className="size-6" style={{ background: color }} />
+                      ))}
+                    </span>
+                    <span>
+                      <span className="block text-sm font-medium">{option.label}</span>
+                      <span className="block text-xs text-muted">{option.description}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          ) : activeSection === "profile" ? (
             <section
               id="profile"
               className="rounded-xl border border-border bg-background p-5 sm:p-7"

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Providers } from "@/components/providers";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { themeBootScript } from "@/utils/theme";
 import "@/app/globals.css";
 
 const geistSans = Geist({
@@ -36,6 +37,9 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
+      </head>
       <body className="min-h-full flex flex-col">
         <TooltipProvider>
           <Providers>{children}</Providers>

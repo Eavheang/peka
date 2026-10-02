@@ -291,7 +291,7 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
           <label className="sr-only" htmlFor="chat-question">
             Your question
           </label>
-          <div className="flex items-end gap-2 rounded-2xl border border-border bg-white/70 p-2 shadow-[0_8px_30px_rgb(24_26_25/8%)] transition-shadow focus-within:border-primary/60 focus-within:shadow-[0_8px_30px_rgb(24_26_25/12%)]">
+          <div className="flex items-end gap-2 rounded-2xl border border-border bg-background/70 p-2 shadow-[0_8px_30px_rgb(24_26_25/8%)] transition-shadow focus-within:border-primary/60 focus-within:shadow-[0_8px_30px_rgb(24_26_25/12%)]">
             <div className="flex min-w-0 flex-1 flex-col">
               <textarea
                 aria-describedby="chat-question-help"
