@@ -9,6 +9,8 @@ from app.engine.chunks.chunk_model import KnowledgeChunk  # noqa: F401 - registe
 from app.engine.chunks.chunk_set_model import ChunkSet  # noqa: F401 - register table in shared metadata
 from app.engine.search.routes import router as search_router
 from app.chat.routes import router as chat_router
+from app.google_drive.routes import router as google_drive_router
+from app.google_drive.model import GoogleDriveConnection  # noqa: F401 - register table in shared metadata
 from app.workspace_settings import router as workspace_settings_router
 from app.chat.model import ChatMessage, Conversation  # noqa: F401 - register chat tables in shared metadata
 
@@ -19,4 +21,5 @@ routers = [
     chat_router,
     workspace_settings_router,
     audit_router,
+    google_drive_router,
 ]
