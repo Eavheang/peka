@@ -31,7 +31,7 @@ class ChatMessage(Base):
     __tablename__ = "messages"
     __table_args__ = (
         CheckConstraint("role IN ('user', 'assistant')", name="messages_role_check"),
-        CheckConstraint("status IN ('completed')", name="messages_status_check"),
+        CheckConstraint("status IN ('completed', 'stopped')", name="messages_status_check"),
         Index("messages_conversation_id_created_at_idx", "conversation_id", "created_at"),
     )
 

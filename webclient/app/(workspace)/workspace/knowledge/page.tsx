@@ -1,9 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { RotateCcw, XCircle } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { toast } from "@/components/ui/toast";
 import { useGetCurrentUser } from "@/services/auth";
 import { useDeleteFile, useListFiles, useRetryFile, downloadFile } from "@/services/files";
+import { getApiErrorMessage } from "@/utils/api-error";
 import { getStoredToken } from "@/utils/auth-storage";
 import { KnowledgeTable } from "./_partials/table";
 import { Upload } from "./_partials/upload";
@@ -80,13 +85,40 @@ export default function KnowledgePage() {
             </span>
           </div>
         </div>
-        <KnowledgeTable
-          canManageAccess={me.data?.role === "admin"}
-          onDownload={downloadFile}
-          onRemove={(id) => remove.mutate(id)}
-          onRetry={(id) => retry.mutate(id)}
-          sources={sources}
-        />
+        {/* A failed background refresh keeps the sources already loaded. */}
+        {files.isError && !files.data ? (
+          <div className="flex flex-col items-center gap-3 rounded-2xl border border-border px-5 py-16 text-center">
+            <XCircle aria-hidden="true" className="text-danger" size={24} />
+            <p className="font-medium" role="alert">
+              {getApiErrorMessage(files.error, "We could not load your sources.")}
+            </p>
+            <Button
+              disabled={files.isFetching}
+              type="button"
+              variant="outline"
+              onClick={() => void files.refetch()}
+            >
+              <RotateCcw aria-hidden="true" />
+              Retry
+            </Button>
+          </div>
+        ) : (
+          <KnowledgeTable
+            canManageAccess={me.data?.role === "admin"}
+            onDownload={downloadFile}
+            onRemove={(id) =>
+              remove.mutate(id, {
+                onError: (error) =>
+                  toast.add({
+                    title: getApiErrorMessage(error, "This file could not be deleted."),
+                    type: "error",
+                  }),
+              })
+            }
+            onRetry={(id) => retry.mutate(id)}
+            sources={sources}
+          />
+        )}
       </div>
     </section>
   );

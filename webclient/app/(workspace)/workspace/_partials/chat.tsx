@@ -2,8 +2,17 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import axios from "axios";
-import { ArrowDown, ArrowUp, BookOpen, Globe2, LoaderCircle } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  BookOpen,
+  Check,
+  Copy,
+  Globe2,
+  LoaderCircle,
+  RotateCcw,
+  Square,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import Markdown from "react-markdown";
@@ -21,11 +30,21 @@ const SourcePreview = dynamic(() =>
   import("./sourcePreview").then((module) => module.SourcePreview),
 );
 
+const EXAMPLE_QUESTIONS = [
+  "Summarize the key points of our onboarding documents",
+  "What is our leave policy?",
+  "Which documents mention security requirements?",
+];
+
 type DisplayMessage = {
   id: string;
   role: "user" | "assistant";
   text: string;
   result?: ChatResult;
+  // "stopped": the user stopped the answer. "failed": the stream broke; `question` is retried.
+  state?: "stopped" | "failed";
+  error?: string;
+  question?: string;
 };
 
 export function ChatPanel({ conversationId }: { conversationId?: string }) {
@@ -35,8 +54,8 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
   const [validationError, setValidationError] = useState("");
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [isPending, setIsPending] = useState(false);
-  const [requestError, setRequestError] = useState("");
   const [streamStatus, setStreamStatus] = useState("");
+  const [announcement, setAnnouncement] = useState("");
   const [streamingMessageId, setStreamingMessageId] = useState<string>();
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
@@ -46,11 +65,13 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
   const pendingStreamDelta = useRef("");
   const streamFrame = useRef<number | null>(null);
   const skipNextConversationLoad = useRef<string | false>(false);
+  const streamAbort = useRef<AbortController | null>(null);
   const conversationQuery = useGetConversation(conversationId);
 
   useEffect(() => {
     return () => {
       if (streamFrame.current !== null) cancelAnimationFrame(streamFrame.current);
+      streamAbort.current?.abort();
     };
   }, []);
 
@@ -119,7 +140,13 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
     pendingStreamDelta.current = "";
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  function setAssistantMessage(messageId: string, update: Partial<DisplayMessage>) {
+    setMessages((current) =>
+      current.map((message) => (message.id === messageId ? { ...message, ...update } : message)),
+    );
+  }
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (isPending) return;
     if (!trimmedQuery) {
@@ -132,15 +159,28 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
       );
       return;
     }
+    setQuery("");
+    void askQuestion(trimmedQuery);
+  }
 
+  function handleRetry(failedMessageId: string, question: string) {
+    // Drop the failed answer and the question before it; askQuestion adds both back.
+    setMessages((current) => {
+      const index = current.findIndex((message) => message.id === failedMessageId);
+      return index < 1 ? current : [...current.slice(0, index - 1), ...current.slice(index + 1)];
+    });
+    void askQuestion(question);
+  }
+
+  async function askQuestion(question: string) {
+    if (isPending) return;
     setValidationError("");
-    setRequestError("");
     shouldAutoScroll.current = true;
     setShowJumpToLatest(false);
     const userMessage: DisplayMessage = {
       id: crypto.randomUUID(),
       role: "user",
-      text: trimmedQuery,
+      text: question,
     };
     const assistantMessageId = crypto.randomUUID();
     setMessages((current) => [
@@ -148,63 +188,95 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
       userMessage,
       { id: assistantMessageId, role: "assistant", text: "" },
     ]);
+    // Pick the id of a new conversation here so a stopped answer can still be opened.
+    const newConversationId = conversationId ? undefined : crypto.randomUUID();
+    const abort = new AbortController();
+    streamAbort.current = abort;
+    let shownText = "";
     pendingStreamDelta.current = "";
     setIsPending(true);
     setStreamingMessageId(assistantMessageId);
     setStreamStatus("Thinking...");
-    setQuery("");
+    setAnnouncement("Thinking...");
 
     try {
       const response = await sendChatMessageStream(
         {
-          query: trimmedQuery,
-          ...(conversationId ? { conversation_id: conversationId } : {}),
+          query: question,
+          ...(conversationId
+            ? { conversation_id: conversationId }
+            : { new_conversation_id: newConversationId }),
           web_search: webSearchEnabled,
         },
         (event) => {
           if (event.type === "status") {
             setStreamStatus(event.message);
-            return;
+            setAnnouncement(event.message);
+          } else if (event.type === "reset") {
+            discardStreamDelta();
+            shownText = "";
+            setAssistantMessage(assistantMessageId, { text: "" });
+          } else {
+            shownText += event.delta;
+            queueStreamDelta(assistantMessageId, event.delta);
           }
-          queueStreamDelta(assistantMessageId, event.delta);
         },
+        abort.signal,
       );
 
-      flushStreamDelta(assistantMessageId);
-      setMessages((current) =>
-        current.map((message) =>
-          message.id === assistantMessageId
-            ? {
-                ...message,
-                result: {
-                  conversationId: response.conversation_id,
-                  refused: response.refused,
-                  citations: response.citations,
-                },
-              }
-            : message,
-        ),
-      );
+      // The saved answer is the source of truth; replace whatever was streamed with it.
+      discardStreamDelta();
+      setAssistantMessage(assistantMessageId, {
+        text: response.answer,
+        result: {
+          conversationId: response.conversation_id,
+          refused: response.refused,
+          citations: response.citations,
+        },
+      });
+      setAnnouncement("Response ready.");
       queryClient.invalidateQueries({ queryKey: ["chat", "conversations"] });
       if (!conversationId) {
         skipNextConversationLoad.current = response.conversation_id;
         router.replace(`/workspace/${response.conversation_id}`);
       }
     } catch (error: unknown) {
-      setMessages((current) => current.filter((message) => message.id !== assistantMessageId));
-      setQuery((currentQuery) => currentQuery || trimmedQuery);
-      const detail = axios.isAxiosError(error)
-        ? error.response?.data?.detail
-        : error instanceof Error
-          ? error.message
-          : undefined;
-      setRequestError(
-        typeof detail === "string"
-          ? detail
-          : "We could not save that conversation. Please try again.",
-      );
+      flushStreamDelta(assistantMessageId);
+      if (abort.signal.aborted) {
+        if (shownText) {
+          // The server saves the partial answer as stopped.
+          setAssistantMessage(assistantMessageId, { state: "stopped" });
+          // Only the list: refetching this conversation could race the server's save
+          // and replace the messages on screen with ones missing this turn.
+          queryClient.invalidateQueries({ queryKey: ["chat", "conversations"], exact: true });
+          if (newConversationId) {
+            skipNextConversationLoad.current = newConversationId;
+            router.replace(`/workspace/${newConversationId}`);
+          }
+        } else {
+          // Nothing was saved: take the question back into the input.
+          setMessages((current) =>
+            current.filter(
+              (message) => message.id !== assistantMessageId && message.id !== userMessage.id,
+            ),
+          );
+          setQuery((currentQuery) => currentQuery || question);
+        }
+        setAnnouncement("Response stopped.");
+        return;
+      }
+      setAssistantMessage(assistantMessageId, {
+        state: "failed",
+        question,
+        error:
+          error instanceof Error && error.message
+            ? error.message
+            : "We could not finish this answer. Please try again.",
+      });
+      setAnnouncement("");
     } finally {
       discardStreamDelta();
+      if (streamAbort.current === abort) streamAbort.current = null;
       setIsPending(false);
       setStreamingMessageId(undefined);
       setStreamStatus("");
@@ -224,9 +296,12 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
 
   return (
     <section className="relative h-full min-h-0 w-full px-4 sm:px-6">
+      {/* Announce progress only; streamed text would be read aloud chunk by chunk. */}
+      <p aria-live="polite" className="sr-only" role="status">
+        {announcement}
+      </p>
       <div
         ref={conversationRef}
-        aria-live="polite"
         className="absolute inset-0 overflow-y-auto"
         onScroll={(event) => {
           const conversation = event.currentTarget;
@@ -255,6 +330,20 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
                 Ask a question or explore a document in your library. Peka searches your indexed
                 knowledge when needed.
               </p>
+              <div className="mt-6 flex max-w-xl flex-wrap justify-center gap-2">
+                {EXAMPLE_QUESTIONS.map((example) => (
+                  <Button
+                    className="h-auto rounded-full px-3 py-1.5 text-xs font-normal text-copy"
+                    key={example}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                    onClick={() => void askQuestion(example)}
+                  >
+                    {example}
+                  </Button>
+                ))}
+              </div>
             </div>
           ) : (
             messages.map((message) => (
@@ -262,6 +351,11 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
                 key={message.id}
                 message={message}
                 streamingStatus={message.id === streamingMessageId ? streamStatus : undefined}
+                onRetry={
+                  message.question && !isPending
+                    ? () => handleRetry(message.id, message.question as string)
+                    : undefined
+                }
               />
             ))
           )}
@@ -340,26 +434,40 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
                 </div>
               </div>
             </div>
-            <Button
-              aria-label={isPending ? "Responding" : "Send message"}
-              className="rounded-full"
-              disabled={isPending}
-              size="icon-lg"
-              type="submit"
-            >
-              {isPending ? (
-                <LoaderCircle aria-hidden="true" className="animate-spin" />
-              ) : (
+            {isPending ? (
+              <Button
+                aria-label="Stop response"
+                className="rounded-full"
+                key="stop"
+                size="icon-lg"
+                type="button"
+                onClick={(event) => {
+                  // Stopping re-renders this as the submit button before the click finishes;
+                  // without this the same click would submit the restored question again.
+                  event.preventDefault();
+                  streamAbort.current?.abort();
+                }}
+              >
+                <Square aria-hidden="true" className="fill-current" />
+              </Button>
+            ) : (
+              <Button
+                aria-label="Send message"
+                className="rounded-full"
+                key="send"
+                size="icon-lg"
+                type="submit"
+              >
                 <ArrowUp aria-hidden="true" />
-              )}
-            </Button>
+              </Button>
+            )}
           </div>
           <p id="chat-question-help" className="sr-only">
             Press Enter to send or Shift + Enter for a new line.
           </p>
-          {(validationError || requestError) && (
+          {validationError && (
             <p className="mt-2 text-sm text-danger" role="alert">
-              {validationError || requestError}
+              {validationError}
             </p>
           )}
           <p className="mt-2 text-center text-[11px] text-muted">
@@ -374,12 +482,25 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
 function ChatMessageBubble({
   message,
   streamingStatus,
+  onRetry,
 }: {
   message: DisplayMessage;
   streamingStatus?: string;
+  onRetry?: () => void;
 }) {
   const isUser = message.role === "user";
   const result = message.result;
+  const [copied, setCopied] = useState(false);
+
+  async function copyAnswer() {
+    try {
+      await navigator.clipboard.writeText(message.text);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard access denied; the text stays selectable.
+    }
+  }
 
   return (
     <article className={isUser ? "ml-auto max-w-2xl" : "max-w-3xl"}>
@@ -413,6 +534,34 @@ function ChatMessageBubble({
             {streamingStatus}
           </p>
         )}
+        {message.state === "stopped" && (
+          <p className="mt-2 text-xs font-medium text-muted">Response stopped</p>
+        )}
+        {message.state === "failed" && (
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <p className="text-sm text-danger" role="alert">
+              {message.error}
+            </p>
+            {onRetry && (
+              <Button size="sm" type="button" variant="outline" onClick={onRetry}>
+                <RotateCcw aria-hidden="true" />
+                Retry
+              </Button>
+            )}
+          </div>
+        )}
+        {!isUser && message.text && !streamingStatus && (
+          <Button
+            aria-label={copied ? "Copied" : "Copy response"}
+            className="mt-2 text-muted hover:text-foreground"
+            size="icon-sm"
+            type="button"
+            variant="ghost"
+            onClick={() => void copyAnswer()}
+          >
+            {copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
+          </Button>
+        )}
         {!isUser && result && result.citations.length > 0 && (
           <details className="mt-5 border-t border-border pt-4">
             <summary className="cursor-pointer text-xs font-semibold text-muted hover:text-foreground">
@@ -436,13 +585,14 @@ function ChatMessageBubble({
 }
 
 function toDisplayMessage(
-  message: Pick<ChatMessage, "id" | "role" | "content" | "refused" | "citations">,
+  message: Pick<ChatMessage, "id" | "role" | "content" | "refused" | "citations" | "status">,
   conversationId?: string,
 ): DisplayMessage {
   return {
     id: message.id,
     role: message.role,
     text: message.content,
+    ...(message.status === "stopped" ? { state: "stopped" as const } : {}),
     ...(message.role === "assistant"
       ? {
           result: {

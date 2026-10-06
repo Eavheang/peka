@@ -17,6 +17,7 @@ export interface SourcePreviewResponse {
 export interface ChatRequest {
   query: string;
   conversation_id?: string;
+  new_conversation_id?: string;
   web_search?: boolean;
   timezone?: string;
 }
@@ -41,7 +42,7 @@ export interface ChatMessage {
   content: string;
   refused: boolean;
   citations: Citation[];
-  status: "completed";
+  status: "completed" | "stopped";
   created_at: string;
 }
 

@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, cast
+from typing import Any, Literal, cast
 from uuid import UUID
 
 from psycopg.types.json import Jsonb
@@ -20,14 +20,17 @@ class ChatRepository:
         query: str,
         response: ChatResponse,
         conversation_id: UUID | None = None,
+        status: Literal["completed", "stopped"] = "completed",
+        new_conversation_id: UUID | None = None,
     ) -> dict[str, Any]:
         citations = [citation.model_dump(mode="json") for citation in response.citations]
         with get_connection() as connection:
             if conversation_id is None:
                 conversation = connection.execute(
-                    "INSERT INTO conversations (owner_id, title) VALUES (%s, %s) "
+                    "INSERT INTO conversations (id, owner_id, title) "
+                    "VALUES (COALESCE(%s, gen_random_uuid()), %s, %s) "
                     "RETURNING id, owner_id, title, created_at, updated_at",
-                    (owner_id, title),
+                    (new_conversation_id, owner_id, title),
                 ).fetchone()
             else:
                 conversation = connection.execute(
@@ -62,9 +65,12 @@ class ChatRepository:
             assistant_message = connection.execute(
                 "INSERT INTO messages "
                 "(conversation_id, sequence, role, content, refused, citations, status) "
-                "VALUES (%s, %s, 'assistant', %s, %s, %s, 'completed') "
+                "VALUES (%s, %s, 'assistant', %s, %s, %s, %s) "
                 "RETURNING id, role, content, refused, citations, status, created_at",
-                (conversation["id"], next_sequence + 1, response.answer, response.refused, Jsonb(citations)),
+                (
+                    conversation["id"], next_sequence + 1, response.answer, response.refused,
+                    Jsonb(citations), status,
+                ),
             ).fetchone()
             if user_message is None or assistant_message is None:
                 raise RuntimeError("Unable to persist chat messages")

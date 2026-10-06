@@ -27,6 +27,7 @@ from app.engine.ai_runtime import (
 from app.engine.search.repository import search_repository
 from app.engine.search.service import access_levels_for_role, search_knowledge
 from app.engine.web_search.service import web_search as perform_web_search
+from app.workspace_settings import provider_config
 
 logger = logging.getLogger(__name__)
 
@@ -81,11 +82,16 @@ class ChatStreamText:
 
 
 @dataclass(frozen=True)
+class ChatStreamReset:
+    """Discard the text streamed so far; a replacement answer follows."""
+
+
+@dataclass(frozen=True)
 class ChatStreamCompleted:
     response: ChatResponse
 
 
-ChatStreamEvent = ChatStreamStatus | ChatStreamText | ChatStreamCompleted
+ChatStreamEvent = ChatStreamStatus | ChatStreamText | ChatStreamReset | ChatStreamCompleted
 
 _HISTORICAL_CITATION_MARKER = re.compile(r"(?<!\S)\[\d+\](?!\S)")
 
@@ -149,6 +155,7 @@ class _JsonTextStreamParser:
         self._source_ids: list[str] = []
         self._sources = sources
         self._used_source_ids: list[str] = []
+        self._pending_markers: list[str] = []
 
     def feed(self, chunk: str) -> str:
         output: list[str] = []
@@ -227,10 +234,14 @@ class _JsonTextStreamParser:
                 self._source_ids = []
                 continue
             if character == "]" and self._in_source_ids:
-                output.extend(self._source_markers())
+                # Hold markers until the block closes: source_ids may come before its text.
+                self._pending_markers = self._source_markers()
                 self._in_source_ids = False
                 self._current_key = None
                 continue
+            if character == "}" and self._pending_markers:
+                output.extend(self._pending_markers)
+                self._pending_markers = []
             if character in ",}]":
                 self._current_key = None
             elif character not in "{[:":
@@ -570,6 +581,7 @@ async def stream_answer_from_knowledge(
             first_error_line(error) if isinstance(error, ValidationError) else error,
             len(raw), raw[:300], raw[-300:],
         )
+        yield ChatStreamReset()
         yield ChatStreamStatus("Retrying response...")
         try:
             answer = _normalize_model_answer(
@@ -596,6 +608,9 @@ def persist_response(
     user_id: UUID,
     response: ChatResponse,
     conversation_id: UUID | None = None,
+    status: Literal["completed", "stopped"] = "completed",
+    metrics: dict | None = None,
+    new_conversation_id: UUID | None = None,
 ) -> ChatResponse:
     persisted = chat_repository.create_exchange(
         owner_id=user_id,
@@ -603,9 +618,13 @@ def persist_response(
         query=query,
         response=response,
         conversation_id=conversation_id,
+        status=status,
+        new_conversation_id=new_conversation_id,
     )
     record_audit_event(
-        "chat_turn", actor_id=user_id, metadata={"conversation_id": str(persisted["conversation"]["id"])}
+        "chat_turn" if status == "completed" else "chat_turn_stopped",
+        actor_id=user_id,
+        metadata={"conversation_id": str(persisted["conversation"]["id"]), **(metrics or {})},
     )
     return response.model_copy(
         update={
@@ -613,6 +632,24 @@ def persist_response(
             "messages": [ChatMessage.model_validate(message) for message in persisted["messages"]],
         }
     )
+
+
+def audit_unsaved_turn(
+    event: Literal["chat_turn_failed", "chat_turn_stopped"],
+    user_id: UUID,
+    conversation_id: UUID | None,
+    metadata: dict,
+) -> None:
+    """Audit a turn that ended without saving an answer."""
+    record_audit_event(
+        event,
+        actor_id=user_id,
+        metadata={"conversation_id": str(conversation_id) if conversation_id else None, **metadata},
+    )
+
+
+def model_name() -> str:
+    return provider_config()["llm_model"]
 
 
 def _encode_conversation_cursor(conversation: dict) -> str:

@@ -600,13 +600,14 @@ def test_chat_stream_endpoint_emits_text_and_persists_completion(monkeypatch) ->
             chat_service.ChatResponse(answer="Hello world", refused=False, citations=[])
         )
 
-    def persist(*args):
+    def persist(*args, **kwargs):
         return args[2].model_copy(
             update={"conversation_id": conversation_id, "messages": []}
         )
 
     monkeypatch.setattr(chat_routes.chat_service, "stream_answer_from_knowledge", stream_answer)
     monkeypatch.setattr(chat_routes.chat_service, "persist_response", persist)
+    monkeypatch.setattr(chat_routes.chat_service, "model_name", lambda: "test-model")
     _override_admin()
     try:
         response = TestClient(app).post("/chat/stream", json={"query": "hello"})
@@ -725,7 +726,7 @@ def test_first_message_is_persisted_and_returned(monkeypatch) -> None:
     calls = []
 
     class FakeRepository:
-        def create_exchange(self, owner_id, title, query, response, conversation_id=None):
+        def create_exchange(self, owner_id, title, query, response, conversation_id=None, status="completed", new_conversation_id=None):
             calls.append((owner_id, title, query, conversation_id, response))
             return {
                 "conversation": {"id": conversation_id or conversation_id_for_test},
@@ -849,7 +850,7 @@ def test_stream_falls_back_to_the_plain_text_answer_when_regeneration_fails(monk
 
     events = _stream_events(monkeypatch, [prose])
     completed = next(e for e in events if isinstance(e, chat_service.ChatStreamCompleted))
-    shown = "".join(e.delta for e in events if isinstance(e, chat_service.ChatStreamText))
+    shown = _visible_text(events)
 
     assert "RAG evolved in three stages." in completed.response.answer
     assert "[1" not in completed.response.answer
@@ -870,3 +871,233 @@ def test_plain_text_fallback_cleans_markers_and_rejects_json_and_empty() -> None
     assert "source-" not in cleaned and "[" not in cleaned.split("\n\n")[0]
     for unusable in ("", "   ", '{"blocks":[]}', "```json\n{}\n```", "[1]"):
         assert chat_service._plain_text_fallback(unusable) is None
+
+
+def _visible_text(events) -> str:
+    """The text a client shows: deltas since the last reset."""
+    shown = ""
+    for event in events:
+        if isinstance(event, chat_service.ChatStreamReset):
+            shown = ""
+        elif isinstance(event, chat_service.ChatStreamText):
+            shown += event.delta
+    return shown
+
+
+_POLICY_SOURCE = {
+    "title": "policy.pdf",
+    "heading": "Attendance",
+    "content": "Policy details.",
+    "source_locations": [],
+}
+
+
+@pytest.mark.parametrize(
+    "block",
+    [
+        {"kind": "grounded", "text": "Staff badge in.", "source_ids": ["source-1"]},
+        {"source_ids": ["source-1"], "kind": "grounded", "text": "Staff badge in."},
+        {"kind": "grounded", "source_ids": ["source-1"], "text": "Staff badge in."},
+    ],
+)
+def test_streamed_text_matches_final_answer_in_any_field_order(monkeypatch, block) -> None:
+    payload = json.dumps({"blocks": [block, {"source_ids": [], "text": "Ask HR.", "kind": "general"}]})
+
+    async def stream_text(*args, **kwargs):
+        for index in range(0, len(payload), 5):
+            yield payload[index:index + 5]
+
+    monkeypatch.setattr(chat_service, "stream_structured_text", stream_text)
+    monkeypatch.setattr(chat_service, "search_knowledge", lambda *args: [_POLICY_SOURCE])
+    monkeypatch.setattr(
+        chat_service,
+        "generate_structured",
+        lambda messages, output_type: _search_plan("search_knowledge_base", "policy"),
+    )
+
+    async def collect():
+        return [event async for event in chat_service.stream_answer_from_knowledge("policy", "staff")]
+
+    events = asyncio.run(collect())
+    completed = next(e for e in events if isinstance(e, chat_service.ChatStreamCompleted))
+
+    assert completed.response.answer == "Staff badge in. [1]\n\nAsk HR."
+    assert _visible_text(events) == completed.response.answer
+    assert not any(isinstance(e, chat_service.ChatStreamReset) for e in events)
+
+
+def test_stream_resets_shown_text_before_a_regenerated_answer(monkeypatch) -> None:
+    def generate(messages, output_type):
+        if output_type is chat_service.SearchPlan:
+            return _search_plan()
+        return chat_service.ModelAnswer(blocks=[{"kind": "general", "text": "Fresh answer."}])
+
+    async def stream_text(*args, **kwargs):
+        yield '{"blocks":[{"kind":"general","text":"Broken ans'
+
+    monkeypatch.setattr(chat_service, "stream_structured_text", stream_text)
+    monkeypatch.setattr(chat_service, "generate_structured", generate)
+
+    async def collect():
+        return [event async for event in chat_service.stream_answer_from_knowledge("hello", "staff")]
+
+    events = asyncio.run(collect())
+    completed = next(e for e in events if isinstance(e, chat_service.ChatStreamCompleted))
+
+    assert "".join(e.delta for e in events if isinstance(e, chat_service.ChatStreamText)).startswith("Broken")
+    assert _visible_text(events) == completed.response.answer == "Fresh answer."
+
+
+class _StreamRecorder:
+    def __init__(self, monkeypatch, events, persist_error: Exception | None = None) -> None:
+        from app.chat import routes as chat_routes
+
+        self.routes = chat_routes
+        self.saved: list[tuple] = []
+        self.new_conversation_ids: list = []
+        self.request = None
+        self.audited: list[tuple] = []
+        self.closed = False
+
+        async def stream_answer(*args, **kwargs):
+            try:
+                for event in events:
+                    if isinstance(event, Exception):
+                        raise event
+                    yield event
+            finally:
+                self.closed = True
+
+        def persist(
+            query, user_id, response, conversation_id=None, status="completed", metrics=None,
+            new_conversation_id=None,
+        ):
+            if persist_error:
+                raise persist_error
+            self.saved.append((response.answer, status, metrics))
+            self.new_conversation_ids.append(new_conversation_id)
+            return response.model_copy(update={"conversation_id": uuid4(), "messages": []})
+
+        monkeypatch.setattr(chat_routes.chat_service, "stream_answer_from_knowledge", stream_answer)
+        monkeypatch.setattr(chat_routes.chat_service, "persist_response", persist)
+        monkeypatch.setattr(chat_routes.chat_service, "model_name", lambda: "test-model")
+        monkeypatch.setattr(
+            chat_routes.chat_service,
+            "audit_unsaved_turn",
+            lambda event, user_id, conversation_id, metadata: self.audited.append((event, metadata)),
+        )
+
+    def generator(self):
+        from app.chat.schemas import ChatRequest
+
+        return self.routes._stream_events(
+            self.request or ChatRequest(query="hello"), {"id": uuid4(), "role": "staff"}, []
+        )
+
+    def run(self) -> list[dict]:
+        async def collect():
+            return [chunk async for chunk in self.generator()]
+
+        return [json.loads(chunk[6:]) for chunk in asyncio.run(collect()) if chunk != "data: [DONE]\n\n"]
+
+    def stop_after(self, chunks: int) -> None:
+        """Read some events, then cancel the request the way a client disconnect does."""
+
+        async def drive():
+            stream = self.generator()
+            for _ in range(chunks):
+                await anext(stream)
+            with pytest.raises(asyncio.CancelledError):
+                await stream.athrow(asyncio.CancelledError())
+
+        asyncio.run(drive())
+
+
+def _done(answer: str):
+    return chat_service.ChatStreamCompleted(chat_service.ChatResponse(answer=answer, refused=False, citations=[]))
+
+
+def test_stop_while_streaming_saves_the_shown_text_as_stopped(monkeypatch) -> None:
+    recorder = _StreamRecorder(monkeypatch, [
+        chat_service.ChatStreamStatus("Writing response..."),
+        chat_service.ChatStreamText("Partial "),
+        chat_service.ChatStreamText("answer"),
+        _done("never reached"),
+    ])
+
+    recorder.stop_after(3)
+
+    assert recorder.closed
+    assert [(answer, status) for answer, status, _ in recorder.saved] == [("Partial answer", "stopped")]
+    assert recorder.saved[0][2]["model"] == "test-model"
+    assert recorder.saved[0][2]["ttft_ms"] is not None
+
+
+def test_stop_during_a_retry_saves_nothing(monkeypatch) -> None:
+    recorder = _StreamRecorder(monkeypatch, [
+        chat_service.ChatStreamText("Broken"),
+        chat_service.ChatStreamReset(),
+        chat_service.ChatStreamStatus("Retrying response..."),
+        _done("Regenerated"),
+    ])
+
+    recorder.stop_after(3)
+
+    assert recorder.closed
+    assert recorder.saved == []
+    assert [event for event, _ in recorder.audited] == ["chat_turn_stopped"]
+
+
+def test_stop_before_the_first_token_saves_nothing(monkeypatch) -> None:
+    recorder = _StreamRecorder(monkeypatch, [
+        chat_service.ChatStreamStatus("Thinking..."),
+        chat_service.ChatStreamText("Too late"),
+    ])
+
+    recorder.stop_after(1)
+
+    assert recorder.saved == []
+    assert recorder.audited[0][1]["ttft_ms"] is None
+
+
+def test_completed_stream_records_model_and_time_to_first_token(monkeypatch) -> None:
+    recorder = _StreamRecorder(monkeypatch, [chat_service.ChatStreamText("Hi"), _done("Hi")])
+
+    events = recorder.run()
+
+    assert [event["type"] for event in events] == ["text", "done"]
+    assert recorder.saved[0][1] == "completed"
+    assert recorder.saved[0][2]["model"] == "test-model"
+
+
+def test_save_failure_sends_an_error_event_and_is_audited(monkeypatch) -> None:
+    recorder = _StreamRecorder(
+        monkeypatch, [chat_service.ChatStreamText("Hi"), _done("Hi")], persist_error=OSError("db down")
+    )
+
+    events = recorder.run()
+
+    assert events[-1] == {"type": "error", "message": "We could not save this answer. Please try again."}
+    assert recorder.audited == [("chat_turn_failed", {"model": "test-model", "ttft_ms": recorder.audited[0][1]["ttft_ms"], "reason": "save_failed"})]
+
+
+def test_unexpected_stream_failure_sends_an_error_event_and_is_audited(monkeypatch) -> None:
+    recorder = _StreamRecorder(monkeypatch, [chat_service.ChatStreamText("Hi"), KeyError("boom")])
+
+    events = recorder.run()
+
+    assert events[-1] == {"type": "error", "message": "The answer could not be generated."}
+    assert recorder.audited[0][0] == "chat_turn_failed"
+    assert recorder.audited[0][1]["reason"] == "KeyError"
+
+
+def test_stop_in_a_new_conversation_saves_under_the_client_chosen_id(monkeypatch) -> None:
+    from app.chat.schemas import ChatRequest
+
+    recorder = _StreamRecorder(monkeypatch, [chat_service.ChatStreamText("Partial"), _done("never")])
+    new_id = uuid4()
+    recorder.request = ChatRequest(query="hello", new_conversation_id=new_id)
+
+    recorder.stop_after(1)
+
+    assert recorder.new_conversation_ids == [new_id]

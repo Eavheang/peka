@@ -11,7 +11,11 @@ import type {
 } from "@/interface/chat";
 import axiosInstance, { fetchAuthenticated } from "@/utils/axios";
 
-type ChatStreamUpdate = { type: "status"; message: string } | { type: "text"; delta: string };
+type ChatStreamUpdate =
+  | { type: "status"; message: string }
+  | { type: "text"; delta: string }
+  // Discard the text shown so far; the server is replacing the answer.
+  | { type: "reset" };
 
 type ChatStreamEvent =
   | ChatStreamUpdate
@@ -111,6 +115,7 @@ function parseChatStreamEvent(value: unknown): ChatStreamEvent | undefined {
   if (value.type === "status" && typeof value.message === "string") {
     return { type: "status", message: value.message };
   }
+  if (value.type === "reset") return { type: "reset" };
   if (value.type === "text" && typeof value.delta === "string") {
     return { type: "text", delta: value.delta };
   }
@@ -196,6 +201,9 @@ export function useGetConversation(conversationId?: string) {
     queryKey: ["chat", "conversations", conversationId],
     enabled: Boolean(conversationId),
     queryFn: () => getConversation(conversationId as string),
+    // The chat panel keeps unsaved state (a failed answer and its Retry); a refetch on focus
+    // would replace it with the saved messages.
+    refetchOnWindowFocus: false,
     // A missing (404) or malformed (422) conversation will not appear on retry, so fail at once
     // instead of showing "Loading…" through the default three delayed retries. Network and 5xx
     // errors are still retried.
