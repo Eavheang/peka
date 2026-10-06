@@ -20,9 +20,12 @@ export interface ChatRequest {
   web_search?: boolean;
 }
 
+export type AnswerStatus = "answered" | "refused";
+
 export interface ChatResponse {
   answer: string;
   refused: boolean;
+  answer_status: AnswerStatus;
   citations: Citation[];
   conversation_id: string;
   messages: ChatMessage[];
@@ -30,7 +33,7 @@ export interface ChatResponse {
 
 export interface ChatResult {
   conversationId: string;
-  refused: boolean;
+  answerStatus: AnswerStatus;
   citations: Citation[];
 }
 

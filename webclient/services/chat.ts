@@ -2,6 +2,8 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tansta
 import axios from "axios";
 
 import type {
+  AnswerStatus,
+  ChatMessage,
   ChatRequest,
   ChatResponse,
   Citation,
@@ -115,12 +117,26 @@ function parseChatStreamEvent(value: unknown): ChatStreamEvent | undefined {
     return { type: "error", message: value.message };
   }
   if (value.type === "done" && isChatResponse(value.response)) {
-    return { type: "done", response: value.response };
+    return { type: "done", response: normalizeChatResponse(value.response) };
   }
   return undefined;
 }
 
-function isChatResponse(value: unknown): value is ChatResponse {
+type ChatResponseWire = {
+  answer: string;
+  refused: boolean;
+  answer_status?: unknown;
+  citations: Citation[];
+  conversation_id: string;
+  messages: ChatMessage[];
+};
+
+function parseAnswerStatus(value: unknown): AnswerStatus {
+  if (value === "answered" || value === "refused") return value;
+  return "answered";
+}
+
+function isChatResponse(value: unknown): value is ChatResponseWire {
   return (
     isRecord(value) &&
     typeof value.answer === "string" &&
@@ -129,6 +145,17 @@ function isChatResponse(value: unknown): value is ChatResponse {
     typeof value.conversation_id === "string" &&
     Array.isArray(value.messages)
   );
+}
+
+function normalizeChatResponse(value: ChatResponseWire): ChatResponse {
+  return {
+    answer: value.answer,
+    refused: value.refused,
+    answer_status: parseAnswerStatus(value.answer_status),
+    citations: value.citations,
+    conversation_id: value.conversation_id,
+    messages: value.messages,
+  };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

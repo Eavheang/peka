@@ -11,7 +11,7 @@ import remarkGfm from "remark-gfm";
 
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import type { ChatMessage, ChatResult } from "@/interface/chat";
+import type { ChatMessage, ChatResponse, ChatResult } from "@/interface/chat";
 import { sendChatMessageStream, useGetConversation } from "@/services/chat";
 import { getApiErrorMessage } from "@/utils/api-error";
 
@@ -173,16 +173,7 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
       flushStreamDelta(assistantMessageId);
       setMessages((current) =>
         current.map((message) =>
-          message.id === assistantMessageId
-            ? {
-                ...message,
-                result: {
-                  conversationId: response.conversation_id,
-                  refused: response.refused,
-                  citations: response.citations,
-                },
-              }
-            : message,
+          message.id === assistantMessageId ? applyStreamResult(message, response) : message,
         ),
       );
       queryClient.invalidateQueries({ queryKey: ["chat", "conversations"] });
@@ -371,7 +362,18 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
   );
 }
 
-function ChatMessageBubble({
+export function applyStreamResult(message: DisplayMessage, response: ChatResponse): DisplayMessage {
+  return {
+    ...message,
+    result: {
+      conversationId: response.conversation_id,
+      answerStatus: response.answer_status,
+      citations: response.citations,
+    },
+  };
+}
+
+export function ChatMessageBubble({
   message,
   streamingStatus,
 }: {
@@ -380,6 +382,25 @@ function ChatMessageBubble({
 }) {
   const isUser = message.role === "user";
   const result = message.result;
+
+  if (!isUser && result?.answerStatus === "refused") {
+    return (
+      <article className="max-w-3xl">
+        <div
+          role="status"
+          className="rounded-2xl border border-border bg-secondary px-5 py-4 text-foreground"
+        >
+          <p className="text-xs font-semibold uppercase tracking-wider">No evidence found</p>
+          {message.text ? (
+            <p className="mt-2 whitespace-pre-wrap text-sm leading-7">{message.text}</p>
+          ) : null}
+          <p className="mt-3 text-sm leading-6 text-copy">
+            Upload a relevant document or rephrase the question.
+          </p>
+        </div>
+      </article>
+    );
+  }
 
   return (
     <article className={isUser ? "ml-auto max-w-2xl" : "max-w-3xl"}>
@@ -390,11 +411,6 @@ function ChatMessageBubble({
             : "text-foreground"
         }
       >
-        {result?.refused && (
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary">
-            Not enough evidence
-          </p>
-        )}
         {message.text &&
           (isUser ? (
             <p className="whitespace-pre-wrap text-sm leading-7 text-panel-foreground">
@@ -435,7 +451,7 @@ function ChatMessageBubble({
   );
 }
 
-function toDisplayMessage(
+export function toDisplayMessage(
   message: Pick<ChatMessage, "id" | "role" | "content" | "refused" | "citations">,
   conversationId?: string,
 ): DisplayMessage {
@@ -447,7 +463,7 @@ function toDisplayMessage(
       ? {
           result: {
             conversationId: conversationId ?? "",
-            refused: message.refused,
+            answerStatus: message.refused ? "refused" : "answered",
             citations: message.citations,
           },
         }

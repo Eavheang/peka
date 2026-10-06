@@ -10,7 +10,8 @@
     "lint-fix": "oxlint --fix",
     "format": "oxfmt",
     "format-check": "oxfmt --check",
-    "tsc": "tsc --noEmit"
+    "tsc": "tsc --noEmit",
+    "test": "bun test"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
