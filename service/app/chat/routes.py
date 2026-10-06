@@ -40,12 +40,13 @@ def _conversation_history(payload: ChatRequest, user_id: UUID) -> list[dict]:
 def chat(payload: ChatRequest, user: dict = Depends(authenticated)) -> ChatResponse:
     try:
         history = _conversation_history(payload, user["id"])
-        if payload.web_search:
-            answer = answer_from_knowledge(
-                payload.query, user["role"], history, web_search=True,
-            )
-        else:
-            answer = answer_from_knowledge(payload.query, user["role"], history)
+        answer = answer_from_knowledge(
+            payload.query,
+            user["role"],
+            history,
+            web_search=payload.web_search,
+            timezone=payload.timezone,
+        )
         return chat_service.persist_response(
             payload.query,
             user["id"],
@@ -73,6 +74,7 @@ async def chat_stream(payload: ChatRequest, user: dict = Depends(authenticated))
                 user["role"],
                 history,
                 web_search=payload.web_search,
+                timezone=payload.timezone,
             ):
                 if isinstance(event, chat_service.ChatStreamStatus):
                     yield _sse({"type": "status", "message": event.message})

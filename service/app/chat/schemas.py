@@ -8,6 +8,7 @@ class ChatRequest(BaseModel):
     query: str = Field(min_length=1, max_length=4000)
     conversation_id: UUID | None = None
     web_search: bool = False
+    timezone: str | None = Field(default=None, max_length=64)
 
     @field_validator("query", mode="before")
     @classmethod
