@@ -1,7 +1,17 @@
 "use client";
 
-import { ChangeEvent, DragEvent, useRef, useState } from "react";
-import { FileText, FileUp, Loader2, Plus, Trash2, UploadCloud, XCircle } from "lucide-react";
+import { ChangeEvent, DragEvent, MouseEvent, useRef, useState } from "react";
+import {
+  FileText,
+  FileUp,
+  HardDrive,
+  Laptop,
+  Loader2,
+  Plus,
+  Trash2,
+  UploadCloud,
+  XCircle,
+} from "lucide-react";
 
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -14,6 +24,7 @@ import {
 } from "@/components/ui/select";
 import type { AccessLevel } from "@/interface/files";
 import { useUploadFiles } from "@/services/files";
+import { pickGoogleDriveFiles, useImportDriveFiles } from "@/services/google-drive";
 import { useGetCurrentUser } from "@/services/auth";
 import { getApiErrorMessage } from "@/utils/api-error";
 import { getStoredToken } from "@/utils/auth-storage";
@@ -27,9 +38,14 @@ function formatFileSize(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
+// Local files carry `file`; Google Drive picks carry `driveId` and are downloaded by the backend.
 type PendingFile = {
-  file: File;
+  key: string;
+  name: string;
+  size: number | null;
   accessLevel: AccessLevel;
+  file?: File;
+  driveId?: string;
 };
 
 function fileKey(file: File) {
@@ -45,7 +61,11 @@ export function Upload() {
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
   const [bulkAccessLevel, setBulkAccessLevel] = useState("");
 
+  const [isPickingDrive, setIsPickingDrive] = useState(false);
+
   const upload = useUploadFiles();
+  const driveImport = useImportDriveFiles();
+  const isUploading = upload.isPending || driveImport.isPending;
   const user = useGetCurrentUser(getStoredToken("peka_access_token") ?? "");
   const canSetConfidential = user.data?.role === "admin";
 
@@ -68,19 +88,51 @@ export function Upload() {
         return;
       }
 
-      valid.push({ file, accessLevel: "general" });
+      valid.push({
+        key: fileKey(file),
+        name: file.name,
+        size: file.size,
+        accessLevel: "general",
+        file,
+      });
     });
 
     if (errors.length) {
       setUploadError(errors.join(" "));
     }
 
-    if (valid.length) {
-      setPendingFiles((current) => {
-        const existing = new Set(current.map(({ file }) => fileKey(file)));
+    addPending(valid);
+  }
 
-        return [...current, ...valid.filter(({ file }) => !existing.has(fileKey(file)))];
-      });
+  function addPending(items: PendingFile[]) {
+    if (!items.length) return;
+
+    setPendingFiles((current) => {
+      const existing = new Set(current.map(({ key }) => key));
+
+      return [...current, ...items.filter(({ key }) => !existing.has(key))];
+    });
+  }
+
+  async function chooseFromDrive() {
+    setUploadError("");
+    setIsPickingDrive(true);
+
+    try {
+      const docs = await pickGoogleDriveFiles();
+      addPending(
+        docs.map(({ id, name, sizeBytes }) => ({
+          key: `drive-${id}`,
+          name,
+          size: sizeBytes ?? null,
+          accessLevel: "general",
+          driveId: id,
+        })),
+      );
+    } catch (error) {
+      setUploadError(getApiErrorMessage(error, "Google Drive is unavailable."));
+    } finally {
+      setIsPickingDrive(false);
     }
   }
 
@@ -103,13 +155,12 @@ export function Upload() {
     setPendingFiles((current) => current.filter((_, fileIndex) => fileIndex !== index));
     setSelectedFiles((current) => {
       const next = new Set(current);
-      next.delete(fileKey(fileToRemove.file));
+      next.delete(fileToRemove.key);
       return next;
     });
   }
 
-  function toggleFile(file: File) {
-    const key = fileKey(file);
+  function toggleFile(key: string) {
     setSelectedFiles((current) => {
       const next = new Set(current);
       if (next.has(key)) next.delete(key);
@@ -121,29 +172,39 @@ export function Upload() {
   function applyBulkAccess(level: AccessLevel) {
     setPendingFiles((current) =>
       current.map((pendingFile) =>
-        selectedFiles.has(fileKey(pendingFile.file))
-          ? { ...pendingFile, accessLevel: level }
-          : pendingFile,
+        selectedFiles.has(pendingFile.key) ? { ...pendingFile, accessLevel: level } : pendingFile,
       ),
     );
     setBulkAccessLevel("");
   }
 
-  function proceed() {
+  async function proceed() {
     if (!pendingFiles.length) return;
 
     setUploadError("");
 
-    upload.mutate(pendingFiles, {
-      onSuccess: () => {
-        setPendingFiles([]);
-        setSelectedFiles(new Set());
-        setBulkAccessLevel("");
-      },
-      onError: (error) => {
-        setUploadError(getApiErrorMessage(error, "Upload failed."));
-      },
-    });
+    const local = pendingFiles.flatMap(({ file, accessLevel }) =>
+      file ? [{ file, accessLevel }] : [],
+    );
+    const drive = pendingFiles.flatMap(({ driveId, accessLevel }) =>
+      driveId ? [{ id: driveId, accessLevel }] : [],
+    );
+
+    // Drop each batch from the queue once stored so a retry never re-sends it.
+    try {
+      if (local.length) {
+        await upload.mutateAsync(local);
+        setPendingFiles((current) => current.filter(({ file }) => !file));
+      }
+      if (drive.length) {
+        await driveImport.mutateAsync(drive);
+        setPendingFiles((current) => current.filter(({ driveId }) => !driveId));
+      }
+      setSelectedFiles(new Set());
+      setBulkAccessLevel("");
+    } catch (error) {
+      setUploadError(getApiErrorMessage(error, "Upload failed."));
+    }
   }
 
   const hasFiles = pendingFiles.length > 0;
@@ -183,35 +244,67 @@ export function Upload() {
             }}
             onDrop={drop}
           >
-            <div
-              className={`grid size-12 place-items-center rounded-2xl transition-colors ${
-                isDragging ? "bg-primary text-primary-foreground" : "bg-secondary text-foreground"
-              }`}
-            >
-              <UploadCloud size={22} />
+            <div className="flex items-center gap-2">
+              <UploadCloud
+                aria-hidden="true"
+                size={20}
+                className={isDragging ? "text-primary" : "text-copy"}
+              />
+              <h2 className="text-lg font-semibold">
+                {isDragging ? "Drop your files here" : "Upload documents"}
+              </h2>
             </div>
 
-            <h2 className="mt-5 text-lg font-semibold">
-              {isDragging ? "Drop your files here" : "Upload documents"}
-            </h2>
-
-            <p className="mt-2 max-w-sm text-sm leading-6 text-copy">
-              Drag and drop documents here, or choose files from your computer.
+            <p className="mt-1.5 text-sm text-copy">
+              Drag and drop anywhere in this box, or pick a source.
             </p>
 
-            <Button
-              type="button"
-              className="mt-5"
-              onClick={(event) => {
-                event.stopPropagation();
-                inputRef.current?.click();
-              }}
-            >
-              <FileUp size={16} />
-              Choose files
-            </Button>
+            <div className="mt-6 grid w-full max-w-lg gap-3 sm:grid-cols-2">
+              {/* The computer card has no handler: its click bubbles to the box, which opens the file dialog. */}
+              {[
+                {
+                  title: "Your computer",
+                  hint: "Browse local files",
+                  icon: <Laptop size={18} />,
+                  iconClass: "bg-primary text-primary-foreground",
+                },
+                {
+                  title: "Google Drive",
+                  hint: isPickingDrive ? "Opening picker…" : "Import from Drive",
+                  icon: isPickingDrive ? (
+                    <Loader2 className="animate-spin" size={18} />
+                  ) : (
+                    <HardDrive size={18} />
+                  ),
+                  iconClass: "bg-secondary text-foreground",
+                  disabled: isPickingDrive,
+                  onClick: (event: MouseEvent) => {
+                    event.stopPropagation();
+                    void chooseFromDrive();
+                  },
+                },
+              ].map(({ title, hint, icon, iconClass, disabled, onClick }) => (
+                <button
+                  key={title}
+                  type="button"
+                  disabled={disabled}
+                  className="flex items-center gap-3 rounded-xl border border-border bg-background p-3 text-left transition-colors hover:border-primary/50 hover:bg-secondary/40 disabled:pointer-events-none disabled:opacity-50"
+                  onClick={onClick}
+                >
+                  <span
+                    className={`grid size-10 shrink-0 place-items-center rounded-lg ${iconClass}`}
+                  >
+                    {icon}
+                  </span>
+                  <span>
+                    <span className="block text-sm font-medium">{title}</span>
+                    <span className="block text-xs text-muted-foreground">{hint}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
 
-            <p className="mt-4 text-xs text-muted-foreground">
+            <p className="mt-5 text-xs text-muted-foreground">
               PDF, DOCX, PPTX, XLSX, MD or TXT · Max 25 MB per file
             </p>
           </div>
@@ -245,7 +338,7 @@ export function Upload() {
                     }}
                   >
                     <SelectTrigger
-                      disabled={upload.isPending}
+                      disabled={isUploading}
                       aria-label={`Set access for ${selectedFiles.size} selected ${selectedFiles.size === 1 ? "file" : "files"}`}
                       className={buttonVariants({
                         variant: "outline",
@@ -268,11 +361,26 @@ export function Upload() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  disabled={upload.isPending}
+                  disabled={isUploading}
                   onClick={() => inputRef.current?.click()}
                 >
                   <Plus size={15} />
                   Add files
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isUploading || isPickingDrive}
+                  onClick={() => void chooseFromDrive()}
+                >
+                  {isPickingDrive ? (
+                    <Loader2 className="animate-spin" size={15} />
+                  ) : (
+                    <HardDrive size={15} />
+                  )}
+                  Google Drive
                 </Button>
               </div>
             </div>
@@ -300,18 +408,18 @@ export function Upload() {
               )}
 
               <ul className="h-full max-h-none space-y-1 overflow-y-auto">
-                {pendingFiles.map(({ file, accessLevel }, index) => (
+                {pendingFiles.map(({ key, name, size, driveId, accessLevel }, index) => (
                   <li
-                    key={`${fileKey(file)}-${index}`}
+                    key={key}
                     className="group flex items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-secondary/50"
                   >
                     <input
                       type="checkbox"
-                      checked={selectedFiles.has(fileKey(file))}
-                      aria-label={`Select ${file.name}`}
+                      checked={selectedFiles.has(key)}
+                      aria-label={`Select ${name}`}
                       className="size-4 shrink-0 accent-primary"
-                      disabled={upload.isPending}
-                      onChange={() => toggleFile(file)}
+                      disabled={isUploading}
+                      onChange={() => toggleFile(key)}
                     />
 
                     <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-secondary">
@@ -319,10 +427,12 @@ export function Upload() {
                     </div>
 
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium">{file.name}</p>
+                      <p className="truncate text-sm font-medium">{name}</p>
 
                       <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
-                        <span>{formatFileSize(file.size)}</span>
+                        {driveId && <span>Google Drive</span>}
+                        {driveId && size !== null && <span aria-hidden="true">·</span>}
+                        {size !== null && <span>{formatFileSize(size)}</span>}
                         <span aria-hidden="true">·</span>
                         <span className="capitalize">{accessLevel}</span>
                       </div>
@@ -330,10 +440,10 @@ export function Upload() {
 
                     <Button
                       type="button"
-                      aria-label={`Remove ${file.name}`}
+                      aria-label={`Remove ${name}`}
                       variant="ghost"
                       size="icon"
-                      disabled={upload.isPending}
+                      disabled={isUploading}
                       className="size-8 text-muted-foreground hover:text-danger"
                       onClick={() => removeFile(index)}
                     >
@@ -353,7 +463,7 @@ export function Upload() {
             )}
 
             {/* Upload progress */}
-            {upload.isPending && (
+            {isUploading && (
               <div className="px-5 pb-4">
                 <div className="mb-2 flex items-center justify-between text-xs text-copy">
                   <span>Uploading documents…</span>
@@ -368,7 +478,7 @@ export function Upload() {
             <div className="flex items-center justify-between gap-4 border-t border-border bg-secondary/20 px-5 py-2 ">
               <button
                 type="button"
-                disabled={upload.isPending}
+                disabled={isUploading}
                 onClick={() => {
                   setPendingFiles([]);
                   setSelectedFiles(new Set());
@@ -379,19 +489,14 @@ export function Upload() {
                 Clear all
               </button>
 
-              <Button
-                type="button"
-                disabled={upload.isPending}
-                className="h-11 px-5"
-                onClick={proceed}
-              >
-                {upload.isPending ? (
+              <Button type="button" disabled={isUploading} className="h-11 px-5" onClick={proceed}>
+                {isUploading ? (
                   <Loader2 className="animate-spin" size={16} />
                 ) : (
                   <FileUp size={16} />
                 )}
 
-                {upload.isPending
+                {isUploading
                   ? "Uploading…"
                   : `Upload ${pendingFiles.length} ${pendingFiles.length === 1 ? "file" : "files"}`}
               </Button>

@@ -38,6 +38,11 @@ class Settings(BaseSettings):
     smtp_user: str | None = None
     smtp_password: SecretStr | None = None
     smtp_from: str | None = None
+    google_client_id: str | None = None
+    google_client_secret: SecretStr | None = None
+    google_redirect_uri: str = "http://localhost:8000/integrations/google/callback"
+    google_api_key: str | None = None
+    google_app_id: str | None = None
 
     @model_validator(mode="after")
     def validate_auth(self) -> "Settings":
