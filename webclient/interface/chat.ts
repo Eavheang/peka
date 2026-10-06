@@ -18,6 +18,7 @@ export interface ChatRequest {
   query: string;
   conversation_id?: string;
   web_search?: boolean;
+  timezone?: string;
 }
 
 export interface ChatResponse {

@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal
 from uuid import UUID
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import ai
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -325,12 +326,31 @@ def preview_source(request: SourcePreviewRequest, user_role: str) -> dict | None
     )
 
 
+def _now_in_user_timezone(timezone_name: str | None) -> datetime:
+    if timezone_name:
+        try:
+            return datetime.now(ZoneInfo(timezone_name))
+        except (ZoneInfoNotFoundError, ValueError):
+            pass
+    return datetime.now().astimezone()
+
+
+def _current_datetime_context(timezone_name: str | None = None) -> str:
+    now = _now_in_user_timezone(timezone_name)
+    zone = getattr(now.tzinfo, "key", "server local")
+    return (
+        f"Current date/time: {now:%A} {now.isoformat(timespec='minutes')} ({zone}). "
+        "This is the user's local time; use it for now, today, and relative dates."
+    )
+
+
 def _conversation_messages(
     query: str,
     history: list[dict] | None,
     system_prompt: str,
+    timezone_name: str | None = None,
 ) -> list[ai.messages.Message]:
-    messages = [ai.system_message(system_prompt)]
+    messages = [ai.system_message(f"{system_prompt} {_current_datetime_context(timezone_name)}")]
     # Bound history by characters as well as turns to leave room for search results.
     recent: list[dict[str, str]] = []
     remaining = 24000
@@ -380,10 +400,13 @@ def _search_plan(
     query: str,
     history: list[dict] | None,
     web_search: bool,
+    timezone_name: str | None = None,
 ) -> SearchPlan:
     try:
         plan = generate_structured(
-            _conversation_messages(query, history, _retrieval_prompt(web_search)),
+            _conversation_messages(
+                query, history, _retrieval_prompt(web_search), timezone_name
+            ),
             SearchPlan,
         )
     except AIModelError:
@@ -463,10 +486,11 @@ def answer_from_knowledge(
     user_role: str,
     history: list[dict] | None = None,
     web_search: bool = False,
+    timezone: str | None = None,
 ) -> ChatResponse:
-    search_plan = _search_plan(query, history, web_search)
+    search_plan = _search_plan(query, history, web_search, timezone)
     sources = {}
-    messages = _conversation_messages(query, history, _SYSTEM_PROMPT)
+    messages = _conversation_messages(query, history, _SYSTEM_PROMPT, timezone)
 
     if search_plan.tool != "none":
         if search_plan.query is None:
@@ -495,12 +519,15 @@ async def stream_answer_from_knowledge(
     user_role: str,
     history: list[dict] | None = None,
     web_search: bool = False,
+    timezone: str | None = None,
 ) -> AsyncIterator[ChatStreamEvent]:
     """Generate and stream one answer while validating its final metadata."""
     yield ChatStreamStatus("Thinking...")
-    search_plan = await asyncio.to_thread(_search_plan, query, history, web_search)
+    search_plan = await asyncio.to_thread(
+        _search_plan, query, history, web_search, timezone
+    )
     sources: dict[str, dict] = {}
-    messages = _conversation_messages(query, history, _SYSTEM_PROMPT)
+    messages = _conversation_messages(query, history, _SYSTEM_PROMPT, timezone)
 
     if search_plan.tool != "none":
         if search_plan.query is None:

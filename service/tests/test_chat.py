@@ -399,6 +399,41 @@ def test_historical_citation_markers_are_not_sent_back_as_context():
     assert messages[-2].text == "Attendance is at least 95%."
 
 
+@pytest.fixture
+def frozen_now(monkeypatch) -> datetime:
+    frozen = datetime(2026, 10, 6, 9, 0, tzinfo=timezone.utc)
+
+    class FrozenDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return frozen.astimezone(tz) if tz is not None else frozen
+
+    monkeypatch.setattr(chat_service, "datetime", FrozenDateTime)
+    return frozen
+
+
+def test_conversation_messages_include_current_datetime(frozen_now) -> None:
+    messages = chat_service._conversation_messages("hello", None, "You are Peka.")
+
+    assert frozen_now.astimezone().isoformat(timespec="minutes") in messages[0].text
+
+
+def test_conversation_messages_use_client_timezone(frozen_now) -> None:
+    messages = chat_service._conversation_messages(
+        "hello", None, "You are Peka.", "Asia/Phnom_Penh"
+    )
+
+    assert "Tuesday 2026-10-06T16:00+07:00 (Asia/Phnom_Penh)" in messages[0].text
+
+
+def test_unknown_timezone_falls_back_to_server_local_time(monkeypatch) -> None:
+    messages = chat_service._conversation_messages(
+        "hello", None, "You are Peka.", "Not/A_Zone"
+    )
+
+    assert "Current date/time:" in messages[0].text
+
+
 def test_model_routes_ambiguous_follow_up_to_current_knowledge_search(monkeypatch):
     history = [
         {"role": "user", "content": "What is school policy?"},
@@ -513,7 +548,7 @@ def test_chat_endpoint_returns_answer(monkeypatch) -> None:
     monkeypatch.setattr(
         chat_routes,
         "answer_from_knowledge",
-        lambda query, role, history: chat_service.ChatResponse(answer="ok [1]", refused=False, citations=[]),
+        lambda query, role, history, **kwargs: chat_service.ChatResponse(answer="ok [1]", refused=False, citations=[]),
     )
     monkeypatch.setattr(chat_service, "persist_response", lambda query, user_id, response, conversation_id=None: response)
     _override_admin()
@@ -525,6 +560,31 @@ def test_chat_endpoint_returns_answer(monkeypatch) -> None:
         assert body == {"answer": "ok [1]", "refused": False, "citations": []}
     finally:
         app.dependency_overrides.clear()
+
+
+def test_chat_endpoint_forwards_client_timezone(monkeypatch) -> None:
+    from app.chat import routes as chat_routes
+
+    seen = {}
+
+    def answer(query, role, history, web_search=False, timezone=None):
+        seen["timezone"] = timezone
+        return chat_service.ChatResponse(answer="ok", refused=False, citations=[])
+
+    monkeypatch.setattr(chat_routes, "answer_from_knowledge", answer)
+    monkeypatch.setattr(
+        chat_service, "persist_response", lambda query, user_id, response, conversation_id=None: response
+    )
+    _override_admin()
+    try:
+        response = TestClient(app).post(
+            "/chat", json={"query": "q", "timezone": "Asia/Phnom_Penh"}
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert seen["timezone"] == "Asia/Phnom_Penh"
 
 
 def test_chat_stream_endpoint_emits_text_and_persists_completion(monkeypatch) -> None:
@@ -692,7 +752,7 @@ def test_first_message_is_persisted_and_returned(monkeypatch) -> None:
             }
 
     conversation_id_for_test = conversation_id
-    monkeypatch.setattr(chat_routes, "answer_from_knowledge", lambda query, role, history: chat_service.ChatResponse(
+    monkeypatch.setattr(chat_routes, "answer_from_knowledge", lambda query, role, history, **kwargs: chat_service.ChatResponse(
         answer="grounded answer [1]",
         refused=False,
         citations=[{"title": "policy.pdf", "heading": "Refunds", "page": 2, "source_locations": [{"page": 2}]}],
@@ -736,7 +796,7 @@ def test_endpoint_authorizes_history_before_calling_model(monkeypatch, found):
         assert owner_id == "u1"
         return {"messages": history} if found else None
 
-    def answer(query, role, context):
+    def answer(query, role, context, **kwargs):
         seen.append(context)
         return chat_service.ChatResponse(answer="Details", refused=False, citations=[])
 
