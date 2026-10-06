@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     embedding_batch_size: int = 1
     search_top_k: int = 5
     search_similarity_floor: float = 0.3
+    # Chat refuses KB-grounded turns when the best ACL-filtered hit is below this
+    # cosine score (bge-small). Uncalibrated default; run scripts/calibrate_no_evidence_threshold.py.
+    no_evidence_threshold: float = 0.70
     exa_api_key: SecretStr | None = None
     exa_base_url: str = "https://api.exa.ai"
     web_search_top_k: int = 5

@@ -16,6 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from app.audit.service import record_audit_event
 from app.chat.repository import chat_repository
 from app.chat.schemas import ChatMessage, ChatResponse, Citation, SourcePreviewRequest
+from app.config import settings
 from app.engine.ai_runtime import (
     AIModelError,
     first_error_line,
@@ -28,6 +29,10 @@ from app.engine.search.service import access_levels_for_role, search_knowledge
 from app.engine.web_search.service import web_search as perform_web_search
 
 logger = logging.getLogger(__name__)
+
+NO_EVIDENCE_ANSWER = (
+    "I could not find enough evidence in your documents to answer that."
+)
 
 _SYSTEM_PROMPT = (
     "You are Peka, a helpful assistant. Answer general questions, arithmetic, and casual "
@@ -319,6 +324,14 @@ def _citations(results: list[dict]) -> list[Citation]:
     return citations
 
 
+def _lacks_evidence(top_score: float | None) -> bool:
+    return top_score is None or top_score < settings.no_evidence_threshold
+
+
+def _no_evidence_response() -> ChatResponse:
+    return ChatResponse(answer=NO_EVIDENCE_ANSWER, refused=True, citations=[])
+
+
 def preview_source(request: SourcePreviewRequest, user_role: str) -> dict | None:
     return search_repository.find_source(
         request.chunk_id, request.title, request.heading, access_levels_for_role(user_role),
@@ -471,11 +484,13 @@ def answer_from_knowledge(
     if search_plan.tool != "none":
         if search_plan.query is None:
             raise AIModelError("Model returned an invalid retrieval plan")
-        results = (
-            perform_web_search(search_plan.query)
-            if search_plan.tool == "web_search"
-            else search_knowledge(search_plan.query, user_role)
-        )
+        if search_plan.tool == "web_search":
+            results = perform_web_search(search_plan.query)
+        else:
+            retrieval = search_knowledge(search_plan.query, user_role)
+            if _lacks_evidence(retrieval.top_score):
+                return _no_evidence_response()
+            results = retrieval.hits
         sources = {
             f"source-{index}": result
             for index, result in enumerate(results, 1)
@@ -514,7 +529,15 @@ async def stream_answer_from_knowledge(
         if search_plan.tool == "web_search":
             results = await asyncio.to_thread(perform_web_search, search_plan.query)
         else:
-            results = await asyncio.to_thread(search_knowledge, search_plan.query, user_role)
+            retrieval = await asyncio.to_thread(
+                search_knowledge, search_plan.query, user_role
+            )
+            if _lacks_evidence(retrieval.top_score):
+                refused = _no_evidence_response()
+                yield ChatStreamText(refused.answer)
+                yield ChatStreamCompleted(refused)
+                return
+            results = retrieval.hits
         sources = {
             f"source-{index}": result
             for index, result in enumerate(results, 1)

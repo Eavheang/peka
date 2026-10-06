@@ -8,11 +8,19 @@ import pytest
 
 from app.chat import service as chat_service
 from app.auth.routes import authenticated
+from app.engine.search.service import RetrievalResult
 from app.main import app
 
 
 def _search_plan(tool="none", query=None):
     return chat_service.SearchPlan(tool=tool, query=query)
+
+
+def _retrieval(hits=None, top_score=None) -> RetrievalResult:
+    hits = list(hits or [])
+    if top_score is None and hits:
+        top_score = max(float(hit.get("score", 0.99)) for hit in hits)
+    return RetrievalResult(hits=hits, top_score=top_score)
 
 
 def _override_admin() -> None:
@@ -121,12 +129,13 @@ def test_grounded_answer_carries_citations(monkeypatch) -> None:
             ]
         )
 
-    monkeypatch.setattr(chat_service, "search_knowledge", lambda query, role: results)
+    monkeypatch.setattr(chat_service, "search_knowledge", lambda query, role: _retrieval(results))
     monkeypatch.setattr(chat_service, "generate_structured", fake_generation)
 
     response = chat_service.answer_from_knowledge("refund time?", "admin")
 
     assert response.refused is False
+    assert response.answer_status == "answered"
     assert "source-1" in seen["prompt"] and "handbook.pptx" in seen["prompt"]
     assert response.answer == "Refunds take 14 days. [1]"
     assert len(response.citations) == 1
@@ -162,7 +171,7 @@ def test_invalid_source_is_dropped_without_retry(monkeypatch):
         )
 
     monkeypatch.setattr(chat_service, "generate_structured", generate)
-    monkeypatch.setattr(chat_service, "search_knowledge", lambda *args: results)
+    monkeypatch.setattr(chat_service, "search_knowledge", lambda *args: _retrieval(results))
 
     response = chat_service.answer_from_knowledge(
         "Is fighting against school policy?", "staff", web_search=True
@@ -191,7 +200,7 @@ def test_stream_invalid_source_is_dropped_without_retry(monkeypatch):
         if output_type is chat_service.SearchPlan
         else pytest.fail("Answer generation should use the streaming path"),
     )
-    monkeypatch.setattr(chat_service, "search_knowledge", lambda *args: results)
+    monkeypatch.setattr(chat_service, "search_knowledge", lambda *args: _retrieval(results))
 
     async def stream_text(messages, output_type):
         stream_calls.append(messages)
@@ -226,31 +235,23 @@ def test_stream_invalid_source_is_dropped_without_retry(monkeypatch):
     assert len(stream_calls) == 1
 
 
-def test_empty_search_falls_back_without_citations(monkeypatch):
+def test_empty_knowledge_search_refuses_without_calling_the_answer_model(monkeypatch):
     calls = []
 
     def generate(messages, output_type):
         calls.append(output_type)
         if output_type is chat_service.SearchPlan:
             return _search_plan("search_knowledge_base", "improve sales")
-        assert "<search_results>\n{}\n</search_results>" in messages[-1].text
-        return chat_service.ModelAnswer(
-            blocks=[
-                {
-                    "kind": "general",
-                    "text": "Consider customer feedback.",
-                    "source_ids": [],
-                }
-            ]
-        )
+        raise AssertionError("Empty KB retrieval must skip the answer model")
 
     monkeypatch.setattr(chat_service, "generate_structured", generate)
-    monkeypatch.setattr(chat_service, "search_knowledge", lambda *args: [])
+    monkeypatch.setattr(chat_service, "search_knowledge", lambda *args: _retrieval([]))
     response = chat_service.answer_from_knowledge("How do we improve sales?", "staff")
-    assert response.answer == "Consider customer feedback."
+    assert response.answer == chat_service.NO_EVIDENCE_ANSWER
     assert response.citations == []
-    assert response.refused is False
-    assert calls == [chat_service.SearchPlan, chat_service.ModelAnswer]
+    assert response.refused is True
+    assert response.answer_status == "refused"
+    assert calls == [chat_service.SearchPlan]
 
 
 @pytest.mark.parametrize("blocks", [
@@ -283,7 +284,7 @@ def test_mixed_answer_remaps_and_deduplicates_sources(monkeypatch):
 
     def search(query, role):
         searches.append((query, role))
-        return results
+        return _retrieval(results)
 
     def generate(messages, output_type):
         if output_type is chat_service.SearchPlan:
@@ -339,7 +340,7 @@ def test_answer_formats_markdown_bullets_without_changing_stream_content(monkeyp
             ]
         )
 
-    monkeypatch.setattr(chat_service, "search_knowledge", lambda query, role: results)
+    monkeypatch.setattr(chat_service, "search_knowledge", lambda query, role: _retrieval(results))
     monkeypatch.setattr(chat_service, "generate_structured", generate)
 
     response = chat_service.answer_from_knowledge("Report and your opinion?", "staff")
@@ -360,7 +361,11 @@ def test_enforces_one_search_per_turn(monkeypatch):
         )
 
     monkeypatch.setattr(chat_service, "generate_structured", generate)
-    monkeypatch.setattr(chat_service, "search_knowledge", lambda *args: searches.append(args) or [])
+    monkeypatch.setattr(
+        chat_service,
+        "search_knowledge",
+        lambda *args: searches.append(args) or _retrieval([]),
+    )
     chat_service.answer_from_knowledge("sales", "staff")
     assert len(searches) == 1
 
@@ -437,7 +442,7 @@ def test_model_routes_ambiguous_follow_up_to_current_knowledge_search(monkeypatc
     monkeypatch.setattr(
         chat_service,
         "search_knowledge",
-        lambda query, role: searches.append((query, role)) or [result],
+        lambda query, role: searches.append((query, role)) or _retrieval([result]),
     )
 
     response = chat_service.answer_from_knowledge(
@@ -466,7 +471,19 @@ def test_retrieval_router_prompt_has_only_search_plan_schema(monkeypatch):
         )
 
     monkeypatch.setattr(chat_service, "generate_structured", generate)
-    monkeypatch.setattr(chat_service, "search_knowledge", lambda *args: [])
+    monkeypatch.setattr(
+        chat_service,
+        "search_knowledge",
+        lambda *args: _retrieval(
+            [{
+                "title": "school-policy.pdf",
+                "heading": "Discipline",
+                "snippet": "Three levels.",
+                "source_locations": [],
+                "score": 0.9,
+            }]
+        ),
+    )
 
     response = chat_service.answer_from_knowledge(
         "But based on the school policy, what will happen?", "admin", history
@@ -495,7 +512,19 @@ def test_model_selects_knowledge_base_for_contextual_follow_up(monkeypatch):
         )
 
     monkeypatch.setattr(chat_service, "generate_structured", generate)
-    monkeypatch.setattr(chat_service, "search_knowledge", lambda *args: [])
+    monkeypatch.setattr(
+        chat_service,
+        "search_knowledge",
+        lambda *args: _retrieval(
+            [{
+                "title": "school-policy.pdf",
+                "heading": "Conduct",
+                "snippet": "Fighting is prohibited.",
+                "source_locations": [],
+                "score": 0.9,
+            }]
+        ),
+    )
 
     chat_service.answer_from_knowledge(
         "What happens if a student fights?", "admin", history, web_search=True
@@ -522,7 +551,12 @@ def test_chat_endpoint_returns_answer(monkeypatch) -> None:
         response = client.post("/chat", json={"query": "q"})
         assert response.status_code == 200
         body = response.json()
-        assert body == {"answer": "ok [1]", "refused": False, "citations": []}
+        assert body == {
+            "answer": "ok [1]",
+            "refused": False,
+            "answer_status": "answered",
+            "citations": [],
+        }
     finally:
         app.dependency_overrides.clear()
 
@@ -629,7 +663,7 @@ def test_streamed_markdown_matches_final_answer(monkeypatch) -> None:
             yield payload[index:index + 7]
 
     monkeypatch.setattr(chat_service, "stream_structured_text", stream_text)
-    monkeypatch.setattr(chat_service, "search_knowledge", lambda *args: [result])
+    monkeypatch.setattr(chat_service, "search_knowledge", lambda *args: _retrieval([result]))
     monkeypatch.setattr(
         chat_service,
         "generate_structured",
@@ -810,3 +844,201 @@ def test_plain_text_fallback_cleans_markers_and_rejects_json_and_empty() -> None
     assert "source-" not in cleaned and "[" not in cleaned.split("\n\n")[0]
     for unusable in ("", "   ", '{"blocks":[]}', "```json\n{}\n```", "[1]"):
         assert chat_service._plain_text_fallback(unusable) is None
+
+
+def test_below_threshold_refuses_without_llm_or_citations(monkeypatch) -> None:
+    answer_calls = 0
+    hit = {
+        "title": "noise.pdf",
+        "heading": "Unrelated",
+        "snippet": "Weak match.",
+        "source_locations": [],
+        "score": 0.55,
+    }
+
+    def generate(messages, output_type):
+        nonlocal answer_calls
+        if output_type is chat_service.SearchPlan:
+            return _search_plan("search_knowledge_base", "pet policy")
+        answer_calls += 1
+        raise AssertionError("Below-threshold retrieval must skip the answer model")
+
+    monkeypatch.setattr(chat_service.settings, "no_evidence_threshold", 0.70)
+    monkeypatch.setattr(chat_service, "generate_structured", generate)
+    monkeypatch.setattr(
+        chat_service, "search_knowledge", lambda *args: _retrieval([hit], top_score=0.55)
+    )
+
+    response = chat_service.answer_from_knowledge("What is our pet policy?", "staff")
+
+    assert answer_calls == 0
+    assert response.answer == chat_service.NO_EVIDENCE_ANSWER
+    assert response.citations == []
+    assert response.refused is True
+    assert response.answer_status == "refused"
+
+
+def test_at_threshold_runs_normal_answer_path(monkeypatch) -> None:
+    hit = {
+        "title": "policy.pdf",
+        "heading": "Leave",
+        "snippet": "20 days of leave.",
+        "content": "20 days of leave.",
+        "source_locations": [{"page": 1}],
+        "score": 0.70,
+    }
+    answer_calls = 0
+
+    def generate(messages, output_type):
+        nonlocal answer_calls
+        if output_type is chat_service.SearchPlan:
+            return _search_plan("search_knowledge_base", "leave days")
+        answer_calls += 1
+        return chat_service.ModelAnswer(
+            blocks=[{
+                "kind": "grounded",
+                "text": "Every employee gets 20 days of leave.",
+                "source_ids": ["source-1"],
+            }]
+        )
+
+    monkeypatch.setattr(chat_service.settings, "no_evidence_threshold", 0.70)
+    monkeypatch.setattr(chat_service, "generate_structured", generate)
+    monkeypatch.setattr(
+        chat_service, "search_knowledge", lambda *args: _retrieval([hit], top_score=0.70)
+    )
+
+    response = chat_service.answer_from_knowledge("How much leave?", "staff")
+
+    assert answer_calls == 1
+    assert response.refused is False
+    assert response.answer_status == "answered"
+    assert response.answer == "Every employee gets 20 days of leave. [1]"
+    assert len(response.citations) == 1
+
+
+def test_stream_refusal_emits_fixed_text_and_answer_status(monkeypatch) -> None:
+    monkeypatch.setattr(chat_service.settings, "no_evidence_threshold", 0.70)
+    monkeypatch.setattr(
+        chat_service,
+        "generate_structured",
+        lambda messages, output_type: _search_plan("search_knowledge_base", "missing topic")
+        if output_type is chat_service.SearchPlan
+        else pytest.fail("Refusal must not call the answer model"),
+    )
+    monkeypatch.setattr(chat_service, "search_knowledge", lambda *args: _retrieval([]))
+
+    async def collect():
+        return [
+            event
+            async for event in chat_service.stream_answer_from_knowledge(
+                "What is the Antarctica stipend?", "staff"
+            )
+        ]
+
+    events = asyncio.run(collect())
+    text = "".join(
+        event.delta for event in events if isinstance(event, chat_service.ChatStreamText)
+    )
+    completed = next(
+        event for event in events if isinstance(event, chat_service.ChatStreamCompleted)
+    )
+
+    assert text == chat_service.NO_EVIDENCE_ANSWER
+    assert completed.response.answer_status == "refused"
+    assert completed.response.refused is True
+    assert completed.response.citations == []
+
+
+def test_refusal_persist_writes_refused_flag_and_audit(monkeypatch) -> None:
+    owner_id = uuid4()
+    created_conversation_id = uuid4()
+    audits = []
+    persisted = []
+
+    class FakeRepository:
+        def create_exchange(self, owner_id, title, query, response, conversation_id=None):
+            persisted.append(response)
+            created_at = datetime.now(timezone.utc)
+            return {
+                "conversation": {"id": created_conversation_id},
+                "messages": [
+                    {
+                        "id": uuid4(),
+                        "role": "user",
+                        "content": query,
+                        "refused": False,
+                        "citations": [],
+                        "status": "completed",
+                        "created_at": created_at,
+                    },
+                    {
+                        "id": uuid4(),
+                        "role": "assistant",
+                        "content": response.answer,
+                        "refused": response.refused,
+                        "citations": [],
+                        "status": "completed",
+                        "created_at": created_at,
+                    },
+                ],
+            }
+
+    monkeypatch.setattr(chat_service, "chat_repository", FakeRepository())
+    monkeypatch.setattr(
+        chat_service,
+        "record_audit_event",
+        lambda name, actor_id=None, metadata=None: audits.append(
+            (name, actor_id, metadata)
+        ),
+    )
+
+    saved = chat_service.persist_response(
+        "missing evidence?",
+        owner_id,
+        chat_service.ChatResponse(
+            answer=chat_service.NO_EVIDENCE_ANSWER, refused=True, citations=[]
+        ),
+    )
+
+    assert persisted[0].refused is True
+    assert persisted[0].answer_status == "refused"
+    assert saved.messages[1].refused is True
+    assert audits == [
+        ("chat_turn", owner_id, {"conversation_id": str(created_conversation_id)})
+    ]
+
+
+def test_answered_stream_payload_includes_answer_status(monkeypatch) -> None:
+    """Blast-radius check: answered path stays the same except answer_status."""
+    async def stream_text(*args, **kwargs):
+        yield json.dumps(
+            {"blocks": [{"kind": "general", "text": "Hello", "source_ids": []}]}
+        )
+
+    monkeypatch.setattr(chat_service, "stream_structured_text", stream_text)
+    monkeypatch.setattr(
+        chat_service,
+        "generate_structured",
+        lambda messages, output_type: _search_plan()
+        if output_type is chat_service.SearchPlan
+        else pytest.fail("Answer generation should use the streaming path"),
+    )
+
+    async def collect():
+        return [
+            event
+            async for event in chat_service.stream_answer_from_knowledge("hello", "staff")
+        ]
+
+    events = asyncio.run(collect())
+    completed = next(
+        event for event in events if isinstance(event, chat_service.ChatStreamCompleted)
+    )
+    payload = completed.response.model_dump(mode="json", exclude_none=True)
+
+    assert payload["answer"] == "Hello"
+    assert payload["refused"] is False
+    assert payload["citations"] == []
+    assert payload["answer_status"] == "answered"
+    assert set(payload) == {"answer", "refused", "citations", "answer_status"}

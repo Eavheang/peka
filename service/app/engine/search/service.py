@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 from app.engine.chunks.embeddings import EmbeddingError, embed_texts
 from app.engine.search.repository import search_repository
 
@@ -23,10 +25,18 @@ def access_levels_for_role(role: str) -> tuple[str, ...]:
     return ROLE_ACCESS_LEVELS.get(role, ("general",))
 
 
-def search_knowledge(query: str, user_role: str) -> list[dict]:
+@dataclass(frozen=True)
+class RetrievalResult:
+    """ACL-filtered vector hits plus the best cosine score among them."""
+
+    hits: list[dict]
+    top_score: float | None
+
+
+def search_knowledge(query: str, user_role: str) -> RetrievalResult:
     vector = embed_query(query)
     results = search_repository.search_chunks(vector, access_levels_for_role(user_role))
-    return [
+    hits = [
         {
             "chunk_id": str(row["id"]),
             "file_id": str(row["file_id"]),
@@ -39,3 +49,5 @@ def search_knowledge(query: str, user_role: str) -> list[dict]:
         }
         for row in results
     ]
+    top_score = max((hit["score"] for hit in hits), default=None)
+    return RetrievalResult(hits=hits, top_score=top_score)

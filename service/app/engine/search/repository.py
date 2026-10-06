@@ -14,10 +14,11 @@ class SearchRepository:
         query_vector: list[float],
         allowed_access_levels: tuple[str, ...],
         top_k: int | None = None,
+        similarity_floor: float | None = None,
     ) -> list[dict[str, Any]]:
         """Vector search over active chunk sets, permission-filtered in SQL."""
         limit = top_k or settings.search_top_k
-        floor = settings.search_similarity_floor
+        floor = settings.search_similarity_floor if similarity_floor is None else similarity_floor
         with get_connection() as connection:
             register_vector(connection)
             rows = connection.execute(

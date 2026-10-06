@@ -125,7 +125,7 @@ def test_search_knowledge_applies_the_role_mapping_end_to_end(monkeypatch, corpu
 
     results = search_service.search_knowledge("what are the rules?", role)
 
-    assert found(results, corpus) == expected
+    assert found(results.hits, corpus) == expected
 
 
 def test_changing_a_file_to_confidential_hides_it_from_staff_immediately(corpus):

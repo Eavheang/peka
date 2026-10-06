@@ -1,7 +1,8 @@
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, computed_field, field_validator
 
 
 class ChatRequest(BaseModel):
@@ -70,3 +71,8 @@ class ChatResponse(BaseModel):
     citations: list[Citation]
     conversation_id: UUID | None = None
     messages: list[ChatMessage] | None = None
+
+    @computed_field
+    @property
+    def answer_status(self) -> Literal["answered", "refused"]:
+        return "refused" if self.refused else "answered"

@@ -12,6 +12,6 @@ def search(payload: SearchRequest, user: dict = Depends(authenticated)) -> list[
     if not payload.query.strip():
         raise HTTPException(status_code=422, detail="Query must not be empty")
     try:
-        return search_knowledge(payload.query, user["role"])
+        return search_knowledge(payload.query, user["role"]).hits
     except RuntimeError as error:
         raise HTTPException(status_code=503, detail=str(error)) from None
