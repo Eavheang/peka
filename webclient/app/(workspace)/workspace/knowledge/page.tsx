@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import axios from "axios";
 import { RotateCcw, XCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -110,7 +111,10 @@ export default function KnowledgePage() {
               remove.mutate(id, {
                 onError: (error) =>
                   toast.add({
-                    title: getApiErrorMessage(error, "This file could not be deleted."),
+                    title:
+                      axios.isAxiosError(error) && error.response?.status === 403
+                        ? "You can't delete this file"
+                        : getApiErrorMessage(error, "This file could not be deleted."),
                     type: "error",
                   }),
               })

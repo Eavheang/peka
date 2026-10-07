@@ -55,6 +55,12 @@ function fileKey(file: File) {
   return `${file.name}-${file.size}-${file.lastModified}`;
 }
 
+// sessionStorage is untrusted: only general|confidential count, and non-admins cannot restore confidential.
+function clampRestoredAccessLevel(value: unknown, canSetConfidential: boolean): AccessLevel {
+  const accessLevel = value === "general" || value === "confidential" ? value : "general";
+  return accessLevel === "confidential" && !canSetConfidential ? "general" : accessLevel;
+}
+
 export function Upload() {
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -65,6 +71,8 @@ export function Upload() {
   const [bulkAccessLevel, setBulkAccessLevel] = useState("");
 
   const [isPickingDrive, setIsPickingDrive] = useState(false);
+  // Hold Drive picks from the OAuth redirect until the current user's role is known.
+  const [restoredDrivePicks, setRestoredDrivePicks] = useState<PendingFile[] | null>(null);
 
   const upload = useUploadFiles();
   const driveImport = useImportDriveFiles();
@@ -88,11 +96,26 @@ export function Upload() {
     try {
       const saved = window.sessionStorage.getItem(DRIVE_PICKS_STORAGE_KEY);
       window.sessionStorage.removeItem(DRIVE_PICKS_STORAGE_KEY);
-      if (saved) addPending(JSON.parse(saved) as PendingFile[]);
+      if (saved) setRestoredDrivePicks(JSON.parse(saved) as PendingFile[]);
     } catch {
       // Storage blocked or corrupt: the user picks the files again.
     }
   }, []);
+
+  useEffect(() => {
+    if (!restoredDrivePicks) return;
+    // Do not clamp until role is known; on a failed /me, treat as non-admin.
+    if (!user.isSuccess && !user.isError) return;
+
+    const allowConfidential = user.isSuccess && user.data.role === "admin";
+    addPending(
+      restoredDrivePicks.map((item) => ({
+        ...item,
+        accessLevel: clampRestoredAccessLevel(item.accessLevel, allowConfidential),
+      })),
+    );
+    setRestoredDrivePicks(null);
+  }, [restoredDrivePicks, user.isSuccess, user.isError, user.data?.role]);
 
   // Runs before the Google consent redirect, which reloads the page.
   function beforeDriveConnect() {

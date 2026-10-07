@@ -21,7 +21,7 @@ import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ChatMessage, ChatResult } from "@/interface/chat";
-import { sendChatMessageStream, useGetConversation } from "@/services/chat";
+import { getConversation, sendChatMessageStream, useGetConversation } from "@/services/chat";
 import { getApiErrorMessage } from "@/utils/api-error";
 
 const MAX_QUERY_LENGTH = 4000;
@@ -66,6 +66,10 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
   const streamFrame = useRef<number | null>(null);
   const skipNextConversationLoad = useRef<string | false>(false);
   const streamAbort = useRef<AbortController | null>(null);
+  // Conversation id used for the in-flight turn (includes new_conversation_id before the URL updates).
+  const streamConversationId = useRef<string | undefined>(undefined);
+  // Persisted message count before the in-flight turn; Retry only restores if the reload grew past this.
+  const savedMessageCountAtTurnStart = useRef(0);
   const conversationQuery = useGetConversation(conversationId);
 
   useEffect(() => {
@@ -163,7 +167,40 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
     void askQuestion(trimmedQuery);
   }
 
-  function handleRetry(failedMessageId: string, question: string) {
+  async function handleRetry(failedMessageId: string, question: string) {
+    // Network drops can leave the client on "failed" while the server already saved stopped/complete.
+    // Reload first so Retry does not create a second turn.
+    const savedConversationId = conversationId ?? streamConversationId.current;
+    if (savedConversationId) {
+      try {
+        const detail = await getConversation(savedConversationId);
+        queryClient.setQueryData(["chat", "conversations", savedConversationId], detail);
+        const last = detail.messages.at(-1);
+        const previous = detail.messages.at(-2);
+        // Length must grow past the pre-turn snapshot so an earlier identical question is not mistaken
+        // for a save from this failed attempt.
+        if (
+          detail.messages.length > savedMessageCountAtTurnStart.current &&
+          last?.role === "assistant" &&
+          (last.status === "stopped" || last.status === "completed") &&
+          previous?.role === "user" &&
+          previous.content === question
+        ) {
+          skipNextConversationLoad.current = savedConversationId;
+          setMessages(
+            detail.messages.map((message) => toDisplayMessage(message, savedConversationId)),
+          );
+          queryClient.invalidateQueries({ queryKey: ["chat", "conversations"], exact: true });
+          if (!conversationId) {
+            router.replace(`/workspace/${savedConversationId}`);
+          }
+          return;
+        }
+      } catch {
+        // Reload failed; fall through and re-POST when nothing usable was restored.
+      }
+    }
+
     // Drop the failed answer and the question before it; askQuestion adds both back.
     setMessages((current) => {
       const index = current.findIndex((message) => message.id === failedMessageId);
@@ -177,6 +214,11 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
     setValidationError("");
     shouldAutoScroll.current = true;
     setShowJumpToLatest(false);
+    // Snapshot what was already saved before this turn's optimistic user/assistant rows.
+    // A trailing failed pair is local-only and must not inflate the count.
+    const last = messages.at(-1);
+    savedMessageCountAtTurnStart.current =
+      last?.state === "failed" ? Math.max(0, messages.length - 2) : messages.length;
     const userMessage: DisplayMessage = {
       id: crypto.randomUUID(),
       role: "user",
@@ -190,6 +232,7 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
     ]);
     // Pick the id of a new conversation here so a stopped answer can still be opened.
     const newConversationId = conversationId ? undefined : crypto.randomUUID();
+    streamConversationId.current = conversationId ?? newConversationId;
     const abort = new AbortController();
     streamAbort.current = abort;
     let shownText = "";
@@ -353,7 +396,7 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
                 streamingStatus={message.id === streamingMessageId ? streamStatus : undefined}
                 onRetry={
                   message.question && !isPending
-                    ? () => handleRetry(message.id, message.question as string)
+                    ? () => void handleRetry(message.id, message.question as string)
                     : undefined
                 }
               />

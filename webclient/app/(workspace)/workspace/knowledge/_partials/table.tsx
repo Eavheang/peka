@@ -187,9 +187,7 @@ export function KnowledgeTable({
               <TableCell className="px-5 py-4">
                 {new Date(file.created_at).toLocaleDateString()}
               </TableCell>
-              <TableCell className="px-5 py-4">
-                {fileType(file)}
-              </TableCell>
+              <TableCell className="px-5 py-4">{fileType(file)}</TableCell>
               <TableCell className="px-5 py-4">
                 <Badge variant="outline">{file.access_level}</Badge>
               </TableCell>
