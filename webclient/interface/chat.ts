@@ -19,6 +19,7 @@ export interface ChatRequest {
   conversation_id?: string;
   new_conversation_id?: string;
   web_search?: boolean;
+  regenerate?: boolean;
   timezone?: string;
 }
 

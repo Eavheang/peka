@@ -11,6 +11,8 @@ class ChatRequest(BaseModel):
     # stream is stopped before the server could send it back.
     new_conversation_id: UUID | None = None
     web_search: bool = False
+    # Redo the last answer: the saved last question and answer are replaced, not appended to.
+    regenerate: bool = False
     timezone: str | None = Field(default=None, max_length=64)
 
     @field_validator("query", mode="before")
