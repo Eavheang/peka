@@ -6,7 +6,7 @@ All local stack commands run from `config/`. This directory owns Compose files, 
 
 | Path | Purpose |
 |------|---------|
-| `Makefile` | `setup`, `up`, `down`, `migrate` |
+| `Makefile` | `setup`, `up`, `down`, `migrate`, `prod-up`, `prod-down` |
 | `compose.yaml` | Base services (prod-style) |
 | `compose.dev.yaml` | Hot-reload overlays (bind mounts, bun/uvicorn reload) |
 | `.env.example` / `.env` | Postgres, pgAdmin, embedding defaults, `LLM_API_KEY` |
@@ -20,10 +20,12 @@ Application secrets for the API/worker still live in `service/.env` (`env_file` 
 ## Makefile targets
 
 ```bash
-make setup    # .env if missing; build/start core services; bun install; migrate
-make up       # start compose.yaml + compose.dev.yaml
-make migrate  # alembic upgrade head in service container
-make down     # tear down the stack
+make setup     # .env if missing; build/start core services; bun install; migrate
+make up        # start compose.yaml + compose.dev.yaml
+make migrate   # alembic upgrade head in service container
+make down      # tear down the stack
+make prod-up   # start compose.yaml only (built images, no hot reload)
+make prod-down # tear down the prod-style stack
 ```
 
 ## Compose services
@@ -95,7 +97,7 @@ In-network from worker: `http://llama:8080/v1`
 | Mode | Command |
 |------|---------|
 | Dev (hot reload) | `make up` → both compose files |
-| Prod-style | `docker compose -f compose.yaml up -d --build` |
+| Prod-style | `make prod-up` → `compose.yaml` only |
 
 Dev overlays typically bind-mount source and run `uvicorn --reload` / `bun run dev`.
 

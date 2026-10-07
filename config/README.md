@@ -106,14 +106,14 @@ it is gitignored.
 
 ## Deployment-style run
 
-Builds and runs production containers:
+Builds and runs production containers (base `compose.yaml` only, no hot-reload overlay):
 
 ```bash
-docker compose -f compose.yaml up -d --build
+make prod-up
 ```
 
 Stop deployment containers:
 
 ```bash
-docker compose -f compose.yaml down
+make prod-down
 ```

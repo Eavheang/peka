@@ -88,8 +88,8 @@ Override with `POSTGRES_*` and `PGADMIN_*` in `config/.env`.
 
 ```bash
 cd config
-docker compose -f compose.yaml up -d --build
-docker compose -f compose.yaml down
+make prod-up    # compose.yaml only (built images, no hot reload)
+make prod-down
 ```
 
 ## Next reading
