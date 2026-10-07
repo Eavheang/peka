@@ -550,7 +550,7 @@ def test_chat_endpoint_returns_answer(monkeypatch) -> None:
         "answer_from_knowledge",
         lambda query, role, history, **kwargs: chat_service.ChatResponse(answer="ok [1]", refused=False, citations=[]),
     )
-    monkeypatch.setattr(chat_service, "persist_response", lambda query, user_id, response, conversation_id=None: response)
+    monkeypatch.setattr(chat_service, "persist_response", lambda query, user_id, response, conversation_id=None, **_: response)
     _override_admin()
     try:
         client = TestClient(app)
@@ -573,7 +573,7 @@ def test_chat_endpoint_forwards_client_timezone(monkeypatch) -> None:
 
     monkeypatch.setattr(chat_routes, "answer_from_knowledge", answer)
     monkeypatch.setattr(
-        chat_service, "persist_response", lambda query, user_id, response, conversation_id=None: response
+        chat_service, "persist_response", lambda query, user_id, response, conversation_id=None, **_: response
     )
     _override_admin()
     try:
@@ -620,6 +620,48 @@ def test_chat_stream_endpoint_emits_text_and_persists_completion(monkeypatch) ->
     assert '"type": "done"' in response.text
     assert '"conversation_id": "' + str(conversation_id) in response.text
     assert "data: [DONE]" in response.text
+
+
+def test_chat_stream_regenerate_replays_last_question_and_replaces_pair(monkeypatch) -> None:
+    from app.chat import routes as chat_routes
+
+    conversation_id = uuid4()
+    history = [
+        {"role": "user", "content": "first"},
+        {"role": "assistant", "content": "one"},
+        {"role": "user", "content": "second"},
+        {"role": "assistant", "content": "two"},
+    ]
+    seen: dict = {}
+
+    async def stream_answer(query, role, hist, **kwargs):
+        seen["query"], seen["history"] = query, hist
+        yield chat_service.ChatStreamCompleted(
+            chat_service.ChatResponse(answer="new", refused=False, citations=[])
+        )
+
+    def persist(query, user_id, response, conversation_id=None, **kwargs):
+        seen["replace_last"] = kwargs["replace_last"]
+        return response.model_copy(update={"conversation_id": conversation_id, "messages": []})
+
+    monkeypatch.setattr(chat_routes.chat_service, "get_conversation", lambda *_: {"messages": history})
+    monkeypatch.setattr(chat_routes.chat_service, "stream_answer_from_knowledge", stream_answer)
+    monkeypatch.setattr(chat_routes.chat_service, "persist_response", persist)
+    monkeypatch.setattr(chat_routes.chat_service, "model_name", lambda: "test-model")
+    _override_admin()
+    try:
+        client = TestClient(app)
+        ok = client.post(
+            "/chat/stream",
+            json={"query": "ignored", "conversation_id": str(conversation_id), "regenerate": True},
+        )
+        no_conversation = client.post("/chat/stream", json={"query": "x", "regenerate": True})
+    finally:
+        app.dependency_overrides.clear()
+
+    assert ok.status_code == 200
+    assert seen == {"query": "second", "history": history[:2], "replace_last": True}
+    assert no_conversation.status_code == 409
 
 
 def test_stream_answer_parses_incremental_json_and_validates_answer(monkeypatch) -> None:
@@ -726,7 +768,7 @@ def test_first_message_is_persisted_and_returned(monkeypatch) -> None:
     calls = []
 
     class FakeRepository:
-        def create_exchange(self, owner_id, title, query, response, conversation_id=None, status="completed", new_conversation_id=None):
+        def create_exchange(self, owner_id, title, query, response, conversation_id=None, status="completed", new_conversation_id=None, replace_last=False):
             calls.append((owner_id, title, query, conversation_id, response))
             return {
                 "conversation": {"id": conversation_id or conversation_id_for_test},
@@ -803,7 +845,7 @@ def test_endpoint_authorizes_history_before_calling_model(monkeypatch, found):
 
     monkeypatch.setattr(chat_service, "get_conversation", get_conversation)
     monkeypatch.setattr(chat_routes, "answer_from_knowledge", answer)
-    monkeypatch.setattr(chat_service, "persist_response", lambda *args: args[2])
+    monkeypatch.setattr(chat_service, "persist_response", lambda *args, **_: args[2])
     _override_admin()
     try:
         response = TestClient(app).post("/chat", json={"query": "More details?", "conversation_id": str(conversation_id)})
@@ -970,7 +1012,7 @@ class _StreamRecorder:
 
         def persist(
             query, user_id, response, conversation_id=None, status="completed", metrics=None,
-            new_conversation_id=None,
+            new_conversation_id=None, replace_last=False,
         ):
             if persist_error:
                 raise persist_error

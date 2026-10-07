@@ -22,6 +22,7 @@ class ChatRepository:
         conversation_id: UUID | None = None,
         status: Literal["completed", "stopped"] = "completed",
         new_conversation_id: UUID | None = None,
+        replace_last: bool = False,
     ) -> dict[str, Any]:
         citations = [citation.model_dump(mode="json") for citation in response.citations]
         with get_connection() as connection:
@@ -49,6 +50,17 @@ class ChatRepository:
 
             if conversation is None:
                 raise RuntimeError("Unable to create conversation")
+
+            if replace_last:
+                removed = connection.execute(
+                    "DELETE FROM messages WHERE id IN ("
+                    "SELECT id FROM messages WHERE conversation_id = %s ORDER BY sequence DESC LIMIT 2"
+                    ") RETURNING role",
+                    (conversation["id"],),
+                ).fetchall()
+                # The conversation moved on while the answer streamed; roll back.
+                if sorted(row["role"] for row in removed) != ["assistant", "user"]:
+                    raise RuntimeError("The conversation changed. Please try again.")
 
             next_sequence = connection.execute(
                 "SELECT COALESCE(MAX(sequence), -1) + 1 AS next_sequence "

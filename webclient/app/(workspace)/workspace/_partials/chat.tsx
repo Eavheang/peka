@@ -30,12 +30,6 @@ const SourcePreview = dynamic(() =>
   import("./sourcePreview").then((module) => module.SourcePreview),
 );
 
-const EXAMPLE_QUESTIONS = [
-  "Summarize the key points of our onboarding documents",
-  "What is our leave policy?",
-  "Which documents mention security requirements?",
-];
-
 type DisplayMessage = {
   id: string;
   role: "user" | "assistant";
@@ -45,6 +39,8 @@ type DisplayMessage = {
   state?: "stopped" | "failed";
   error?: string;
   question?: string;
+  // The failed attempt was a regenerate, so Retry must replace the saved answer, not append.
+  regenerate?: boolean;
 };
 
 export function ChatPanel({ conversationId }: { conversationId?: string }) {
@@ -168,10 +164,12 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
   }
 
   async function handleRetry(failedMessageId: string, question: string) {
+    const regenerate = messages.find((message) => message.id === failedMessageId)?.regenerate;
     // Network drops can leave the client on "failed" while the server already saved stopped/complete.
     // Reload first so Retry does not create a second turn.
+    // A failed regenerate is skipped: the saved last turn is the old answer, which would match.
     const savedConversationId = conversationId ?? streamConversationId.current;
-    if (savedConversationId) {
+    if (savedConversationId && !regenerate) {
       try {
         const detail = await getConversation(savedConversationId);
         queryClient.setQueryData(["chat", "conversations", savedConversationId], detail);
@@ -201,15 +199,25 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
       }
     }
 
-    // Drop the failed answer and the question before it; askQuestion adds both back.
+    // Drop the failed answer, and the question before it unless a regenerate keeps it.
     setMessages((current) => {
       const index = current.findIndex((message) => message.id === failedMessageId);
-      return index < 1 ? current : [...current.slice(0, index - 1), ...current.slice(index + 1)];
+      if (index < 1) return current;
+      return [...current.slice(0, regenerate ? index : index - 1), ...current.slice(index + 1)];
     });
-    void askQuestion(question);
+    void askQuestion(question, { regenerate });
   }
 
-  async function askQuestion(question: string) {
+  function handleRegenerate(answer: DisplayMessage, question: string) {
+    void askQuestion(question, { regenerate: true, previous: answer });
+  }
+
+  // `regenerate`: the question is already on screen and saved, and the new answer replaces
+  // the saved one. `previous` is the answer on screen being replaced.
+  async function askQuestion(
+    question: string,
+    { regenerate = false, previous }: { regenerate?: boolean; previous?: DisplayMessage } = {},
+  ) {
     if (isPending) return;
     setValidationError("");
     shouldAutoScroll.current = true;
@@ -226,8 +234,8 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
     };
     const assistantMessageId = crypto.randomUUID();
     setMessages((current) => [
-      ...current,
-      userMessage,
+      ...current.filter((message) => message.id !== previous?.id),
+      ...(regenerate ? [] : [userMessage]),
       { id: assistantMessageId, role: "assistant", text: "" },
     ]);
     // Pick the id of a new conversation here so a stopped answer can still be opened.
@@ -250,6 +258,7 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
             ? { conversation_id: conversationId }
             : { new_conversation_id: newConversationId }),
           web_search: webSearchEnabled,
+          ...(regenerate && { regenerate }),
         },
         (event) => {
           if (event.type === "status") {
@@ -296,6 +305,13 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
             skipNextConversationLoad.current = newConversationId;
             router.replace(`/workspace/${newConversationId}`);
           }
+        } else if (regenerate) {
+          // Nothing was saved, so the old answer is still the saved one.
+          setMessages((current) =>
+            previous
+              ? current.map((message) => (message.id === assistantMessageId ? previous : message))
+              : current.filter((message) => message.id !== assistantMessageId),
+          );
         } else {
           // Nothing was saved: take the question back into the input.
           setMessages((current) =>
@@ -311,6 +327,7 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
       setAssistantMessage(assistantMessageId, {
         state: "failed",
         question,
+        regenerate,
         error:
           error instanceof Error && error.message
             ? error.message
@@ -373,27 +390,23 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
                 Ask a question or explore a document in your library. Peka searches your indexed
                 knowledge when needed.
               </p>
-              <div className="mt-6 flex max-w-xl flex-wrap justify-center gap-2">
-                {EXAMPLE_QUESTIONS.map((example) => (
-                  <Button
-                    className="h-auto rounded-full px-3 py-1.5 text-xs font-normal text-copy"
-                    key={example}
-                    size="sm"
-                    type="button"
-                    variant="outline"
-                    onClick={() => void askQuestion(example)}
-                  >
-                    {example}
-                  </Button>
-                ))}
-              </div>
             </div>
           ) : (
-            messages.map((message) => (
+            messages.map((message, index) => (
               <ChatMessageBubble
                 key={message.id}
                 message={message}
                 streamingStatus={message.id === streamingMessageId ? streamStatus : undefined}
+                onRegenerate={
+                  conversationId &&
+                  !isPending &&
+                  index === messages.length - 1 &&
+                  message.role === "assistant" &&
+                  message.state !== "failed" &&
+                  messages[index - 1]?.role === "user"
+                    ? () => handleRegenerate(message, messages[index - 1].text)
+                    : undefined
+                }
                 onRetry={
                   message.question && !isPending
                     ? () => void handleRetry(message.id, message.question as string)
@@ -525,10 +538,12 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
 function ChatMessageBubble({
   message,
   streamingStatus,
+  onRegenerate,
   onRetry,
 }: {
   message: DisplayMessage;
   streamingStatus?: string;
+  onRegenerate?: () => void;
   onRetry?: () => void;
 }) {
   const isUser = message.role === "user";
@@ -603,6 +618,18 @@ function ChatMessageBubble({
             onClick={() => void copyAnswer()}
           >
             {copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
+          </Button>
+        )}
+        {!isUser && message.text && !streamingStatus && onRegenerate && (
+          <Button
+            aria-label="Regenerate response"
+            className="ml-1 mt-2 text-muted hover:text-foreground"
+            size="icon-sm"
+            type="button"
+            variant="ghost"
+            onClick={onRegenerate}
+          >
+            <RotateCcw aria-hidden="true" />
           </Button>
         )}
         {!isUser && result && result.citations.length > 0 && (

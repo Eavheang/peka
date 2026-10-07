@@ -41,10 +41,19 @@ def _conversation_history(payload: ChatRequest, user_id: UUID) -> list[dict]:
     return conversation["messages"]
 
 
+def _prepare(payload: ChatRequest, user_id: UUID) -> tuple[ChatRequest, list[dict]]:
+    history = _conversation_history(payload, user_id)
+    if not payload.regenerate:
+        return payload, history
+    if len(history) < 2 or history[-1]["role"] != "assistant" or history[-2]["role"] != "user":
+        raise HTTPException(status_code=409, detail="There is no answer to regenerate")
+    return payload.model_copy(update={"query": history[-2]["content"]}), history[:-2]
+
+
 @router.post("", response_model=ChatResponse, response_model_exclude_none=True)
 def chat(payload: ChatRequest, user: dict = Depends(authenticated)) -> ChatResponse:
     try:
-        history = _conversation_history(payload, user["id"])
+        payload, history = _prepare(payload, user["id"])
         answer = answer_from_knowledge(
             payload.query,
             user["role"],
@@ -57,6 +66,7 @@ def chat(payload: ChatRequest, user: dict = Depends(authenticated)) -> ChatRespo
             user["id"],
             answer,
             payload.conversation_id,
+            replace_last=payload.regenerate,
         )
     except ConversationNotFoundError:
         raise HTTPException(status_code=404, detail="Conversation not found") from None
@@ -68,7 +78,7 @@ def chat(payload: ChatRequest, user: dict = Depends(authenticated)) -> ChatRespo
 @router.post("/stream")
 async def chat_stream(payload: ChatRequest, user: dict = Depends(authenticated)) -> StreamingResponse:
     try:
-        history = _conversation_history(payload, user["id"])
+        payload, history = _prepare(payload, user["id"])
     except ConversationNotFoundError:
         raise HTTPException(status_code=404, detail="Conversation not found") from None
 
@@ -121,6 +131,7 @@ async def _stream_events(payload: ChatRequest, user: dict, history: list[dict]) 
                             payload.conversation_id,
                             metrics=metrics,
                             new_conversation_id=payload.new_conversation_id,
+                            replace_last=payload.regenerate,
                         )
                     except Exception:
                         logger.exception("Saving the chat answer failed")
@@ -165,6 +176,7 @@ def _save_stopped(payload: ChatRequest, user_id: UUID, partial: str, metrics: di
                 status="stopped",
                 metrics=metrics,
                 new_conversation_id=payload.new_conversation_id,
+                replace_last=payload.regenerate,
             )
         else:
             chat_service.audit_unsaved_turn("chat_turn_stopped", user_id, payload.conversation_id, metrics)
