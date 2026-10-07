@@ -31,9 +31,10 @@ const SourcePreview = dynamic(() =>
 );
 
 const EXAMPLE_QUESTIONS = [
-  "Summarize the key points of our onboarding documents",
-  "What is our leave policy?",
-  "Which documents mention security requirements?",
+  "What is our remote work policy?",
+  "Summarize the latest product roadmap.",
+  "Who owns customer onboarding?",
+  "Where can I find the security guidelines?",
 ];
 
 type DisplayMessage = {
@@ -330,20 +331,20 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
                 Ask a question or explore a document in your library. Peka searches your indexed
                 knowledge when needed.
               </p>
-              <div className="mt-6 flex max-w-xl flex-wrap justify-center gap-2">
+              <ul className="mt-8 grid w-full max-w-xl gap-2 sm:grid-cols-2">
                 {EXAMPLE_QUESTIONS.map((example) => (
-                  <Button
-                    className="h-auto rounded-full px-3 py-1.5 text-xs font-normal text-copy"
-                    key={example}
-                    size="sm"
-                    type="button"
-                    variant="outline"
-                    onClick={() => void askQuestion(example)}
-                  >
-                    {example}
-                  </Button>
+                  <li key={example}>
+                    <button
+                      className="w-full rounded-xl border border-border bg-background px-4 py-3 text-left text-sm leading-6 text-copy transition-colors hover:border-primary/40 hover:bg-secondary/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50"
+                      disabled={isPending}
+                      type="button"
+                      onClick={() => void askQuestion(example)}
+                    >
+                      {example}
+                    </button>
+                  </li>
                 ))}
-              </div>
+              </ul>
             </div>
           ) : (
             messages.map((message) => (
@@ -491,12 +492,20 @@ function ChatMessageBubble({
   const isUser = message.role === "user";
   const result = message.result;
   const [copied, setCopied] = useState(false);
+  const copyResetRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copyResetRef.current !== null) window.clearTimeout(copyResetRef.current);
+    };
+  }, []);
 
   async function copyAnswer() {
     try {
       await navigator.clipboard.writeText(message.text);
       setCopied(true);
-      window.setTimeout(() => setCopied(false), 2000);
+      if (copyResetRef.current !== null) window.clearTimeout(copyResetRef.current);
+      copyResetRef.current = window.setTimeout(() => setCopied(false), 2000);
     } catch {
       // Clipboard access denied; the text stays selectable.
     }
@@ -551,16 +560,23 @@ function ChatMessageBubble({
           </div>
         )}
         {!isUser && message.text && !streamingStatus && (
-          <Button
-            aria-label={copied ? "Copied" : "Copy response"}
-            className="mt-2 text-muted hover:text-foreground"
-            size="icon-sm"
-            type="button"
-            variant="ghost"
-            onClick={() => void copyAnswer()}
-          >
-            {copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
-          </Button>
+          <div className="mt-3">
+            <Button
+              aria-label={copied ? "Copied" : "Copy answer"}
+              className="h-8 gap-1.5 px-2.5 text-muted hover:text-foreground"
+              size="sm"
+              type="button"
+              variant="ghost"
+              onClick={() => void copyAnswer()}
+            >
+              {copied ? (
+                <Check aria-hidden="true" size={14} />
+              ) : (
+                <Copy aria-hidden="true" size={14} />
+              )}
+              {copied ? "Copied" : "Copy"}
+            </Button>
+          </div>
         )}
         {!isUser && result && result.citations.length > 0 && (
           <details className="mt-5 border-t border-border pt-4">
