@@ -18,6 +18,7 @@ import pytest
 from psycopg.rows import dict_row
 
 from app.auth.security import create_access_token, hash_password
+from app.chat.repository import ConversationChangedError
 from app.chat.schemas import ChatResponse
 from app.chat.service import persist_response
 from app.config import settings
@@ -154,7 +155,7 @@ def test_regenerate_never_deletes_a_turn_added_while_it_ran(database):
     # Another tab sends a new question before the regenerate saves.
     persist_response("second", owner["id"], answer, first.conversation_id)
 
-    with pytest.raises(RuntimeError, match="conversation changed"):
+    with pytest.raises(ConversationChangedError):
         persist_response(
             "first", owner["id"], ChatResponse(answer="redo", refused=False, citations=[]),
             first.conversation_id, replace_ids=pinned,

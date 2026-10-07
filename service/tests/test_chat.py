@@ -622,6 +622,42 @@ def test_chat_stream_endpoint_emits_text_and_persists_completion(monkeypatch) ->
     assert "data: [DONE]" in response.text
 
 
+def test_regenerate_conflict_is_a_409_on_both_endpoints(monkeypatch) -> None:
+    from app.chat import routes as chat_routes
+    from app.chat.repository import ConversationChangedError
+
+    history = [
+        {"id": uuid4(), "role": "user", "content": "q"},
+        {"id": uuid4(), "role": "assistant", "content": "a"},
+    ]
+    answer = chat_service.ChatResponse(answer="new", refused=False, citations=[])
+
+    async def stream_answer(*_args, **_kwargs):
+        yield chat_service.ChatStreamCompleted(answer)
+
+    def persist(*_args, **_kwargs):
+        raise ConversationChangedError
+
+    monkeypatch.setattr(chat_routes.chat_service, "get_conversation", lambda *_: {"messages": history})
+    monkeypatch.setattr(chat_routes, "answer_from_knowledge", lambda *_args, **_kwargs: answer)
+    monkeypatch.setattr(chat_routes.chat_service, "stream_answer_from_knowledge", stream_answer)
+    monkeypatch.setattr(chat_routes.chat_service, "persist_response", persist)
+    monkeypatch.setattr(chat_routes.chat_service, "audit_unsaved_turn", lambda *_args: None)
+    monkeypatch.setattr(chat_routes.chat_service, "model_name", lambda: "test-model")
+    body = {"query": "x", "conversation_id": str(uuid4()), "regenerate": True}
+    _override_admin()
+    try:
+        client = TestClient(app)
+        plain = client.post("/chat", json=body)
+        stream = client.post("/chat/stream", json=body)
+    finally:
+        app.dependency_overrides.clear()
+
+    assert plain.status_code == 409
+    assert plain.json() == {"detail": "The conversation changed. Please try again."}
+    assert '"type": "error", "status": 409' in stream.text
+
+
 def test_chat_stream_regenerate_replays_last_question_and_replaces_pair(monkeypatch) -> None:
     from app.chat import routes as chat_routes
 

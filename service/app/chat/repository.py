@@ -12,6 +12,10 @@ class ConversationNotFoundError(LookupError):
     pass
 
 
+class ConversationChangedError(Exception):
+    """A regenerate's pinned pair is no longer the last turn."""
+
+
 class ChatRepository:
     def create_exchange(
         self,
@@ -62,7 +66,7 @@ class ChatRepository:
                 ).fetchall()
                 # The pair is gone or no longer last (another tab or a new message); roll back.
                 if {row["id"] for row in removed} != set(replace_ids):
-                    raise RuntimeError("The conversation changed. Please try again.")
+                    raise ConversationChangedError
 
             next_sequence = connection.execute(
                 "SELECT COALESCE(MAX(sequence), -1) + 1 AS next_sequence "
