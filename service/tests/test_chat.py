@@ -627,10 +627,8 @@ def test_chat_stream_regenerate_replays_last_question_and_replaces_pair(monkeypa
 
     conversation_id = uuid4()
     history = [
-        {"role": "user", "content": "first"},
-        {"role": "assistant", "content": "one"},
-        {"role": "user", "content": "second"},
-        {"role": "assistant", "content": "two"},
+        {"id": uuid4(), "role": role, "content": content}
+        for role, content in [("user", "first"), ("assistant", "one"), ("user", "second"), ("assistant", "two")]
     ]
     seen: dict = {}
 
@@ -641,7 +639,7 @@ def test_chat_stream_regenerate_replays_last_question_and_replaces_pair(monkeypa
         )
 
     def persist(query, user_id, response, conversation_id=None, **kwargs):
-        seen["replace_last"] = kwargs["replace_last"]
+        seen["replace_ids"] = kwargs["replace_ids"]
         return response.model_copy(update={"conversation_id": conversation_id, "messages": []})
 
     monkeypatch.setattr(chat_routes.chat_service, "get_conversation", lambda *_: {"messages": history})
@@ -660,7 +658,10 @@ def test_chat_stream_regenerate_replays_last_question_and_replaces_pair(monkeypa
         app.dependency_overrides.clear()
 
     assert ok.status_code == 200
-    assert seen == {"query": "second", "history": history[:2], "replace_last": True}
+    assert seen == {
+        "query": "second", "history": history[:2],
+        "replace_ids": (history[2]["id"], history[3]["id"]),
+    }
     assert no_conversation.status_code == 409
 
 
@@ -768,7 +769,7 @@ def test_first_message_is_persisted_and_returned(monkeypatch) -> None:
     calls = []
 
     class FakeRepository:
-        def create_exchange(self, owner_id, title, query, response, conversation_id=None, status="completed", new_conversation_id=None, replace_last=False):
+        def create_exchange(self, owner_id, title, query, response, conversation_id=None, status="completed", new_conversation_id=None, replace_ids=None):
             calls.append((owner_id, title, query, conversation_id, response))
             return {
                 "conversation": {"id": conversation_id or conversation_id_for_test},
@@ -1012,7 +1013,7 @@ class _StreamRecorder:
 
         def persist(
             query, user_id, response, conversation_id=None, status="completed", metrics=None,
-            new_conversation_id=None, replace_last=False,
+            new_conversation_id=None, replace_ids=None,
         ):
             if persist_error:
                 raise persist_error

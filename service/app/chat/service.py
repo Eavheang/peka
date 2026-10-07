@@ -611,7 +611,7 @@ def persist_response(
     status: Literal["completed", "stopped"] = "completed",
     metrics: dict | None = None,
     new_conversation_id: UUID | None = None,
-    replace_last: bool = False,
+    replace_ids: tuple[UUID, UUID] | None = None,
 ) -> ChatResponse:
     persisted = chat_repository.create_exchange(
         owner_id=user_id,
@@ -621,7 +621,7 @@ def persist_response(
         conversation_id=conversation_id,
         status=status,
         new_conversation_id=new_conversation_id,
-        replace_last=replace_last,
+        replace_ids=replace_ids,
     )
     record_audit_event(
         "chat_turn" if status == "completed" else "chat_turn_stopped",
