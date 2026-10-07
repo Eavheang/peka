@@ -68,6 +68,8 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
   const streamAbort = useRef<AbortController | null>(null);
   // Conversation id used for the in-flight turn (includes new_conversation_id before the URL updates).
   const streamConversationId = useRef<string | undefined>(undefined);
+  // Persisted message count before the in-flight turn; Retry only restores if the reload grew past this.
+  const savedMessageCountAtTurnStart = useRef(0);
   const conversationQuery = useGetConversation(conversationId);
 
   useEffect(() => {
@@ -175,7 +177,10 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
         queryClient.setQueryData(["chat", "conversations", savedConversationId], detail);
         const last = detail.messages.at(-1);
         const previous = detail.messages.at(-2);
+        // Length must grow past the pre-turn snapshot so an earlier identical question is not mistaken
+        // for a save from this failed attempt.
         if (
+          detail.messages.length > savedMessageCountAtTurnStart.current &&
           last?.role === "assistant" &&
           (last.status === "stopped" || last.status === "completed") &&
           previous?.role === "user" &&
@@ -209,6 +214,11 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
     setValidationError("");
     shouldAutoScroll.current = true;
     setShowJumpToLatest(false);
+    // Snapshot what was already saved before this turn's optimistic user/assistant rows.
+    // A trailing failed pair is local-only and must not inflate the count.
+    const last = messages.at(-1);
+    savedMessageCountAtTurnStart.current =
+      last?.state === "failed" ? Math.max(0, messages.length - 2) : messages.length;
     const userMessage: DisplayMessage = {
       id: crypto.randomUUID(),
       role: "user",
