@@ -113,7 +113,7 @@ def _persist_new_chat(monkeypatch, owner_id, prompt):
     conversation_id = uuid4()
     created_at = datetime.now(timezone.utc)
 
-    def create_exchange(owner_id, title, query, response, conversation_id=None):
+    def create_exchange(owner_id, title, query, response, conversation_id=None, status="completed", new_conversation_id=None):
         assert conversation_id is None
         return {
             "conversation": {

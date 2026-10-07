@@ -50,13 +50,17 @@ function loadPicker() {
   return pickerScript;
 }
 
-/** Opens the Drive picker; redirects to Google consent first when the account is not connected. */
-export async function pickGoogleDriveFiles(): Promise<DriveDoc[]> {
+/**
+ * Opens the Drive picker; redirects to Google consent first when the account is not connected.
+ * `beforeConnect` runs before that redirect and can cancel it by returning false.
+ */
+export async function pickGoogleDriveFiles(beforeConnect: () => boolean): Promise<DriveDoc[]> {
   let config: PickerConfig;
   try {
     config = (await axiosInstance.get<PickerConfig>("/integrations/google/picker")).data;
   } catch (error) {
     if (isAxiosError(error) && error.response?.status === 409) {
+      if (!beforeConnect()) return [];
       const { url } = (await axiosInstance.get<{ url: string }>("/integrations/google/connect"))
         .data;
       window.location.assign(url);

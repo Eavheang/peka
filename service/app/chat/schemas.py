@@ -7,6 +7,9 @@ from pydantic import BaseModel, Field, field_validator
 class ChatRequest(BaseModel):
     query: str = Field(min_length=1, max_length=4000)
     conversation_id: UUID | None = None
+    # Client-chosen id for a new conversation, so the client knows it even when the
+    # stream is stopped before the server could send it back.
+    new_conversation_id: UUID | None = None
     web_search: bool = False
     timezone: str | None = Field(default=None, max_length=64)
 

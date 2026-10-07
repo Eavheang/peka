@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, DragEvent, MouseEvent, useRef, useState } from "react";
+import { ChangeEvent, DragEvent, MouseEvent, useEffect, useRef, useState } from "react";
 import {
   FileText,
   FileUp,
@@ -28,9 +28,12 @@ import { pickGoogleDriveFiles, useImportDriveFiles } from "@/services/google-dri
 import { useGetCurrentUser } from "@/services/auth";
 import { getApiErrorMessage } from "@/utils/api-error";
 import { getStoredToken } from "@/utils/auth-storage";
+import { toast } from "@/components/ui/toast";
 
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 const ACCEPTED_EXTENSIONS = [".pdf", ".docx", ".pptx", ".xlsx", ".md", ".txt"];
+// Drive picks queued before the Google consent redirect, restored when the user comes back.
+const DRIVE_PICKS_STORAGE_KEY = "peka_pending_drive_picks";
 
 function formatFileSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -68,6 +71,50 @@ export function Upload() {
   const isUploading = upload.isPending || driveImport.isPending;
   const user = useGetCurrentUser(getStoredToken("peka_access_token") ?? "");
   const canSetConfidential = user.data?.role === "admin";
+
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const result = url.searchParams.get("google_drive");
+    if (result) {
+      toast.add(
+        result === "connected"
+          ? { title: "Google Drive connected.", type: "success" }
+          : { title: "Google Drive could not be connected. Please try again.", type: "error" },
+      );
+      url.searchParams.delete("google_drive");
+      window.history.replaceState(null, "", url);
+    }
+
+    try {
+      const saved = window.sessionStorage.getItem(DRIVE_PICKS_STORAGE_KEY);
+      window.sessionStorage.removeItem(DRIVE_PICKS_STORAGE_KEY);
+      if (saved) addPending(JSON.parse(saved) as PendingFile[]);
+    } catch {
+      // Storage blocked or corrupt: the user picks the files again.
+    }
+  }, []);
+
+  // Runs before the Google consent redirect, which reloads the page.
+  function beforeDriveConnect() {
+    const localCount = pendingFiles.filter(({ file }) => file).length;
+    if (
+      localCount &&
+      !window.confirm(
+        `Connecting Google Drive reloads this page and clears ${localCount} local ${localCount === 1 ? "file" : "files"} from the upload queue. Continue?`,
+      )
+    ) {
+      return false;
+    }
+    try {
+      window.sessionStorage.setItem(
+        DRIVE_PICKS_STORAGE_KEY,
+        JSON.stringify(pendingFiles.filter(({ driveId }) => driveId)),
+      );
+    } catch {
+      // Storage blocked: Drive picks are lost with the reload.
+    }
+    return true;
+  }
 
   function ingestFiles(selected: File[]) {
     setUploadError("");
@@ -119,7 +166,7 @@ export function Upload() {
     setIsPickingDrive(true);
 
     try {
-      const docs = await pickGoogleDriveFiles();
+      const docs = await pickGoogleDriveFiles(beforeDriveConnect);
       addPending(
         docs.map(({ id, name, sizeBytes }) => ({
           key: `drive-${id}`,

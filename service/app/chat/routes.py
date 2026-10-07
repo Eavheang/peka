@@ -1,7 +1,12 @@
 import asyncio
 import json
 import logging
+import time
+from collections.abc import AsyncIterator
+from contextlib import aclosing
 from uuid import UUID
+
+import anyio
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from fastapi.responses import StreamingResponse
@@ -67,40 +72,8 @@ async def chat_stream(payload: ChatRequest, user: dict = Depends(authenticated))
     except ConversationNotFoundError:
         raise HTTPException(status_code=404, detail="Conversation not found") from None
 
-    async def events():
-        try:
-            async for event in chat_service.stream_answer_from_knowledge(
-                payload.query,
-                user["role"],
-                history,
-                web_search=payload.web_search,
-                timezone=payload.timezone,
-            ):
-                if isinstance(event, chat_service.ChatStreamStatus):
-                    yield _sse({"type": "status", "message": event.message})
-                elif isinstance(event, chat_service.ChatStreamText):
-                    yield _sse({"type": "text", "delta": event.delta})
-                else:
-                    # persist_response writes the chat audit row. Keep that insert
-                    # off the event loop so a slow database does not stall the stream.
-                    response = await asyncio.to_thread(
-                        chat_service.persist_response,
-                        payload.query,
-                        user["id"],
-                        event.response,
-                        payload.conversation_id,
-                    )
-                    yield _sse({
-                        "type": "done",
-                        "response": response.model_dump(mode="json", exclude_none=True),
-                    })
-                    yield "data: [DONE]\n\n"
-        except RuntimeError as error:
-            logger.warning("Streaming chat request failed: %s", error)
-            yield _sse({"type": "error", "message": str(error)})
-
     return StreamingResponse(
-        events(),
+        _stream_events(payload, user, history),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -108,6 +81,95 @@ async def chat_stream(payload: ChatRequest, user: dict = Depends(authenticated))
             "X-Accel-Buffering": "no",
         },
     )
+
+
+async def _stream_events(payload: ChatRequest, user: dict, history: list[dict]) -> AsyncIterator[str]:
+    started = time.monotonic()
+    metrics: dict = {"model": None, "ttft_ms": None}
+    shown: list[str] = []  # the text the client currently displays
+    finished = False
+    try:
+        metrics["model"] = await asyncio.to_thread(chat_service.model_name)
+        async with aclosing(chat_service.stream_answer_from_knowledge(
+            payload.query,
+            user["role"],
+            history,
+            web_search=payload.web_search,
+            timezone=payload.timezone,
+        )) as events:
+            async for event in events:
+                if isinstance(event, chat_service.ChatStreamStatus):
+                    yield _sse({"type": "status", "message": event.message})
+                elif isinstance(event, chat_service.ChatStreamReset):
+                    shown.clear()
+                    yield _sse({"type": "reset"})
+                elif isinstance(event, chat_service.ChatStreamText):
+                    if metrics["ttft_ms"] is None:
+                        metrics["ttft_ms"] = round((time.monotonic() - started) * 1000)
+                    shown.append(event.delta)
+                    yield _sse({"type": "text", "delta": event.delta})
+                else:
+                    finished = True
+                    try:
+                        # persist_response writes the chat audit row. Keep that insert
+                        # off the event loop so a slow database does not stall the stream.
+                        response = await asyncio.to_thread(
+                            chat_service.persist_response,
+                            payload.query,
+                            user["id"],
+                            event.response,
+                            payload.conversation_id,
+                            metrics=metrics,
+                            new_conversation_id=payload.new_conversation_id,
+                        )
+                    except Exception:
+                        logger.exception("Saving the chat answer failed")
+                        await asyncio.to_thread(
+                            chat_service.audit_unsaved_turn, "chat_turn_failed", user["id"],
+                            payload.conversation_id, {**metrics, "reason": "save_failed"},
+                        )
+                        yield _sse({"type": "error", "message": "We could not save this answer. Please try again."})
+                        return
+                    yield _sse({
+                        "type": "done",
+                        "response": response.model_dump(mode="json", exclude_none=True),
+                    })
+                    yield "data: [DONE]\n\n"
+    except (asyncio.CancelledError, GeneratorExit):
+        # The client disconnected (Stop, closed tab). Closing the answer stream above
+        # cancels the model request; a search or retry already in a worker thread
+        # finishes on its own and its result is dropped.
+        if not finished:
+            with anyio.CancelScope(shield=True):
+                await asyncio.to_thread(_save_stopped, payload, user["id"], "".join(shown).strip(), metrics)
+        raise
+    except Exception as error:
+        logger.warning("Streaming chat request failed: %s", error, exc_info=not isinstance(error, RuntimeError))
+        finished = True
+        await asyncio.to_thread(
+            chat_service.audit_unsaved_turn, "chat_turn_failed", user["id"],
+            payload.conversation_id, {**metrics, "reason": type(error).__name__},
+        )
+        message = str(error) if isinstance(error, RuntimeError) else "The answer could not be generated."
+        yield _sse({"type": "error", "message": message})
+
+
+def _save_stopped(payload: ChatRequest, user_id: UUID, partial: str, metrics: dict) -> None:
+    try:
+        if partial:
+            chat_service.persist_response(
+                payload.query,
+                user_id,
+                ChatResponse(answer=partial, refused=False, citations=[]),
+                payload.conversation_id,
+                status="stopped",
+                metrics=metrics,
+                new_conversation_id=payload.new_conversation_id,
+            )
+        else:
+            chat_service.audit_unsaved_turn("chat_turn_stopped", user_id, payload.conversation_id, metrics)
+    except Exception:
+        logger.exception("Saving the stopped chat answer failed")
 
 
 def _sse(payload: dict) -> str:
