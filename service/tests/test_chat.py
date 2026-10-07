@@ -622,15 +622,49 @@ def test_chat_stream_endpoint_emits_text_and_persists_completion(monkeypatch) ->
     assert "data: [DONE]" in response.text
 
 
+def test_regenerate_conflict_is_a_409_on_both_endpoints(monkeypatch) -> None:
+    from app.chat import routes as chat_routes
+    from app.chat.repository import ConversationChangedError
+
+    history = [
+        {"id": uuid4(), "role": "user", "content": "q"},
+        {"id": uuid4(), "role": "assistant", "content": "a"},
+    ]
+    answer = chat_service.ChatResponse(answer="new", refused=False, citations=[])
+
+    async def stream_answer(*_args, **_kwargs):
+        yield chat_service.ChatStreamCompleted(answer)
+
+    def persist(*_args, **_kwargs):
+        raise ConversationChangedError
+
+    monkeypatch.setattr(chat_routes.chat_service, "get_conversation", lambda *_: {"messages": history})
+    monkeypatch.setattr(chat_routes, "answer_from_knowledge", lambda *_args, **_kwargs: answer)
+    monkeypatch.setattr(chat_routes.chat_service, "stream_answer_from_knowledge", stream_answer)
+    monkeypatch.setattr(chat_routes.chat_service, "persist_response", persist)
+    monkeypatch.setattr(chat_routes.chat_service, "audit_unsaved_turn", lambda *_args: None)
+    monkeypatch.setattr(chat_routes.chat_service, "model_name", lambda: "test-model")
+    body = {"query": "x", "conversation_id": str(uuid4()), "regenerate": True}
+    _override_admin()
+    try:
+        client = TestClient(app)
+        plain = client.post("/chat", json=body)
+        stream = client.post("/chat/stream", json=body)
+    finally:
+        app.dependency_overrides.clear()
+
+    assert plain.status_code == 409
+    assert plain.json() == {"detail": "The conversation changed. Please try again."}
+    assert '"type": "error", "status": 409' in stream.text
+
+
 def test_chat_stream_regenerate_replays_last_question_and_replaces_pair(monkeypatch) -> None:
     from app.chat import routes as chat_routes
 
     conversation_id = uuid4()
     history = [
-        {"role": "user", "content": "first"},
-        {"role": "assistant", "content": "one"},
-        {"role": "user", "content": "second"},
-        {"role": "assistant", "content": "two"},
+        {"id": uuid4(), "role": role, "content": content}
+        for role, content in [("user", "first"), ("assistant", "one"), ("user", "second"), ("assistant", "two")]
     ]
     seen: dict = {}
 
@@ -641,7 +675,7 @@ def test_chat_stream_regenerate_replays_last_question_and_replaces_pair(monkeypa
         )
 
     def persist(query, user_id, response, conversation_id=None, **kwargs):
-        seen["replace_last"] = kwargs["replace_last"]
+        seen["replace_ids"] = kwargs["replace_ids"]
         return response.model_copy(update={"conversation_id": conversation_id, "messages": []})
 
     monkeypatch.setattr(chat_routes.chat_service, "get_conversation", lambda *_: {"messages": history})
@@ -660,7 +694,10 @@ def test_chat_stream_regenerate_replays_last_question_and_replaces_pair(monkeypa
         app.dependency_overrides.clear()
 
     assert ok.status_code == 200
-    assert seen == {"query": "second", "history": history[:2], "replace_last": True}
+    assert seen == {
+        "query": "second", "history": history[:2],
+        "replace_ids": (history[2]["id"], history[3]["id"]),
+    }
     assert no_conversation.status_code == 409
 
 
@@ -768,7 +805,7 @@ def test_first_message_is_persisted_and_returned(monkeypatch) -> None:
     calls = []
 
     class FakeRepository:
-        def create_exchange(self, owner_id, title, query, response, conversation_id=None, status="completed", new_conversation_id=None, replace_last=False):
+        def create_exchange(self, owner_id, title, query, response, conversation_id=None, status="completed", new_conversation_id=None, replace_ids=None):
             calls.append((owner_id, title, query, conversation_id, response))
             return {
                 "conversation": {"id": conversation_id or conversation_id_for_test},
@@ -1012,7 +1049,7 @@ class _StreamRecorder:
 
         def persist(
             query, user_id, response, conversation_id=None, status="completed", metrics=None,
-            new_conversation_id=None, replace_last=False,
+            new_conversation_id=None, replace_ids=None,
         ):
             if persist_error:
                 raise persist_error

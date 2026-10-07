@@ -18,6 +18,7 @@ import pytest
 from psycopg.rows import dict_row
 
 from app.auth.security import create_access_token, hash_password
+from app.chat.repository import ConversationChangedError
 from app.chat.schemas import ChatResponse
 from app.chat.service import persist_response
 from app.config import settings
@@ -144,6 +145,42 @@ def test_chat_turn_writes_the_created_conversation_id(database):
     assert prompt not in json.dumps(rows[0]["metadata"])
     stored = execute("SELECT id FROM conversations WHERE id = %s", (saved.conversation_id,))
     assert stored[0]["id"] == saved.conversation_id
+
+
+def test_regenerate_never_deletes_a_turn_added_while_it_ran(database):
+    owner = _insert_user("staff")
+    answer = ChatResponse(answer="one", refused=False, citations=[])
+    first = persist_response("first", owner["id"], answer)
+    pinned = tuple(message.id for message in first.messages)
+    # Another tab sends a new question before the regenerate saves.
+    persist_response("second", owner["id"], answer, first.conversation_id)
+
+    with pytest.raises(ConversationChangedError):
+        persist_response(
+            "first", owner["id"], ChatResponse(answer="redo", refused=False, citations=[]),
+            first.conversation_id, replace_ids=pinned,
+        )
+
+    rows = execute(
+        "SELECT content FROM messages WHERE conversation_id = %s ORDER BY sequence",
+        (first.conversation_id,),
+    )
+    assert [row["content"] for row in rows] == ["first", "one", "second", "one"]
+
+
+def test_regenerate_replaces_the_pinned_last_pair(database):
+    owner = _insert_user("staff")
+    first = persist_response("q", owner["id"], ChatResponse(answer="old", refused=False, citations=[]))
+    pinned = tuple(message.id for message in first.messages)
+    persist_response(
+        "q", owner["id"], ChatResponse(answer="new", refused=False, citations=[]),
+        first.conversation_id, replace_ids=pinned,
+    )
+    rows = execute(
+        "SELECT content FROM messages WHERE conversation_id = %s ORDER BY sequence",
+        (first.conversation_id,),
+    )
+    assert [row["content"] for row in rows] == ["q", "new"]
 
 
 def test_login_writes_login_success(database, client):

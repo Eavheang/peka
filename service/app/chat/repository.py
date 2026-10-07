@@ -12,6 +12,10 @@ class ConversationNotFoundError(LookupError):
     pass
 
 
+class ConversationChangedError(Exception):
+    """A regenerate's pinned pair is no longer the last turn."""
+
+
 class ChatRepository:
     def create_exchange(
         self,
@@ -22,7 +26,9 @@ class ChatRepository:
         conversation_id: UUID | None = None,
         status: Literal["completed", "stopped"] = "completed",
         new_conversation_id: UUID | None = None,
-        replace_last: bool = False,
+        # Ids of the user+assistant pair a regenerate replaces. Pinned when the request
+        # started, so a turn added meanwhile is never the one deleted.
+        replace_ids: tuple[UUID, UUID] | None = None,
     ) -> dict[str, Any]:
         citations = [citation.model_dump(mode="json") for citation in response.citations]
         with get_connection() as connection:
@@ -51,16 +57,16 @@ class ChatRepository:
             if conversation is None:
                 raise RuntimeError("Unable to create conversation")
 
-            if replace_last:
+            if replace_ids is not None:
                 removed = connection.execute(
                     "DELETE FROM messages WHERE id IN ("
                     "SELECT id FROM messages WHERE conversation_id = %s ORDER BY sequence DESC LIMIT 2"
-                    ") RETURNING role",
+                    ") RETURNING id",
                     (conversation["id"],),
                 ).fetchall()
-                # The conversation moved on while the answer streamed; roll back.
-                if sorted(row["role"] for row in removed) != ["assistant", "user"]:
-                    raise RuntimeError("The conversation changed. Please try again.")
+                # The pair is gone or no longer last (another tab or a new message); roll back.
+                if {row["id"] for row in removed} != set(replace_ids):
+                    raise ConversationChangedError
 
             next_sequence = connection.execute(
                 "SELECT COALESCE(MAX(sequence), -1) + 1 AS next_sequence "

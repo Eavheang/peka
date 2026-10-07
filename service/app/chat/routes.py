@@ -17,8 +17,10 @@ from app.chat.schemas import (
     SourcePreviewRequest, SourcePreviewResponse,
 )
 from app.chat import service as chat_service
-from app.chat.repository import ConversationNotFoundError
+from app.chat.repository import ConversationChangedError, ConversationNotFoundError
 from app.chat.service import answer_from_knowledge
+
+CONVERSATION_CHANGED = "The conversation changed. Please try again."
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 logger = logging.getLogger(__name__)
@@ -41,19 +43,23 @@ def _conversation_history(payload: ChatRequest, user_id: UUID) -> list[dict]:
     return conversation["messages"]
 
 
-def _prepare(payload: ChatRequest, user_id: UUID) -> tuple[ChatRequest, list[dict]]:
+def _prepare(
+    payload: ChatRequest, user_id: UUID,
+) -> tuple[ChatRequest, list[dict], tuple[UUID, UUID] | None]:
+    """Returns the request, the history to answer from, and the pair a regenerate replaces."""
     history = _conversation_history(payload, user_id)
     if not payload.regenerate:
-        return payload, history
+        return payload, history, None
     if len(history) < 2 or history[-1]["role"] != "assistant" or history[-2]["role"] != "user":
         raise HTTPException(status_code=409, detail="There is no answer to regenerate")
-    return payload.model_copy(update={"query": history[-2]["content"]}), history[:-2]
+    replace_ids = (history[-2]["id"], history[-1]["id"])
+    return payload.model_copy(update={"query": history[-2]["content"]}), history[:-2], replace_ids
 
 
 @router.post("", response_model=ChatResponse, response_model_exclude_none=True)
 def chat(payload: ChatRequest, user: dict = Depends(authenticated)) -> ChatResponse:
     try:
-        payload, history = _prepare(payload, user["id"])
+        payload, history, replace_ids = _prepare(payload, user["id"])
         answer = answer_from_knowledge(
             payload.query,
             user["role"],
@@ -66,10 +72,12 @@ def chat(payload: ChatRequest, user: dict = Depends(authenticated)) -> ChatRespo
             user["id"],
             answer,
             payload.conversation_id,
-            replace_last=payload.regenerate,
+            replace_ids=replace_ids,
         )
     except ConversationNotFoundError:
         raise HTTPException(status_code=404, detail="Conversation not found") from None
+    except ConversationChangedError:
+        raise HTTPException(status_code=409, detail=CONVERSATION_CHANGED) from None
     except (RuntimeError,) as error:
         logger.warning("Chat request failed: %s", error)
         raise HTTPException(status_code=503, detail=str(error)) from None
@@ -78,12 +86,12 @@ def chat(payload: ChatRequest, user: dict = Depends(authenticated)) -> ChatRespo
 @router.post("/stream")
 async def chat_stream(payload: ChatRequest, user: dict = Depends(authenticated)) -> StreamingResponse:
     try:
-        payload, history = _prepare(payload, user["id"])
+        payload, history, replace_ids = _prepare(payload, user["id"])
     except ConversationNotFoundError:
         raise HTTPException(status_code=404, detail="Conversation not found") from None
 
     return StreamingResponse(
-        _stream_events(payload, user, history),
+        _stream_events(payload, user, history, replace_ids),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -93,7 +101,9 @@ async def chat_stream(payload: ChatRequest, user: dict = Depends(authenticated))
     )
 
 
-async def _stream_events(payload: ChatRequest, user: dict, history: list[dict]) -> AsyncIterator[str]:
+async def _stream_events(
+    payload: ChatRequest, user: dict, history: list[dict], replace_ids: tuple[UUID, UUID] | None = None,
+) -> AsyncIterator[str]:
     started = time.monotonic()
     metrics: dict = {"model": None, "ttft_ms": None}
     shown: list[str] = []  # the text the client currently displays
@@ -131,8 +141,16 @@ async def _stream_events(payload: ChatRequest, user: dict, history: list[dict]) 
                             payload.conversation_id,
                             metrics=metrics,
                             new_conversation_id=payload.new_conversation_id,
-                            replace_last=payload.regenerate,
+                            replace_ids=replace_ids,
                         )
+                    except ConversationChangedError:
+                        await asyncio.to_thread(
+                            chat_service.audit_unsaved_turn, "chat_turn_failed", user["id"],
+                            payload.conversation_id, {**metrics, "reason": "conversation_changed"},
+                        )
+                        # Headers are already sent, so the 409 rides in the event.
+                        yield _sse({"type": "error", "status": 409, "message": CONVERSATION_CHANGED})
+                        return
                     except Exception:
                         logger.exception("Saving the chat answer failed")
                         await asyncio.to_thread(
@@ -152,7 +170,7 @@ async def _stream_events(payload: ChatRequest, user: dict, history: list[dict]) 
         # finishes on its own and its result is dropped.
         if not finished:
             with anyio.CancelScope(shield=True):
-                await asyncio.to_thread(_save_stopped, payload, user["id"], "".join(shown).strip(), metrics)
+                await asyncio.to_thread(_save_stopped, payload, user["id"], "".join(shown).strip(), metrics, replace_ids)
         raise
     except Exception as error:
         logger.warning("Streaming chat request failed: %s", error, exc_info=not isinstance(error, RuntimeError))
@@ -165,7 +183,10 @@ async def _stream_events(payload: ChatRequest, user: dict, history: list[dict]) 
         yield _sse({"type": "error", "message": message})
 
 
-def _save_stopped(payload: ChatRequest, user_id: UUID, partial: str, metrics: dict) -> None:
+def _save_stopped(
+    payload: ChatRequest, user_id: UUID, partial: str, metrics: dict,
+    replace_ids: tuple[UUID, UUID] | None = None,
+) -> None:
     try:
         if partial:
             chat_service.persist_response(
@@ -176,7 +197,7 @@ def _save_stopped(payload: ChatRequest, user_id: UUID, partial: str, metrics: di
                 status="stopped",
                 metrics=metrics,
                 new_conversation_id=payload.new_conversation_id,
-                replace_last=payload.regenerate,
+                replace_ids=replace_ids,
             )
         else:
             chat_service.audit_unsaved_turn("chat_turn_stopped", user_id, payload.conversation_id, metrics)
