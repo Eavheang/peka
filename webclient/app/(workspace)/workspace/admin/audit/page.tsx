@@ -39,7 +39,7 @@ export default function AuditEventsPage() {
         <p className="mt-1 text-sm text-muted">Review sync, query, and system activity.</p>
       </div>
       <AuditTypeFilter value={typeFilter} onChange={setTypeFilter} />
-      <AuditEventsPanel type={typeFilter === "all" ? undefined : typeFilter} />
+      <AuditEventsPanel key={typeFilter} type={typeFilter === "all" ? undefined : typeFilter} />
     </section>
   );
 }

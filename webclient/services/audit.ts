@@ -13,7 +13,7 @@ export const useListAuditEvents = ({ type }: { type?: AuditEventType }) =>
     queryKey: ["audit-events", "list", type ?? "all"],
     initialPageParam: null as string | null,
     queryFn: async ({ pageParam, signal }) => {
-      const params: Record<string, string> = {};
+      const params: Record<string, string | number> = { limit: 10 };
       if (type) params.type = type;
       if (pageParam) params.cursor = pageParam;
       return (

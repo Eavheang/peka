@@ -34,11 +34,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+const PAGE_SIZE = 10;
+
 export default function AdminPage() {
   const router = useRouter();
   const [token, setToken] = useState("");
   const [inviteOpen, setInviteOpen] = useState(false);
   const [invitation, setInvitation] = useState<InvitationResponse | null>(null);
+  const [page, setPage] = useState(1);
   const [confirmAction, setConfirmAction] = useState<{
     type: "deactivate" | "delete";
     id: string;
@@ -85,6 +88,9 @@ export default function AdminPage() {
   }
 
   const selectedUser = users.data?.find((user) => user.id === confirmAction?.id);
+  const pageCount = Math.max(1, Math.ceil((users.data?.length ?? 0) / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+  const pageUsers = users.data?.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   if (!me.data || me.data.role !== "admin") return null;
 
@@ -159,7 +165,7 @@ export default function AdminPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {users.data?.map((user) => (
+              {pageUsers?.map((user) => (
                 <TableRow key={user.id} className="border-border hover:bg-secondary/40">
                   <TableCell className="px-5 py-4 font-medium text-foreground">
                     {user.display_name && <div>{user.display_name}</div>}
@@ -234,6 +240,33 @@ export default function AdminPage() {
               ))}
             </TableBody>
           </Table>
+          {pageCount > 1 && (
+            <div className="flex items-center justify-between border-t border-border px-5 py-3">
+              <p className="text-sm text-muted">
+                Page {currentPage} of {pageCount}
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  className="border-border"
+                  disabled={currentPage === 1}
+                  type="button"
+                  variant="outline"
+                  onClick={() => setPage(currentPage - 1)}
+                >
+                  Previous
+                </Button>
+                <Button
+                  className="border-border"
+                  disabled={currentPage === pageCount}
+                  type="button"
+                  variant="outline"
+                  onClick={() => setPage(currentPage + 1)}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </section>
