@@ -28,6 +28,7 @@ Read these first if you want to know **what PEKA does** and **how it works**:
 | [Config & Docker](config/README.md) | Ops | Compose, Makefile, nginx, llama |
 | [Security & roles](security.md) | Everyone | JWT, ACL, bootstrap |
 | [Development & CI](development.md) | Contributors | Tests, Husky, PR checks |
+| [Answer-quality evaluation](evaluation.md) | Everyone | RAGAS scores, method, limitations |
 | [Glossary & troubleshooting](glossary-and-troubleshooting.md) | Everyone | Terms and common fixes |
 
 ## Repository layout
@@ -38,6 +39,7 @@ peka/
 ├── service/      # FastAPI API + OKF background worker
 ├── webclient/    # Next.js App Router UI
 ├── docs/         # This documentation
+├── eval/         # Standalone answer-quality check (RAGAS)
 ├── .github/      # PR CI workflows
 └── .husky/       # pre-commit / pre-push gates
 ```
