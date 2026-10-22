@@ -15,15 +15,21 @@ def _search_plan(tool="none", query=None):
     return chat_service.SearchPlan(tool=tool, query=query)
 
 
+@pytest.fixture(autouse=True)
+def _empty_knowledge_base(monkeypatch) -> None:
+    # Chat always searches; tests that need results patch search_knowledge again.
+    monkeypatch.setattr(chat_service, "search_knowledge", lambda query, role: [])
+
+
 def _override_admin() -> None:
     app.dependency_overrides[authenticated] = lambda: {"id": "u1", "role": "admin"}
 
 
-def test_general_question_does_not_search(monkeypatch) -> None:
-    def no_search(*args):
-        raise AssertionError("General questions must not search")
-
-    monkeypatch.setattr(chat_service, "search_knowledge", no_search)
+def test_router_none_still_searches_knowledge_base(monkeypatch) -> None:
+    searched = []
+    monkeypatch.setattr(
+        chat_service, "search_knowledge", lambda query, role: searched.append(query) or []
+    )
     monkeypatch.setattr(
         chat_service,
         "generate_structured",
@@ -37,16 +43,17 @@ def test_general_question_does_not_search(monkeypatch) -> None:
     )
 
     response = chat_service.answer_from_knowledge("What is 1+1?", "staff")
+    assert searched == ["What is 1+1?"]
     assert response.answer == "2"
     assert response.citations == []
     assert response.refused is False
 
 
-def test_search_plan_without_query_answers_without_search(monkeypatch) -> None:
-    def no_search(*args):
-        raise AssertionError("A plan without a query must not search")
-
-    monkeypatch.setattr(chat_service, "search_knowledge", no_search)
+def test_search_plan_without_query_searches_with_raw_question(monkeypatch) -> None:
+    searched = []
+    monkeypatch.setattr(
+        chat_service, "search_knowledge", lambda query, role: searched.append(query) or []
+    )
     monkeypatch.setattr(
         chat_service,
         "generate_structured",
@@ -60,6 +67,7 @@ def test_search_plan_without_query_answers_without_search(monkeypatch) -> None:
     )
 
     response = chat_service.answer_from_knowledge("hi", "staff")
+    assert searched == ["hi"]
     assert response.answer == "Hello"
     assert response.citations == []
 
@@ -380,10 +388,11 @@ def test_model_receives_bounded_conversation_context(monkeypatch):
 
     monkeypatch.setattr(chat_service, "generate_structured", generate)
     chat_service.answer_from_knowledge("What about the second option?", "staff", history)
-    assert len(seen) == 22
-    assert seen[-2].role == "assistant"
-    assert seen[-2].text == "Option two is distribution."
-    assert seen[-1].text == "What about the second option?"
+    # 20 history messages + system + question + retrieval context
+    assert len(seen) == 23
+    assert seen[-3].role == "assistant"
+    assert seen[-3].text == "Option two is distribution."
+    assert seen[-2].text == "What about the second option?"
 
 
 def test_historical_citation_markers_are_not_sent_back_as_context():

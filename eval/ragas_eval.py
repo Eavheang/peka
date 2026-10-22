@@ -76,6 +76,11 @@ async def score(questions: list[dict]) -> None:
         a = answers.get(q["id"])
         if a is None or q["id"] in done:
             continue
+        if q.get("unanswerable"):
+            # Nothing in the corpus answers it: citing nothing is the correct behaviour.
+            append(SCORES, {"id": q["id"], "abstained": int(not a["citations"])})
+            print(f"score {q['id']}: abstained={int(not a['citations'])}")
+            continue
         stem = Path(q["file"]).stem.lower()
         row = {
             "id": q["id"],
@@ -107,9 +112,12 @@ async def score(questions: list[dict]) -> None:
 def report(questions: list[dict]) -> None:
     scores = load(SCORES)
     print(f"\nscored {len(scores)}/{len(questions)} questions")
-    if scores:
+    answerable = [r for r in scores.values() if "abstained" not in r]
+    if answerable:
         for m in METRICS:
-            print(f"{m:18} {mean(float(r[m]) for r in scores.values()):.3f}")
+            print(f"{m:18} {mean(float(r[m]) for r in answerable):.3f}  (n={len(answerable)})")
+    if unanswerable := [r["abstained"] for r in scores.values() if "abstained" in r]:
+        print(f"{'abstained':18} {mean(unanswerable):.3f}  (n={len(unanswerable)}, unanswerable questions)")
 
 
 if __name__ == "__main__":
