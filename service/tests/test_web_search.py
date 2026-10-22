@@ -108,7 +108,12 @@ def test_chat_uses_web_search_only_when_enabled(monkeypatch) -> None:
     assert response.answer == "Current information. [1]"
 
 
-def test_chat_can_answer_directly_when_web_search_is_enabled(monkeypatch) -> None:
+def test_router_none_searches_knowledge_base_not_web(monkeypatch) -> None:
+    def no_web(query):
+        raise AssertionError("Router none must not search the web")
+
+    monkeypatch.setattr(chat_service, "perform_web_search", no_web)
+    monkeypatch.setattr(chat_service, "search_knowledge", lambda query, role: [])
     monkeypatch.setattr(
         chat_service,
         "generate_structured",
