@@ -18,10 +18,10 @@ make setup
 `make setup` will:
 
 1. Copy `config/.env.example` → `config/.env` if missing
-2. Build and start `postgres`, `pgadmin`, `service`, `embeddings`, `okf-worker`
-3. Install webclient dependencies with Bun
-4. Start `webclient`
-5. Run `alembic upgrade head` inside the service container
+2. Build and start `postgres`, `pgadmin`, `embeddings`
+3. Run `alembic upgrade head` (so tables exist before the API boots)
+4. Build and start `service`, `okf-worker`
+5. Install webclient dependencies with Bun and start `webclient` + `proxy`
 
 Also copy and fill **service** env before first useful run:
 
