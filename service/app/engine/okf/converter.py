@@ -70,6 +70,11 @@ def convert_to_okf(extraction: dict, base_dir: Path) -> dict:
 
     try:
         _validate_concept_result(result_dict)
+        # The LLM names the file from its title, so another upload with the same title
+        # (e.g. the .pdf and .docx copy of one report) would overwrite this concept.
+        concept = result_dict["files"][0]
+        path = Path(concept["path"])
+        concept["path"] = str(path.with_stem(f"{path.stem}-{extraction['source_id'][:8]}"))
         write_okf_files(result_dict, base_dir)
         write_indexes(base_dir)
     except ValueError as error:
