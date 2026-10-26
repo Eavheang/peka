@@ -20,9 +20,9 @@ Application secrets for the API/worker still live in `service/.env` (`env_file` 
 ## Makefile targets
 
 ```bash
-make setup     # .env if missing; build/start core services; bun install; migrate
+make setup     # .env if missing; postgres/embeddings; migrate; then API + webclient
 make up        # start compose.yaml + compose.dev.yaml
-make migrate   # alembic upgrade head in service container
+make migrate   # alembic upgrade head (one-shot service container)
 make down      # tear down the stack
 make prod-up   # start compose.yaml only (built images, no hot reload)
 make prod-down # tear down the prod-style stack
