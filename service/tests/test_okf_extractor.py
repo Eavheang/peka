@@ -41,12 +41,12 @@ def test_convert_to_okf_calls_llm_and_writes_files(monkeypatch, tmp_path):
 
     converted = main.convert_to_okf(extraction, tmp_path)
 
-    assert converted == result
+    assert converted["files"][0]["path"] == "knowledge_base/policies/sign-in-policy-abc123.md"
     assert request["output_type"] is main.OKFResult
     payload = json.loads(request["messages"][1].text)
     assert payload["source_id"] == "abc123"
     assert "knowledge_base_state" not in payload
-    assert (tmp_path / "knowledge_base" / "policies" / "sign-in-policy.md").is_file()
+    assert (tmp_path / "knowledge_base" / "policies" / "sign-in-policy-abc123.md").is_file()
     assert (tmp_path / "knowledge_base" / "index.md").read_text(encoding="utf-8") == (
         '---\nokf_version: "0.2"\n---\n\n'
         "# Organization Knowledge Base\n\n## Categories\n\n"
@@ -54,7 +54,31 @@ def test_convert_to_okf_calls_llm_and_writes_files(monkeypatch, tmp_path):
     )
     assert (tmp_path / "knowledge_base" / "policies" / "index.md").read_text(
         encoding="utf-8"
-    ) == "# Policies\n\n- [Sign In Policy](./sign-in-policy.md) - Employees must sign in.\n"
+    ) == "# Policies\n\n- [Sign In Policy Abc123](./sign-in-policy-abc123.md) - Employees must sign in.\n"
+
+
+def test_convert_to_okf_keeps_same_titled_sources_apart(monkeypatch, tmp_path):
+    result = {
+        "document_analysis": {
+            "title": "Report",
+            "document_type": "Report",
+            "category": "reports",
+            "filename": "report.md",
+            "confidence": 1,
+        },
+        "files": [{"path": "knowledge_base/reports/report.md", "file_type": "okf_concept", "content": "# Overview\n\nText.\n"}],
+        "folder_structure": ["knowledge_base/reports/report.md"],
+        "retrieval_sections": [],
+    }
+    monkeypatch.setattr(main, "generate_structured", lambda messages, output_type: main.OKFResult.model_validate(result))
+
+    main.convert_to_okf({"source_id": "aaaaaaaa1111", "sections": []}, tmp_path)
+    main.convert_to_okf({"source_id": "bbbbbbbb2222", "sections": []}, tmp_path)
+
+    assert sorted(path.name for path in (tmp_path / "knowledge_base" / "reports").glob("report-*.md")) == [
+        "report-aaaaaaaa.md",
+        "report-bbbbbbbb.md",
+    ]
 
 
 def test_index_generation_preserves_and_sorts_existing_concepts(tmp_path):

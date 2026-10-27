@@ -1,0 +1,74 @@
+{"id": 1, "doc_hit": 0, "heading_hit": 0, "correct": 0, "grounded": 1}
+{"id": 2, "doc_hit": 0, "heading_hit": 0, "correct": 1, "grounded": 1}
+{"id": 3, "doc_hit": 1, "heading_hit": 0, "correct": 1, "grounded": 1}
+{"id": 4, "doc_hit": 1, "heading_hit": 0, "correct": 1, "grounded": 1}
+{"id": 5, "doc_hit": 0, "heading_hit": 0, "correct": 0, "grounded": 1}
+{"id": 6, "doc_hit": 0, "heading_hit": 0, "correct": 0, "grounded": 1}
+{"id": 7, "doc_hit": 0, "heading_hit": 0, "correct": 0, "grounded": 1}
+{"id": 8, "doc_hit": 1, "heading_hit": 0, "correct": 1, "grounded": 1}
+{"id": 9, "doc_hit": 0, "heading_hit": 0, "correct": 0, "grounded": 1}
+{"id": 10, "doc_hit": 0, "heading_hit": 0, "correct": 0, "grounded": 1}
+{"id": 11, "doc_hit": 1, "heading_hit": 0, "correct": 1, "grounded": 1}
+{"id": 12, "doc_hit": 1, "heading_hit": 0, "correct": 0, "grounded": 0}
+{"id": 13, "doc_hit": 1, "heading_hit": 0, "correct": 1, "grounded": 1}
+{"id": 14, "doc_hit": 1, "heading_hit": 1, "correct": 1, "grounded": 1}
+{"id": 15, "doc_hit": 1, "heading_hit": 1, "correct": 0, "grounded": 1}
+{"id": 16, "doc_hit": 1, "heading_hit": 0, "correct": 1, "grounded": 1}
+{"id": 17, "doc_hit": 1, "heading_hit": 0, "correct": 1, "grounded": 1}
+{"id": 18, "doc_hit": 1, "heading_hit": 0, "correct": 0, "grounded": 1}
+{"id": 19, "doc_hit": 1, "heading_hit": 1, "correct": 1, "grounded": 1}
+{"id": 20, "doc_hit": 1, "heading_hit": 1, "correct": 1, "grounded": 1}
+{"id": 21, "doc_hit": 1, "heading_hit": 0, "correct": 1, "grounded": 1}
+{"id": 22, "doc_hit": 0, "heading_hit": 0, "correct": 0, "grounded": 1}
+{"id": 23, "doc_hit": 1, "heading_hit": 0, "correct": 1, "grounded": 1}
+{"id": 24, "abstained": 1}
+{"id": 25, "abstained": 1}
+{"id": 26, "doc_hit": 1, "heading_hit": 0, "correct": 1, "grounded": 1}
+{"id": 27, "doc_hit": 1, "heading_hit": 0, "correct": 1, "grounded": 1}
+{"id": 28, "doc_hit": 0, "heading_hit": 0, "correct": 1, "grounded": 0}
+{"id": 29, "doc_hit": 1, "heading_hit": 0, "correct": 1, "grounded": 1}
+{"id": 30, "doc_hit": 1, "heading_hit": 1, "correct": 1, "grounded": 1}
+{"id": 31, "doc_hit": 1, "heading_hit": 0, "correct": 0, "grounded": 1}
+{"id": 32, "doc_hit": 1, "heading_hit": 0, "correct": 1, "grounded": 1}
+{"id": 33, "doc_hit": 1, "heading_hit": 1, "correct": 1, "grounded": 1}
+{"id": 34, "doc_hit": 0, "heading_hit": 0, "correct": 0, "grounded": 1}
+{"id": 35, "doc_hit": 0, "heading_hit": 0, "correct": 0, "grounded": 1}
+{"id": 36, "doc_hit": 1, "heading_hit": 0, "correct": 1, "grounded": 1}
+{"id": 37, "doc_hit": 1, "heading_hit": 0, "correct": 1, "grounded": 1}
+{"id": 38, "doc_hit": 1, "heading_hit": 0, "correct": 0, "grounded": 1}
+{"id": 39, "doc_hit": 1, "heading_hit": 0, "correct": 0, "grounded": 1}
+{"id": 40, "doc_hit": 1, "heading_hit": 1, "correct": 1, "grounded": 1}
+{"id": 41, "doc_hit": 0, "heading_hit": 0, "correct": 0, "grounded": 1}
+{"id": 42, "doc_hit": 1, "heading_hit": 0, "correct": 0.5, "grounded": 1}
+{"id": 43, "doc_hit": 1, "heading_hit": 1, "correct": 0, "grounded": 1}
+{"id": 44, "doc_hit": 1, "heading_hit": 1, "correct": 1, "grounded": 1}
+{"id": 45, "doc_hit": 1, "heading_hit": 1, "correct": 1, "grounded": 1}
+{"id": 46, "doc_hit": 1, "heading_hit": 0, "correct": 1, "grounded": 1}
+{"id": 47, "doc_hit": 1, "heading_hit": 0, "correct": 1, "grounded": 1}
+{"id": 48, "doc_hit": 1, "heading_hit": 0, "correct": 1, "grounded": 1}
+{"id": 49, "doc_hit": 0, "heading_hit": 0, "correct": 0, "grounded": 1}
+{"id": 50, "abstained": 1}
+{"id": 51, "abstained": 1}
+{"id": 52, "doc_hit": 0, "heading_hit": 0, "correct": 0, "grounded": 1}
+{"id": 53, "doc_hit": 0, "heading_hit": 0, "correct": 0, "grounded": 0}
+{"id": 54, "doc_hit": 1, "heading_hit": 0, "correct": 1, "grounded": 1}
+{"id": 55, "doc_hit": 1, "heading_hit": 0, "correct": 0.5, "grounded": 1}
+{"id": 56, "doc_hit": 1, "heading_hit": 0, "correct": 0, "grounded": 1}
+{"id": 57, "doc_hit": 1, "heading_hit": 0, "correct": 1, "grounded": 1}
+{"id": 58, "doc_hit": 0, "heading_hit": 0, "correct": 0, "grounded": 1}
+{"id": 59, "doc_hit": 0, "heading_hit": 0, "correct": 0.5, "grounded": 1}
+{"id": 60, "doc_hit": 0, "heading_hit": 0, "correct": 0, "grounded": 1}
+{"id": 61, "doc_hit": 0, "heading_hit": 0, "correct": 0, "grounded": 1}
+{"id": 62, "doc_hit": 0, "heading_hit": 0, "correct": 0, "grounded": 1}
+{"id": 63, "doc_hit": 1, "heading_hit": 0, "correct": 1, "grounded": 1}
+{"id": 64, "doc_hit": 1, "heading_hit": 0, "correct": 1, "grounded": 1}
+{"id": 65, "doc_hit": 1, "heading_hit": 0, "correct": 1, "grounded": 1}
+{"id": 66, "doc_hit": 0, "heading_hit": 0, "correct": 0, "grounded": 1}
+{"id": 67, "doc_hit": 1, "heading_hit": 0, "correct": 0, "grounded": 1}
+{"id": 68, "doc_hit": 1, "heading_hit": 0, "correct": 1, "grounded": 1}
+{"id": 69, "doc_hit": 1, "heading_hit": 0, "correct": 1, "grounded": 1}
+{"id": 70, "doc_hit": 1, "heading_hit": 0, "correct": 0.5, "grounded": 1}
+{"id": 71, "doc_hit": 0, "heading_hit": 0, "correct": 0, "grounded": 1}
+{"id": 72, "doc_hit": 1, "heading_hit": 0, "correct": 0, "grounded": 0}
+{"id": 73, "abstained": 1}
+{"id": 74, "abstained": 1}
