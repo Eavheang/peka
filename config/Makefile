@@ -15,7 +15,7 @@ up:
 	docker compose -f compose.yaml -f compose.dev.yaml up -d
 
 migrate:
-	docker compose -f compose.yaml -f compose.dev.yaml up -d postgres
+	docker compose -f compose.yaml -f compose.dev.yaml up -d --wait postgres
 	docker compose -f compose.yaml -f compose.dev.yaml run --rm --no-deps service alembic upgrade head
 
 down:
