@@ -164,3 +164,12 @@ def test_file_listing_hides_confidential_files_from_general_only_roles(corpus):
     ids = {str(corpus.general["id"]), str(corpus.secret["id"])}
     assert listed(("general",)) & ids == {str(corpus.general["id"])}
     assert listed(("general", "confidential")) & ids == ids
+
+
+def test_keyword_match_finds_a_chunk_the_vector_search_misses(corpus):
+    unrelated = unit_vector(0, 0, 1)  # cosine 0 with both chunks: below the similarity floor
+
+    assert found(search_repository.search_chunks(unrelated, ("general",)), corpus) == set()
+    assert found(
+        search_repository.search_chunks(unrelated, ("general",), query_text="how many days of leave?"), corpus
+    ) == {"general"}
