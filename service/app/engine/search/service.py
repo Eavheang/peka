@@ -25,7 +25,9 @@ def access_levels_for_role(role: str) -> tuple[str, ...]:
 
 def search_knowledge(query: str, user_role: str) -> list[dict]:
     vector = embed_query(query)
-    results = search_repository.search_chunks(vector, access_levels_for_role(user_role))
+    results = search_repository.search_chunks(
+        vector, access_levels_for_role(user_role), query_text=query
+    )
     return [
         {
             "chunk_id": str(row["id"]),

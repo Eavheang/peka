@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     embedding_model: str = "BAAI/bge-small-en-v1.5"
     embedding_dimensions: int = 384
     embedding_batch_size: int = 1
-    search_top_k: int = 5
+    search_top_k: int = 8
     search_similarity_floor: float = 0.3
     exa_api_key: SecretStr | None = None
     exa_base_url: str = "https://api.exa.ai"

@@ -8,7 +8,7 @@ def test_staff_cannot_see_confidential(monkeypatch) -> None:
     seen: dict = {}
 
     class FakeRepo:
-        def search_chunks(self, vector, allowed_access_levels, top_k=None):
+        def search_chunks(self, vector, allowed_access_levels, top_k=None, query_text=None):
             seen["levels"] = allowed_access_levels
             return []
 
@@ -30,7 +30,7 @@ def test_search_returns_results_for_authenticated_user(monkeypatch) -> None:
     monkeypatch.setattr(search_service, "embed_query", lambda query: [0.0] * 1024)
 
     class FakeRepo:
-        def search_chunks(self, vector, levels, top_k=None):
+        def search_chunks(self, vector, levels, top_k=None, query_text=None):
             return [
                 {
                     "id": "00000000-0000-0000-0000-000000000002",
