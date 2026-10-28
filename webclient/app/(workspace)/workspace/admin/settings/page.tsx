@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/toast";
 import { useGetCurrentUser } from "@/services/auth";
 import {
   useProviderSettings,
@@ -23,12 +24,6 @@ export default function ProviderSettingsPage() {
     exa_base_url: "https://api.exa.ai",
     exa_api_key: "",
   });
-  const [result, setResult] = useState<{
-    provider: string;
-    ok: boolean;
-    status: number | null;
-    message: string;
-  } | null>(null);
   const me = useGetCurrentUser(token);
   const settings = useProviderSettings();
   const save = useSaveProviderSettings();
@@ -54,12 +49,17 @@ export default function ProviderSettingsPage() {
     "w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground";
 
   async function testConnection(provider: "llm" | "exa") {
-    setResult(null);
     try {
-      const outcome = await test.mutateAsync(provider);
-      setResult({ provider, ...outcome });
+      const { ok, status, message } = await test.mutateAsync(provider);
+      toast.add({
+        title: `${provider.toUpperCase()}: ${message}${status ? ` (HTTP ${status})` : ""}`,
+        type: ok ? "success" : "error",
+      });
     } catch {
-      setResult({ provider, ok: false, status: null, message: "Unable to run connection test." });
+      toast.add({
+        title: `${provider.toUpperCase()}: Unable to run connection test.`,
+        type: "error",
+      });
     }
   }
 
@@ -90,11 +90,22 @@ export default function ProviderSettingsPage() {
             className="space-y-6"
             onSubmit={(event) => {
               event.preventDefault();
-              save.mutate({
-                ...form,
-                llm_api_key: form.llm_api_key || undefined,
-                exa_api_key: form.exa_api_key || undefined,
-              });
+              save.mutate(
+                {
+                  ...form,
+                  llm_api_key: form.llm_api_key || undefined,
+                  exa_api_key: form.exa_api_key || undefined,
+                },
+                {
+                  onSuccess: () =>
+                    toast.add({ title: "Settings saved.", type: "success" }),
+                  onError: () =>
+                    toast.add({
+                      title: "Unable to save provider settings.",
+                      type: "error",
+                    }),
+                },
+              );
             }}
           >
             <fieldset className="space-y-4 rounded-xl border border-border p-5">
@@ -105,7 +116,9 @@ export default function ProviderSettingsPage() {
                   required
                   className={inputClass}
                   value={form.llm_base_url}
-                  onChange={(e) => setForm({ ...form, llm_base_url: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, llm_base_url: e.target.value })
+                  }
                 />
               </label>
               <label className="block space-y-1 text-sm">
@@ -114,21 +127,31 @@ export default function ProviderSettingsPage() {
                   required
                   className={inputClass}
                   value={form.llm_model}
-                  onChange={(e) => setForm({ ...form, llm_model: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, llm_model: e.target.value })
+                  }
                 />
               </label>
               <label className="block space-y-1 text-sm">
                 API key{" "}
                 {providerSettings.llm_configured && (
-                  <span className="text-muted">(saved; leave blank to keep)</span>
+                  <span className="text-muted">
+                    (saved; leave blank to keep)
+                  </span>
                 )}
                 <input
                   type="password"
                   autoComplete="new-password"
-                  placeholder={providerSettings.llm_configured ? "••••••••" : "Enter API key"}
+                  placeholder={
+                    providerSettings.llm_configured
+                      ? "••••••••"
+                      : "Enter API key"
+                  }
                   className={inputClass}
                   value={form.llm_api_key}
-                  onChange={(e) => setForm({ ...form, llm_api_key: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, llm_api_key: e.target.value })
+                  }
                 />
               </label>
               <Button
@@ -148,21 +171,31 @@ export default function ProviderSettingsPage() {
                   required
                   className={inputClass}
                   value={form.exa_base_url}
-                  onChange={(e) => setForm({ ...form, exa_base_url: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, exa_base_url: e.target.value })
+                  }
                 />
               </label>
               <label className="block space-y-1 text-sm">
                 API key{" "}
                 {providerSettings.exa_configured && (
-                  <span className="text-muted">(saved; leave blank to keep)</span>
+                  <span className="text-muted">
+                    (saved; leave blank to keep)
+                  </span>
                 )}
                 <input
                   type="password"
                   autoComplete="new-password"
-                  placeholder={providerSettings.exa_configured ? "••••••••" : "Enter API key"}
+                  placeholder={
+                    providerSettings.exa_configured
+                      ? "••••••••"
+                      : "Enter API key"
+                  }
                   className={inputClass}
                   value={form.exa_api_key}
-                  onChange={(e) => setForm({ ...form, exa_api_key: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, exa_api_key: e.target.value })
+                  }
                 />
               </label>
               <Button
@@ -174,30 +207,6 @@ export default function ProviderSettingsPage() {
                 Test Exa connection
               </Button>
             </fieldset>
-            {result && (
-              <p
-                role="status"
-                className={result.ok ? "text-sm text-success" : "text-sm text-danger"}
-              >
-                {result.provider.toUpperCase()}: {result.message}
-                {result.status ? ` (HTTP ${result.status})` : ""}
-              </p>
-            )}
-            {test.isError && (
-              <p role="alert" className="text-sm text-danger">
-                Connection test failed unexpectedly.
-              </p>
-            )}
-            {save.isError && (
-              <p role="alert" className="text-sm text-danger">
-                Unable to save provider settings.
-              </p>
-            )}
-            {save.isSuccess && (
-              <p role="status" className="text-sm text-success">
-                Settings saved.
-              </p>
-            )}
             <Button type="submit" disabled={save.isPending}>
               {save.isPending ? "Saving…" : "Save settings"}
             </Button>

@@ -32,9 +32,10 @@ def test_convert_to_okf_calls_llm_and_writes_files(monkeypatch, tmp_path):
     }
     request = {}
 
-    def fake_generation(messages, output_type):
+    def fake_generation(messages, output_type, max_tokens=None):
         request["messages"] = messages
         request["output_type"] = output_type
+        request["max_tokens"] = max_tokens
         return main.OKFResult.model_validate(result)
 
     monkeypatch.setattr(main, "generate_structured", fake_generation)
@@ -43,6 +44,7 @@ def test_convert_to_okf_calls_llm_and_writes_files(monkeypatch, tmp_path):
 
     assert converted["files"][0]["path"] == "knowledge_base/policies/sign-in-policy-abc123.md"
     assert request["output_type"] is main.OKFResult
+    assert request["max_tokens"] == main.settings.okf_max_tokens
     payload = json.loads(request["messages"][1].text)
     assert payload["source_id"] == "abc123"
     assert "knowledge_base_state" not in payload
@@ -70,7 +72,7 @@ def test_convert_to_okf_keeps_same_titled_sources_apart(monkeypatch, tmp_path):
         "folder_structure": ["knowledge_base/reports/report.md"],
         "retrieval_sections": [],
     }
-    monkeypatch.setattr(main, "generate_structured", lambda messages, output_type: main.OKFResult.model_validate(result))
+    monkeypatch.setattr(main, "generate_structured", lambda messages, output_type, **kwargs: main.OKFResult.model_validate(result))
 
     main.convert_to_okf({"source_id": "aaaaaaaa1111", "sections": []}, tmp_path)
     main.convert_to_okf({"source_id": "bbbbbbbb2222", "sections": []}, tmp_path)

@@ -37,8 +37,10 @@ def _model() -> tuple[ai.Model, ai.Provider]:
     return ai.Model(id=config["llm_model"], provider=provider), provider
 
 
-def _inference_params() -> ai.InferenceRequestParams:
-    return ai.InferenceRequestParams(output=ai.OutputParams(max_tokens=settings.llm_max_tokens))
+def _inference_params(max_tokens: int | None = None) -> ai.InferenceRequestParams:
+    return ai.InferenceRequestParams(
+        output=ai.OutputParams(max_tokens=max_tokens or settings.llm_max_tokens)
+    )
 
 
 def first_error_line(error: ValidationError) -> str:
@@ -131,9 +133,10 @@ async def _run_structured_stream(
     model: ai.Model,
     messages: list[ai.messages.Message],
     output_type: type[StructuredOutput],
+    max_tokens: int | None = None,
 ) -> StructuredOutput:
     async with ai.stream(
-        model, messages, output_type=output_type, params=_inference_params()
+        model, messages, output_type=output_type, params=_inference_params(max_tokens)
     ) as stream:
         async for _ in stream:
             pass
@@ -146,9 +149,12 @@ async def _run_structured_stream(
                 output = parse_structured_output(stream.message.text, output_type)
             except ValidationError as error:
                 text = stream.message.text
+                message = first_error_line(error)
+                if "EOF while parsing" in message:
+                    message += " (reply cut off: likely hit the max output tokens limit)"
                 logger.warning(
                     "Model returned invalid structured output for %s (%d chars): %s | start: %r | end: %r",
-                    output_type.__name__, len(text), first_error_line(error), text[:300], text[-300:],
+                    output_type.__name__, len(text), message, text[:300], text[-300:],
                 )
                 raise
 
@@ -162,6 +168,7 @@ async def _generate_structured(
     output_type: type[StructuredOutput],
     *,
     model: ai.Model | None = None,
+    max_tokens: int | None = None,
 ) -> StructuredOutput:
     provider: ai.Provider | None = None
     try:
@@ -170,7 +177,7 @@ async def _generate_structured(
 
         for attempt in range(_MAX_STRUCTURED_ATTEMPTS):
             try:
-                return await _run_structured_stream(model, messages, output_type)
+                return await _run_structured_stream(model, messages, output_type, max_tokens)
             except (ValidationError, AIModelError) as error:
                 if attempt == _MAX_STRUCTURED_ATTEMPTS - 1:
                     raise AIModelError(
@@ -242,5 +249,8 @@ def generate_structured(
     output_type: type[StructuredOutput],
     *,
     model: ai.Model | None = None,
+    max_tokens: int | None = None,
 ) -> StructuredOutput:
-    return asyncio.run(_generate_structured(messages, output_type, model=model))
+    return asyncio.run(
+        _generate_structured(messages, output_type, model=model, max_tokens=max_tokens)
+    )
