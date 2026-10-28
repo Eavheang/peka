@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     llm_api_key: SecretStr
     llm_model: str
     llm_max_tokens: int = 8192
+    # OKF replies embed the whole converted document in one JSON string, so they need more room.
+    okf_max_tokens: int = 32768
     embedding_base_url: str = "http://localhost:8081/v1"
     embedding_model: str = "BAAI/bge-small-en-v1.5"
     embedding_dimensions: int = 384

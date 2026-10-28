@@ -7,6 +7,7 @@ from typing import Literal
 import ai
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.config import settings
 from app.engine.ai_runtime import AIModelError, generate_structured
 from app.engine.okf.file_writer import write_okf_files
 
@@ -62,6 +63,7 @@ def convert_to_okf(extraction: dict, base_dir: Path) -> dict:
                 ai.user_message(json.dumps(payload, ensure_ascii=False, default=str)),
             ],
             OKFResult,
+            max_tokens=settings.okf_max_tokens,
         )
     except AIModelError as error:
         raise OKFConversionError(str(error)) from error

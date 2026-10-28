@@ -85,6 +85,7 @@ Documented in `service/.env.example`. Field names map to `app/config.py` (case-i
 | `LLM_API_KEY` | yes | SecretStr |
 | `LLM_MODEL` | yes | |
 | `LLM_MAX_TOKENS` | no | Default 8192 |
+| `OKF_MAX_TOKENS` | no | Default 32768; output limit for OKF conversion |
 | `EMBEDDING_BASE_URL` | no | Default `http://localhost:8081/v1` |
 | `EMBEDDING_MODEL` | no | `BAAI/bge-small-en-v1.5` |
 | `EMBEDDING_DIMENSIONS` | no | `384` |
