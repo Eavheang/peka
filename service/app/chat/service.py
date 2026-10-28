@@ -49,6 +49,10 @@ _SYSTEM_PROMPT = (
     "(with one or more source IDs from this turn's search). "
     "Separate sourced facts from general analysis in different blocks. "
     "Grounded text must be supported by its listed sources. Use only sources actually used. "
+    "Every fact taken from the search results goes in a grounded block with its source_ids, "
+    "never in a general block. Read tables and metric rows carefully, answer only what was "
+    "asked, and do not add related facts or boilerplate. If none of the sources contains the "
+    "answer, say plainly that the documents do not contain it. "
     "Do not write citation markers or source lists in text; the server adds them. "
     "Do not reuse historical source IDs. Return at least one nonempty block."
 )
@@ -442,7 +446,7 @@ def _source_context(
     prompt_sources = {}
     for source_id, source in sources.items():
         prompt_source = dict(source)
-        for field, limit in (("content", 1200), ("snippet", 300)):
+        for field, limit in (("content", 3000), ("snippet", 300)):
             value = prompt_source.get(field)
             if isinstance(value, str):
                 prompt_source[field] = value[:limit]
