@@ -78,6 +78,33 @@ Ordered by expected gain, with the questions each would fix.
 - **One grader, one pass.** Grades are Claude's judgment, not RAGAS scores, so they are not directly comparable with the earlier run below.
 - **Two things changed between runs A and B** (the overwrite fix and the OKF model). The findings above explain why the drop comes from the model, but it was not tested separately.
 
+## Results: question set 2 (2026-10-28)
+
+67 questions (59 answerable, 8 unanswerable) in [`eval/question-2.json`](../eval/question-2.json), re-asked after the retrieval and prompt changes listed below. Replies are in [`eval/results-2/answers.jsonl`](../eval/results-2/answers.jsonl). All 67 were graded by hand against the `reference` field; RAGAS `score` was not run (no judge credentials, and `question-2.json` has no `heading` field, which `score` needs).
+
+| Metric | Result |
+|--------|--------|
+| `correct` (answerable) | **59/59** |
+| Unanswerable questions correctly declined | **8/8** |
+| Answers with no citations | 9 (7 of the 8 unanswerable, plus Q2 and Q23) |
+| `refused` set to `true` | 0 |
+
+Compared with the 70-file run B (`correct` 0.544), this is a large gain on a different question set. The sets are not directly comparable: question set 2 has 31 questions on the Mekong Harvest Foods documents, 28 metric-table lookups and 8 unanswerable ones, and it was graded in a single pass by one grader.
+
+Changes in the stack for this run:
+
+- `SEARCH_TOP_K` raised from 5 to 10.
+- The chunker splits on `##` as well as `#` (improvement 1 above).
+- The chat system prompt tells the model to put every sourced fact in a grounded block, read tables carefully, answer only what was asked, and say plainly when the documents do not contain the answer.
+- The model sees 3000 characters of each source instead of 1200.
+
+Remaining problems:
+
+- **Q2 and Q23 are correct but uncited**, so nothing backs them. RAGAS faithfulness and recall would score them 0.
+- **Q60 declines correctly but still cites a document** (the handbook). The `abstained` metric requires no citations, so it would score 0 and the unanswerable set would read 7/8.
+- **Unrequested detail**: Q14 lists payment terms for four other suppliers, and Q29 hedges with "likely".
+- **Citations were not checked against the answers.** Correctness is judged on the answer text alone.
+
 ## Earlier run: 2 documents (2026-10-21)
 
 | Metric | Mean (n = 20) |
@@ -143,6 +170,8 @@ export JUDGE_BASE_URL=https://openrouter.ai/api/v1 JUDGE_API_KEY=... JUDGE_MODEL
 - `score` computes the metrics. Output: `results/scores.jsonl`.
 - Both steps skip questions already in their output file. A failure (e.g. a free-tier `503` or a judge timeout) is printed and the question is retried on the next run.
 - To re-run from scratch, delete `results/`. To re-score only, delete `results/scores.jsonl`.
+- `QUESTIONS` (default `questions.jsonl`) and `RESULTS_DIR` (default `results`) select another question file and output directory, e.g. `QUESTIONS=question-2.json RESULTS_DIR=results-2 .venv/bin/python ragas_eval.py ask`. A `.json` question file is a JSON array; `.jsonl` is one object per line.
+- `score` needs `file` to be a single file name and `heading` on every answerable question, so it does not work on `question-2.json` as it stands.
 
 To add a question, append a line to `questions.jsonl` with `id`, `question`, `reference` (the correct answer), `file` (the file name as shown in citations; any format of the same file name counts) and `heading` (the chunk heading that holds the answer). For a question the documents cannot answer, set `"unanswerable": true` instead of `file` and `heading`; it scores `abstained` = 1 when PEKA cites nothing.
 
