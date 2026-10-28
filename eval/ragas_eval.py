@@ -20,14 +20,17 @@ from ragas.llms import llm_factory
 from ragas.metrics.collections import ContextPrecision, ContextRecall, Faithfulness
 
 HERE = Path(__file__).parent
-ANSWERS = HERE / "results" / "answers.jsonl"
-SCORES = HERE / "results" / "scores.jsonl"
+RESULTS = HERE / os.environ.get("RESULTS_DIR", "results")
+ANSWERS = RESULTS / "answers.jsonl"
+SCORES = RESULTS / "scores.jsonl"
 METRICS = ("doc_hit", "heading_hit", "faithfulness", "context_recall", "context_precision")
 
 
 def load(path: Path) -> dict[int, dict]:
     if not path.exists():
         return {}
+    if path.suffix == ".json":
+        return {row["id"]: row for row in json.loads(path.read_text())}
     rows = (json.loads(line) for line in path.read_text().splitlines() if line.strip())
     return {row["id"]: row for row in rows}
 
@@ -121,7 +124,7 @@ def report(questions: list[dict]) -> None:
 
 
 if __name__ == "__main__":
-    questions = list(load(HERE / "questions.jsonl").values())
+    questions = list(load(HERE / os.environ.get("QUESTIONS", "questions.jsonl")).values())
     steps = sys.argv[1:] or ["ask", "score"]
     if "ask" in steps:
         ask(questions)

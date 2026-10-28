@@ -84,7 +84,7 @@ def _sections(markdown: str) -> list[tuple[str, str]]:
     for line in body.splitlines():
         if line.lstrip().startswith("```") or line.lstrip().startswith("~~~"):
             fenced = not fenced
-        match = None if fenced else re.match(r"^#\s+(.+?)\s*#*\s*$", line)
+        match = None if fenced else re.match(r"^#{1,2}\s+(.+?)\s*#*\s*$", line)
         if match:
             if heading and (content := "\n".join(lines).strip()):
                 sections.append((heading, content))
