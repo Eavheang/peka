@@ -72,7 +72,7 @@ def test_convert_to_okf_keeps_same_titled_sources_apart(monkeypatch, tmp_path):
         "folder_structure": ["knowledge_base/reports/report.md"],
         "retrieval_sections": [],
     }
-    monkeypatch.setattr(main, "generate_structured", lambda messages, output_type: main.OKFResult.model_validate(result))
+    monkeypatch.setattr(main, "generate_structured", lambda messages, output_type, **kwargs: main.OKFResult.model_validate(result))
 
     main.convert_to_okf({"source_id": "aaaaaaaa1111", "sections": []}, tmp_path)
     main.convert_to_okf({"source_id": "bbbbbbbb2222", "sections": []}, tmp_path)
