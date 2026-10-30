@@ -52,7 +52,7 @@ export default function SignInPage() {
 
   return (
     <main className="grid min-h-screen bg-background lg:grid-cols-[1fr_0.85fr]">
-      <section className="flex flex-col justify-between bg-panel px-[5vw] py-10 text-panel-foreground">
+      <section className="hidden flex-col justify-between bg-panel px-[5vw] py-10 text-panel-foreground lg:flex">
         <div className="flex items-center gap-2 text-xl font-bold tracking-[-0.06em]">
           <span className="grid size-7 place-items-center rounded-full bg-background">
             <Image className="size-5 " src="/peka.svg" alt="" width={20} height={20} />
