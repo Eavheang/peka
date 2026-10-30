@@ -29,6 +29,8 @@ Read these first if you want to know **what PEKA does** and **how it works**:
 | [Security & roles](security.md) | Everyone | JWT, ACL, bootstrap |
 | [Development & CI](development.md) | Contributors | Tests, Husky, PR checks |
 | [Answer-quality evaluation](evaluation.md) | Everyone | RAGAS scores, method, limitations |
+| [Final report](final-report.md) | Everyone | Verdict on the objectives: Recall@5 over 200+ docs, latency, users served on 6 GB VRAM |
+| [System requirements](system-requirements.md) | Everyone | Hardware, software, how to run PEKA locally, what to expect |
 | [Glossary & troubleshooting](glossary-and-troubleshooting.md) | Everyone | Terms and common fixes |
 
 ## Repository layout

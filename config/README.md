@@ -32,10 +32,10 @@ normal source-code changes automatically.
 
 Uploaded documents are extracted immediately. The `okf-worker` processes queued
 OKF conversions one at a time and retries failed conversions up to three times.
-It parses OKF headings, sends sections to the GPU-hosted BGE-M3 embedding
-service, and stores 1024-dimensional vectors in PostgreSQL with pgvector. BGE-M3
-runs on the GPU through the CUDA TEI image. Start Docker with NVIDIA Container
-Toolkit installed and a compatible NVIDIA driver.
+It parses OKF headings, sends sections to the local embedding service
+(`BAAI/bge-small-en-v1.5`, CPU TEI image), and stores 384-dimensional vectors in
+PostgreSQL with pgvector. The optional local LLM (`make llm`) needs the NVIDIA
+Container Toolkit and a compatible NVIDIA driver.
 
 
 Open:
@@ -54,7 +54,7 @@ Default database connection in pgAdmin:
 - Username: `peka`
 - Password: `peka_dev_password`
 
-pgAdmin login defaults to `admin@peka.local` / `peka_admin_password`.
+pgAdmin login defaults to `admin@example.com` / `peka_admin_password`.
 Override these values with `POSTGRES_*` and `PGADMIN_*` variables in a
 `.env` file in this directory. Copy `.env.example` first if needed.
 

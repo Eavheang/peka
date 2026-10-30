@@ -1,0 +1,110 @@
+{
+  "users": 10,
+  "turns_per_user": 2,
+  "without_indexing": {
+    "requests": 20,
+    "ok": 2,
+    "errors": [
+      "AI provider request failed",
+      "AI provider request failed",
+      "AI provider request failed",
+      "AI provider request failed",
+      "AI provider request failed",
+      "AI provider request failed",
+      "AI provider request failed",
+      "AI provider request failed",
+      "AI provider request failed",
+      "AI provider request failed",
+      "AI provider request failed",
+      "AI provider request failed",
+      "AI provider request failed",
+      "AI provider request failed",
+      "AI provider request failed",
+      "AI provider request failed",
+      "AI provider request failed",
+      "AI provider request failed"
+    ],
+    "first_status_s": {
+      "n": 2,
+      "mean": 0.01690954100001818,
+      "p50": 0.01690954100001818,
+      "p95": 0.019979958000021725,
+      "max": 0.019979958000021725
+    },
+    "ttft_s": {
+      "n": 2,
+      "mean": 45.24183769550007,
+      "p50": 45.24183769550007,
+      "p95": 47.06221027600009,
+      "max": 47.06221027600009
+    },
+    "total_s": {
+      "n": 2,
+      "mean": 46.67372783999997,
+      "p50": 46.67372783999997,
+      "p95": 49.013433160999966,
+      "max": 49.013433160999966
+    },
+    "wall_s": 98.78574079600003
+  },
+  "with_indexing": {
+    "requests": 20,
+    "ok": 2,
+    "errors": [
+      "AI provider request failed",
+      "AI provider request failed",
+      "AI provider request failed",
+      "AI provider request failed",
+      "AI provider request failed",
+      "AI provider request failed",
+      "AI provider request failed",
+      "AI provider request failed",
+      "AI provider request failed",
+      "AI provider request failed",
+      "AI provider request failed",
+      "AI provider request failed",
+      "AI provider request failed",
+      "AI provider request failed",
+      "AI provider request failed",
+      "AI provider request failed",
+      "AI provider request failed",
+      "AI provider request failed"
+    ],
+    "first_status_s": {
+      "n": 2,
+      "mean": 0.014882955999951264,
+      "p50": 0.014882955999951264,
+      "p95": 0.01564446699990185,
+      "max": 0.01564446699990185
+    },
+    "ttft_s": {
+      "n": 2,
+      "mean": 53.17521341499992,
+      "p50": 53.17521341499992,
+      "p95": 64.53335370199989,
+      "max": 64.53335370199989
+    },
+    "total_s": {
+      "n": 2,
+      "mean": 54.52579133899985,
+      "p50": 54.52579133899985,
+      "p95": 66.15197643299985,
+      "max": 66.15197643299985
+    },
+    "wall_s": 113.51872974099979,
+    "uploaded_docs": 8,
+    "okf_status": [
+      "completed",
+      "completed",
+      "completed",
+      "completed",
+      "completed",
+      "completed",
+      "completed",
+      "completed"
+    ],
+    "chat_finished_after_s": 113.51902818500002,
+    "indexing_finished_after_s": 633.018024617,
+    "indexing_still_running_when_chat_ended": 8
+  }
+}

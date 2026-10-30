@@ -100,7 +100,3 @@ In-network from worker: `http://llama:8080/v1`
 | Prod-style | `make prod-up` → `compose.yaml` only |
 
 Dev overlays typically bind-mount source and run `uvicorn --reload` / `bun run dev`.
-
-## Note on embeddings docs
-
-Some older prose in `config/README.md` still mentions BGE-M3 / 1024-d / GPU TEI. **Current Compose and service config use** `BAAI/bge-small-en-v1.5` at **384** dimensions on the **cpu-1.9** TEI image. Prefer this documentation and the Compose file as source of truth.

@@ -1,0 +1,96 @@
+# System requirements and running PEKA locally
+
+This page is for someone who wants to run PEKA on their own machine and use it. It covers what PEKA is, what hardware and software it needs, how to start it, and what to expect from it on a small machine. The numbers come from the [final report](final-report.md), which tested the stack on the minimum hardware below.
+
+## What PEKA is
+
+PEKA (Personal Knowledge Base) is an organization-private assistant. You upload documents (PDF, Word, PowerPoint, Excel, Markdown or text), PEKA indexes them, and you ask questions in a chat. Each answer cites the passages it came from, and people only see documents their role allows. Everything runs on your own machine: the database, the embedding model and, optionally, the language model. See [What is PEKA?](what-is-peka.md) and [How it works](how-it-works.md).
+
+## Minimum requirements
+
+These are the requirements the project targets, and the final report was measured on exactly this class of machine.
+
+| Item | Minimum | Notes |
+|------|---------|-------|
+| GPU | NVIDIA with **6 GB VRAM** | Needed only for the local language model. Tested on an RTX 3060 Laptop GPU. With a hosted model instead (see below) no GPU is needed. |
+| RAM | **16 GB** | The stack uses about 0.4 GB for its services plus about 1.8 GB for the local model server when idle, measured on the test machine (14 GB visible). |
+| Disk | About **20 GB free** | About 7.5 GB of Docker images, the 4.2 GB model file and room for documents and the database. Estimated from the sizes measured on the test machine. |
+| CPU | Modern multi-core CPU | The test machine had 16 threads. Embeddings run on the CPU. A smaller CPU was not tested. |
+| OS | Linux with Docker | Tested on Linux. Windows and macOS were not tested, and macOS has no NVIDIA GPU for the local model. |
+
+Software:
+
+| Software | Version tested | Why |
+|----------|----------------|-----|
+| Docker and Docker Compose | Docker 28.5, Compose 2.40 | Runs every service |
+| NVIDIA driver and NVIDIA Container Toolkit | driver 595 | Lets the llama.cpp container use the GPU |
+| `make` | any | Wraps the Compose commands in `config/Makefile` |
+| Bun | 1.4 | Only for working on the web client outside Docker |
+| Python 3.12 | | Only for working on the service outside Docker (the container image provides it) |
+| A GGUF model file | `gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf` (4.2 GB) | The local language model, placed in `config/model/` |
+
+Ports used on the host: `3000` (web app), `8000` (API), `8080` (llama.cpp), `5432` (Postgres), `5050` (pgAdmin). Free them first or change the mappings in `config/compose.yaml`.
+
+## Start PEKA
+
+Run the Compose commands from `config/`.
+
+1. **Get the model.** Download the Gemma 4 E4B QAT GGUF (`UD-Q4_K_XL` quantisation) and save it as `config/model/gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf`. The file name must match `model:` in `config/llama/config.yaml`. The folder is gitignored.
+2. **Create the service settings.**
+
+   ```bash
+   cp service/.env.example service/.env
+   ```
+
+   In `service/.env`:
+
+   - Replace `JWT_SECRET_KEY` with your own random secret of at least 32 characters.
+   - Set `ADMIN_EMAIL` and a new `ADMIN_PASSWORD` (12 to 1024 characters). The example values are only placeholders and must not be reused.
+   - For the local model use `LLM_BASE_URL=http://llama:8080/v1` and `LLM_MODEL=local`, with any value for `LLM_API_KEY`.
+3. **Set up and start.**
+
+   ```bash
+   cd config
+   make setup     # one time: builds images, installs web client dependencies, runs migrations
+   make llm       # starts the local model (needs the GPU and the model file)
+   make up        # starts the stack with hot reload
+   ```
+
+   The first start downloads the embedding model and can take several minutes. Later starts only need `make up`.
+4. **Sign in.** Open http://localhost:3000/sign-in with the admin account from step 2.
+5. **Add documents.** Open the knowledge library and upload files (up to 25 MB each). Each file shows `queued`, `processing` and then `completed`. A small file took about one minute to index with the local model, so wait for `completed` before asking about it.
+6. **Ask questions.** Open the chat. Answers cite their sources, and a question that the documents cannot answer is declined instead of guessed.
+
+Stop with `make down` and the model with `make llm-down`. `make prod-up` starts the built images without hot reload, but this was not part of the evaluation.
+
+### Using a hosted model instead of a local one
+
+If the machine has no 6 GB NVIDIA GPU, skip steps 1 and `make llm` and point `LLM_BASE_URL`, `LLM_MODEL` and `LLM_API_KEY` in `service/.env` at an OpenAI-compatible service (the earlier answer-quality runs used OpenRouter). Document text then leaves your machine, which is what the local model avoids. The user limits below were measured for the local model and do not apply to a hosted one.
+
+## What to expect on the minimum hardware
+
+| Question | Answer |
+|----------|--------|
+| How fast is an answer? | The first words appear after about **8 s** (12 s at the slowest 5%), and the full answer after about 9 s. |
+| How many people can ask at once? | **2** at the same moment. A third at the same time gets an error. |
+| Can people chat while documents are indexing? | **1** person. With 2 people, most questions failed during indexing. |
+| How accurate is retrieval? | The right document is in the top 5 results for **99%** of questions over 220 documents. |
+| How accurate are answers? | 59 of 59 answerable questions in the latest hand-graded set were correct. Declining unanswerable questions worked 8 of 8. |
+| How long does indexing take? | About 1 minute per small file, one file at a time. |
+| Can it serve 10 people at once? | **No.** With 10 simultaneous questions only 2 of 20 were answered. |
+
+"At the same moment" means questions being answered at the same time. People who only ask now and then share the capacity, so a team of a few occasional users works, while 10 people asking together does not. The reason and the options for raising the limit are in the [final report](final-report.md#how-many-users-does-this-system-serve).
+
+Good habits on this hardware:
+
+- Upload documents when nobody is chatting.
+- Name the subject in the question ("In the Employee Handbook, how many days...") because questions that do not name it can skip the search.
+- Expect one answer to take about 10 s, and wait for it before asking the next question.
+
+## Where to go next
+
+- [Getting started](getting-started.md) for development setup, pgAdmin and database defaults
+- [Config and Docker](config/README.md) for every service, port and setting
+- [User guide](user-guide.md) for the screens, roles and admin tasks
+- [Security and roles](security.md) before exposing it beyond your own machine
+- [Troubleshooting](glossary-and-troubleshooting.md) if something does not start

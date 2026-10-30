@@ -1,2 +1,0 @@
-ask 11: HTTP 503 {"detail":"AI provider request failed"} (rerun to retry)
-ask 22: HTTP 503 {"detail":"AI provider request failed"} (rerun to retry)
