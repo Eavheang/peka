@@ -124,7 +124,7 @@ def report(questions: list[dict]) -> None:
 
 
 if __name__ == "__main__":
-    questions = list(load(HERE / os.environ.get("QUESTIONS", "questions.jsonl")).values())
+    questions = list(load(HERE / os.environ.get("QUESTIONS", "question-2.json")).values())
     steps = sys.argv[1:] or ["ask", "score"]
     if "ask" in steps:
         ask(questions)

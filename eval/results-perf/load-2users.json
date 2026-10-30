@@ -1,0 +1,73 @@
+{
+  "users": 2,
+  "turns_per_user": 3,
+  "without_indexing": {
+    "requests": 6,
+    "ok": 6,
+    "errors": [],
+    "first_status_s": {
+      "n": 6,
+      "mean": 0.014786151000180325,
+      "p50": 0.014914043500311891,
+      "p95": 0.015671113000280457,
+      "max": 0.015671113000280457
+    },
+    "ttft_s": {
+      "n": 6,
+      "mean": 12.30593591583344,
+      "p50": 11.899190771500344,
+      "p95": 13.820241797999643,
+      "max": 13.820241797999643
+    },
+    "total_s": {
+      "n": 6,
+      "mean": 13.748816919000092,
+      "p50": 13.864168718999963,
+      "p95": 15.373708676000206,
+      "max": 15.373708676000206
+    },
+    "wall_s": 43.84707671000024
+  },
+  "with_indexing": {
+    "requests": 6,
+    "ok": 2,
+    "errors": [
+      "AI provider request failed",
+      "AI provider request failed",
+      "AI provider request failed",
+      "AI provider request failed"
+    ],
+    "first_status_s": {
+      "n": 2,
+      "mean": 0.014478755500022089,
+      "p50": 0.014478755500022089,
+      "p95": 0.014745295000011538,
+      "max": 0.014745295000011538
+    },
+    "ttft_s": {
+      "n": 2,
+      "mean": 16.06523307549992,
+      "p50": 16.06523307549992,
+      "p95": 20.815355999000076,
+      "max": 20.815355999000076
+    },
+    "total_s": {
+      "n": 2,
+      "mean": 17.063396066999758,
+      "p50": 17.063396066999758,
+      "p95": 21.77866333699967,
+      "max": 21.77866333699967
+    },
+    "wall_s": 55.298086790999605,
+    "uploaded_docs": 4,
+    "okf_status": [
+      "completed",
+      "completed",
+      "completed",
+      "completed"
+    ],
+    "chat_finished_after_s": 55.298547020000115,
+    "indexing_finished_after_s": 344.7553296279998,
+    "indexing_still_running_when_chat_ended": 4
+  }
+}
