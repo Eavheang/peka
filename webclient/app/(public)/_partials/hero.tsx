@@ -102,7 +102,10 @@ export function PublicHero() {
                 stepRefs.current[index] = node;
               }}
               aria-labelledby={index === 0 ? "hero-title" : `hero-step-${index + 1}-title`}
-              className="flex min-h-[calc(100dvh-6rem)] max-w-2xl flex-col justify-center gap-5 py-16 lg:opacity-0"
+              className={cn(
+                "max-w-2xl flex-col justify-center gap-5 pb-16 lg:min-h-[calc(100dvh-6rem)] lg:py-16 lg:opacity-0",
+                index === 0 ? "flex" : "hidden lg:flex",
+              )}
             >
               {renderStepContent(item, index, true)}
             </article>
