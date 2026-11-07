@@ -1,0 +1,206 @@
+staff questions 43 top-20 overlap 0.988 lowest 0.95 ms with 213 ms without 212
+full questions 43 top-20 overlap 0.992 lowest 0.95 ms with 238 ms without 294
+plan staff
+Limit (actual rows=20 loops=1)
+  CTE terms
+    ->  Result (actual rows=1 loops=1)
+  CTE candidates
+    ->  Append (actual rows=960 loops=1)
+          ->  Subquery Scan on "*SELECT* 1_1" (actual rows=480 loops=1)
+                ->  Limit (actual rows=480 loops=1)
+                      ->  WindowAgg (actual rows=480 loops=1)
+                            ->  Nested Loop (actual rows=480 loops=1)
+                                  ->  Gather Merge (actual rows=480 loops=1)
+                                        Workers Planned: 2
+                                        Workers Launched: 2
+                                        ->  Sort (actual rows=559 loops=3)
+                                              Sort Key: ((kc_2.embedding <=> '[query]'))
+                                              Sort Method: quicksort  Memory: 1166kB
+                                              Worker 0:  Sort Method: quicksort  Memory: 852kB
+                                              Worker 1:  Sort Method: quicksort  Memory: 867kB
+                                              ->  Hash Join (actual rows=7929 loops=3)
+                                                    Hash Cond: (kc_2.file_id = f.id)
+                                                    ->  Parallel Seq Scan on knowledge_chunks kc_2 (actual rows=15689 loops=3)
+                                                          Filter: (('1'::double precision - (embedding <=> '[query]')) >= '0.3'::double precision)
+                                                    ->  Hash (actual rows=1234 loops=3)
+                                                          Buckets: 2048  Batches: 1  Memory Usage: 74kB
+                                                          ->  Seq Scan on files f (actual rows=1234 loops=3)
+                                                                Filter: (access_level = ANY ('{general}'::text[]))
+                                                                Rows Removed by Filter: 1164
+                                  ->  Memoize (actual rows=1 loops=480)
+                                        Cache Key: kc_2.chunk_set_id
+                                        Cache Mode: logical
+                                        Hits: 96  Misses: 384  Evictions: 0  Overflows: 0  Memory Usage: 48kB
+                                        ->  Index Scan using chunk_sets_pkey on chunk_sets cs_1 (actual rows=1 loops=384)
+                                              Index Cond: (id = kc_2.chunk_set_id)
+                                              Filter: (status = 'active'::text)
+          ->  Subquery Scan on "*SELECT* 2" (actual rows=480 loops=1)
+                ->  Limit (actual rows=480 loops=1)
+                      InitPlan 2 (returns $1)
+                        ->  CTE Scan on terms (actual rows=1 loops=1)
+                      InitPlan 3 (returns $2)
+                        ->  CTE Scan on terms terms_1 (actual rows=1 loops=1)
+                      ->  Sort (actual rows=480 loops=1)
+                            Sort Key: (row_number() OVER (?))
+                            Sort Method: top-N heapsort  Memory: 58kB
+                            ->  WindowAgg (actual rows=15116 loops=1)
+                                  ->  Sort (actual rows=15116 loops=1)
+                                        Sort Key: (ts_rank_cd(kc_3.search_words, $1)) DESC
+                                        Sort Method: quicksort  Memory: 1093kB
+                                        ->  Nested Loop (actual rows=15116 loops=1)
+                                              ->  Hash Join (actual rows=15116 loops=1)
+                                                    Hash Cond: (kc_3.file_id = f_1.id)
+                                                    ->  Bitmap Heap Scan on knowledge_chunks kc_3 (actual rows=29456 loops=1)
+                                                          Recheck Cond: (search_words @@ $2)
+                                                          Heap Blocks: exact=7173
+                                                          ->  Bitmap Index Scan on knowledge_chunks_search_words_idx (actual rows=29456 loops=1)
+                                                                Index Cond: (search_words @@ $2)
+                                                    ->  Hash (actual rows=1234 loops=1)
+                                                          Buckets: 2048  Batches: 1  Memory Usage: 74kB
+                                                          ->  Seq Scan on files f_1 (actual rows=1234 loops=1)
+                                                                Filter: (access_level = ANY ('{general}'::text[]))
+                                                                Rows Removed by Filter: 1164
+                                              ->  Index Scan using chunk_sets_pkey on chunk_sets cs_2 (actual rows=1 loops=15116)
+                                                    Index Cond: (id = kc_3.chunk_set_id)
+                                                    Filter: (status = 'active'::text)
+  ->  Sort (actual rows=20 loops=1)
+        Sort Key: (sum((1.0 / ((60 + ranked.rank))::numeric))) DESC
+        Sort Method: top-N heapsort  Memory: 62kB
+        ->  Nested Loop (actual rows=135 loops=1)
+              ->  GroupAggregate (actual rows=135 loops=1)
+                    Group Key: ranked.id
+                    ->  Sort (actual rows=160 loops=1)
+                          Sort Key: ranked.id
+                          Sort Method: quicksort  Memory: 32kB
+                          ->  Subquery Scan on ranked (actual rows=160 loops=1)
+                                ->  WindowAgg (actual rows=160 loops=1)
+                                      Run Condition: (row_number() OVER (?) <= '80'::smallint)
+                                      ->  Sort (actual rows=348 loops=1)
+                                            Sort Key: c.branch, c.rank
+                                            Sort Method: quicksort  Memory: 44kB
+                                            ->  Hash Join (actual rows=348 loops=1)
+                                                  Hash Cond: (c.id = d.id)
+                                                  ->  CTE Scan on candidates c (actual rows=960 loops=1)
+                                                  ->  Hash (actual rows=299 loops=1)
+                                                        Buckets: 1024  Batches: 1  Memory Usage: 23kB
+                                                        ->  Subquery Scan on d (actual rows=299 loops=1)
+                                                              Filter: ((d.file_id = d.best_file) OR (('1'::double precision - (d.centroid <=> d.best_c
+                                                              Rows Removed by Filter: 545
+                                                              ->  WindowAgg (actual rows=844 loops=1)
+                                                                    ->  Sort (actual rows=844 loops=1)
+                                                                          Sort Key: (lower(regexp_replace(kc_1.file_path, '^.*/|\.[^./]*$'::text, ''::
+                                                                          Sort Method: quicksort  Memory: 1372kB
+                                                                          ->  Nested Loop (actual rows=844 loops=1)
+                                                                                ->  Nested Loop (actual rows=844 loops=1)
+                                                                                      ->  HashAggregate (actual rows=844 loops=1)
+                                                                                            Group Key: candidates.id
+                                                                                            Batches: 1  Memory Usage: 569kB
+                                                                                            ->  CTE Scan on candidates (actual rows=960 loops=1)
+                                                                                      ->  Index Scan using knowledge_chunks_pkey on knowledge_chunks k
+                                                                                            Index Cond: (id = candidates.id)
+                                                                                ->  Index Scan using chunk_sets_pkey on chunk_sets cs (actual rows=1 l
+                                                                                      Index Cond: (id = kc_1.chunk_set_id)
+              ->  Index Scan using knowledge_chunks_pkey on knowledge_chunks kc (actual rows=1 loops=135)
+                    Index Cond: (id = ranked.id)
+Planning Time: 1.774 ms
+Execution Time: 270.199 ms
+plan full
+Limit (actual rows=20 loops=1)
+  CTE terms
+    ->  Result (actual rows=1 loops=1)
+  CTE candidates
+    ->  Append (actual rows=960 loops=1)
+          ->  Subquery Scan on "*SELECT* 1_1" (actual rows=480 loops=1)
+                ->  Limit (actual rows=480 loops=1)
+                      ->  WindowAgg (actual rows=480 loops=1)
+                            ->  Nested Loop (actual rows=480 loops=1)
+                                  ->  Nested Loop (actual rows=480 loops=1)
+                                        ->  Index Scan using knowledge_chunks_embedding_idx on knowledge_chunks kc_2 (actual rows=480 loops=1)
+                                              Order By: (embedding <=> '[query]')
+                                              Filter: (('1'::double precision - (embedding <=> '[query]')) >= '0.3'::double precision)
+                                        ->  Memoize (actual rows=1 loops=480)
+                                              Cache Key: kc_2.chunk_set_id
+                                              Cache Mode: logical
+                                              Hits: 61  Misses: 419  Evictions: 0  Overflows: 0  Memory Usage: 53kB
+                                              ->  Index Scan using chunk_sets_pkey on chunk_sets cs_1 (actual rows=1 loops=419)
+                                                    Index Cond: (id = kc_2.chunk_set_id)
+                                                    Filter: (status = 'active'::text)
+                                  ->  Memoize (actual rows=1 loops=480)
+                                        Cache Key: kc_2.file_id
+                                        Cache Mode: logical
+                                        Hits: 61  Misses: 419  Evictions: 0  Overflows: 0  Memory Usage: 53kB
+                                        ->  Index Scan using files_pkey on files f (actual rows=1 loops=419)
+                                              Index Cond: (id = kc_2.file_id)
+                                              Filter: (access_level = ANY ('{general,confidential}'::text[]))
+          ->  Subquery Scan on "*SELECT* 2" (actual rows=480 loops=1)
+                ->  Limit (actual rows=480 loops=1)
+                      InitPlan 2 (returns $1)
+                        ->  CTE Scan on terms (actual rows=1 loops=1)
+                      InitPlan 3 (returns $2)
+                        ->  CTE Scan on terms terms_1 (actual rows=1 loops=1)
+                      ->  Sort (actual rows=480 loops=1)
+                            Sort Key: (row_number() OVER (?))
+                            Sort Method: top-N heapsort  Memory: 58kB
+                            ->  WindowAgg (actual rows=29456 loops=1)
+                                  ->  Sort (actual rows=29456 loops=1)
+                                        Sort Key: (ts_rank_cd(kc_3.search_words, $1)) DESC
+                                        Sort Method: quicksort  Memory: 2149kB
+                                        ->  Hash Join (actual rows=29456 loops=1)
+                                              Hash Cond: (kc_3.file_id = f_1.id)
+                                              ->  Hash Join (actual rows=29456 loops=1)
+                                                    Hash Cond: (kc_3.chunk_set_id = cs_2.id)
+                                                    ->  Bitmap Heap Scan on knowledge_chunks kc_3 (actual rows=29456 loops=1)
+                                                          Recheck Cond: (search_words @@ $2)
+                                                          Heap Blocks: exact=7173
+                                                          ->  Bitmap Index Scan on knowledge_chunks_search_words_idx (actual rows=29456 loops=1)
+                                                                Index Cond: (search_words @@ $2)
+                                                    ->  Hash (actual rows=2398 loops=1)
+                                                          Buckets: 4096  Batches: 1  Memory Usage: 145kB
+                                                          ->  Seq Scan on chunk_sets cs_2 (actual rows=2398 loops=1)
+                                                                Filter: (status = 'active'::text)
+                                                                Rows Removed by Filter: 70
+                                              ->  Hash (actual rows=2398 loops=1)
+                                                    Buckets: 4096  Batches: 1  Memory Usage: 145kB
+                                                    ->  Seq Scan on files f_1 (actual rows=2398 loops=1)
+                                                          Filter: (access_level = ANY ('{general,confidential}'::text[]))
+  ->  Sort (actual rows=20 loops=1)
+        Sort Key: (sum((1.0 / ((60 + ranked.rank))::numeric))) DESC
+        Sort Method: top-N heapsort  Memory: 58kB
+        ->  Nested Loop (actual rows=136 loops=1)
+              ->  GroupAggregate (actual rows=136 loops=1)
+                    Group Key: ranked.id
+                    ->  Sort (actual rows=160 loops=1)
+                          Sort Key: ranked.id
+                          Sort Method: quicksort  Memory: 32kB
+                          ->  Subquery Scan on ranked (actual rows=160 loops=1)
+                                ->  WindowAgg (actual rows=160 loops=1)
+                                      Run Condition: (row_number() OVER (?) <= '80'::smallint)
+                                      ->  Sort (actual rows=367 loops=1)
+                                            Sort Key: c.branch, c.rank
+                                            Sort Method: quicksort  Memory: 45kB
+                                            ->  Hash Join (actual rows=367 loops=1)
+                                                  Hash Cond: (c.id = d.id)
+                                                  ->  CTE Scan on candidates c (actual rows=960 loops=1)
+                                                  ->  Hash (actual rows=303 loops=1)
+                                                        Buckets: 1024  Batches: 1  Memory Usage: 23kB
+                                                        ->  Subquery Scan on d (actual rows=303 loops=1)
+                                                              Filter: ((d.file_id = d.best_file) OR (('1'::double precision - (d.centroid <=> d.best_c
+                                                              Rows Removed by Filter: 507
+                                                              ->  WindowAgg (actual rows=810 loops=1)
+                                                                    ->  Sort (actual rows=810 loops=1)
+                                                                          Sort Key: (lower(regexp_replace(kc_1.file_path, '^.*/|\.[^./]*$'::text, ''::
+                                                                          Sort Method: quicksort  Memory: 1317kB
+                                                                          ->  Nested Loop (actual rows=810 loops=1)
+                                                                                ->  Nested Loop (actual rows=810 loops=1)
+                                                                                      ->  HashAggregate (actual rows=810 loops=1)
+                                                                                            Group Key: candidates.id
+                                                                                            Batches: 1  Memory Usage: 569kB
+                                                                                            ->  CTE Scan on candidates (actual rows=960 loops=1)
+                                                                                      ->  Index Scan using knowledge_chunks_pkey on knowledge_chunks k
+                                                                                            Index Cond: (id = candidates.id)
+                                                                                ->  Index Scan using chunk_sets_pkey on chunk_sets cs (actual rows=1 l
+                                                                                      Index Cond: (id = kc_1.chunk_set_id)
+              ->  Index Scan using knowledge_chunks_pkey on knowledge_chunks kc (actual rows=1 loops=136)
+                    Index Cond: (id = ranked.id)
+Planning Time: 2.256 ms
+Execution Time: 353.649 ms

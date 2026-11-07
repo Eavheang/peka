@@ -29,9 +29,10 @@ class KnowledgeChunksRepository:
             for chunk, vector in zip(chunks, vectors, strict=True):
                 connection.execute(
                     "INSERT INTO knowledge_chunks "
-                    "(file_id, chunk_set_id, heading, content, source_locations, embedding) "
-                    "VALUES (%s, %s, %s, %s, %s, %s)",
+                    "(file_id, file_path, chunk_set_id, heading, content, source_locations, embedding) "
+                    "VALUES (%s, (SELECT path FROM files WHERE id = %s), %s, %s, %s, %s, %s)",
                     (
+                        file_id,
                         file_id,
                         set_id,
                         chunk.heading,
@@ -40,6 +41,11 @@ class KnowledgeChunksRepository:
                         Vector(vector),
                     ),
                 )
+            connection.execute(
+                "UPDATE chunk_sets SET centroid = "
+                "(SELECT avg(embedding) FROM knowledge_chunks WHERE chunk_set_id = %s) WHERE id = %s",
+                (set_id, set_id),
+            )
             superseded = [
                 row["id"]
                 for row in connection.execute(

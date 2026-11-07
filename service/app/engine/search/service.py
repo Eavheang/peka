@@ -72,7 +72,7 @@ def search_knowledge(query: str, user_role: str, top_k: int | None = None) -> li
         {
             "chunk_id": str(row["id"]),
             "file_id": str(row["file_id"]),
-            "title": search_repository.file_title(row["file_id"]),
+            "title": row["file_path"].rsplit("/", 1)[-1],
             "heading": row["heading"],
             "snippet": row["content"][:300],
             "content": row["content"],
