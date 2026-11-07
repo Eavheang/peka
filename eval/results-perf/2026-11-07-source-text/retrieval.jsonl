@@ -1,0 +1,2 @@
+{"set": "set2", "questions": 59, "doc1": 0.966, "doc5": 0.983, "doc10": 1.0, "ev_q": 59, "ev1": 0.881, "ev5": 0.949, "ev10": 0.949, "ms_p50": 761, "ms_max": 961, "ctx_top5_chars": 5021, "distinct_docs_top5": 1.76, "doc5_miss": [31], "ev5_miss": [15, 31, 48]}
+{"set": "set1", "questions": 68, "doc1": 0.824, "doc5": 0.838, "doc10": 0.838, "ev_q": 0, "ev1": 0.0, "ev5": 0.0, "ev10": 0.0, "ms_p50": 770, "ms_max": 940, "ctx_top5_chars": 6043, "distinct_docs_top5": 1.96, "doc5_miss": [18, 19, 31, 32, 54, 55, 56, 57, 68, 69, 70], "ev5_miss": []}

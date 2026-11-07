@@ -95,12 +95,11 @@ def _write_extraction(storage, relative_source):
     extraction_path.write_text(json.dumps({"source_id": "source-1", "sections": []}), encoding="utf-8")
 
 
-def _prepare_worker(monkeypatch, tmp_path, jobs, convert):
+def _prepare_worker(monkeypatch, tmp_path, jobs, chunk):
     _write_extraction(tmp_path, jobs.path)
     monkeypatch.setattr(worker, "okf_jobs_repository", jobs)
     monkeypatch.setattr(worker.settings, "file_storage_dir", tmp_path)
-    monkeypatch.setattr(worker, "convert_to_okf", convert)
-    monkeypatch.setattr(worker, "parse_okf_chunks", lambda result: [])
+    monkeypatch.setattr(worker, "chunk_extraction", chunk)
     monkeypatch.setattr(worker, "embed_chunks", lambda chunks: [])
     monkeypatch.setattr(
         worker,
@@ -163,15 +162,13 @@ def test_admin_list_includes_sync_query_login_and_admin_deny(client, monkeypatch
     prompt = "super-secret-prompt-body-should-not-be-stored"
     file_id = uuid4()
     jobs = ScriptedJobs(file_id, "pdf/policy.pdf")
-    conversions = {"n": 0}
 
-    def convert(extraction, storage):
-        conversions["n"] += 1
+    def chunk(extraction):
         if jobs.should_fail:
             raise RuntimeError("terminal")
-        return {"files": []}
+        return []
 
-    _prepare_worker(monkeypatch, tmp_path, jobs, convert)
+    _prepare_worker(monkeypatch, tmp_path, jobs, chunk)
     assert worker.process_next_job()
     jobs.should_fail = True
     jobs.attempts = 0

@@ -34,23 +34,12 @@ class OKFFile(BaseModel):
     content: str = Field(min_length=1)
 
 
-class OKFRetrievalSection(BaseModel):
-    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
-
-    concept_path: str = Field(min_length=1)
-    heading: str = Field(min_length=1)
-    anchor: str = Field(min_length=1)
-    pages: list[int]
-    summary: str = Field(min_length=1)
-
-
 class OKFResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     document_analysis: OKFDocumentAnalysis
     folder_structure: list[str] = Field(min_length=1)
     files: list[OKFFile] = Field(min_length=1)
-    retrieval_sections: list[OKFRetrievalSection]
 
 
 def convert_to_okf(extraction: dict, base_dir: Path) -> dict:

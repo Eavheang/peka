@@ -85,12 +85,16 @@ Documented in `service/.env.example`. Field names map to `app/config.py` (case-i
 | `LLM_API_KEY` | yes | SecretStr |
 | `LLM_MODEL` | yes | |
 | `LLM_MAX_TOKENS` | no | Default 8192 |
-| `OKF_MAX_TOKENS` | no | Default 32768; output limit for OKF conversion |
+| `OKF_ENRICHMENT_ENABLED` | no | Default `false`. After a file is searchable, also write an LLM OKF page to `knowledge_base/`. Competes with chat on the same model |
+| `OKF_MAX_TOKENS` | no | Default 32768; output limit for OKF enrichment only |
 | `EMBEDDING_BASE_URL` | no | Default `http://localhost:8081/v1` |
 | `EMBEDDING_MODEL` | no | `BAAI/bge-small-en-v1.5` |
 | `EMBEDDING_DIMENSIONS` | no | `384` |
 | `EMBEDDING_BATCH_SIZE` | no | `1` |
-| `SEARCH_TOP_K` | no | `5` |
+| `SEARCH_TOP_K` | no | `8`; results from `POST /search` |
+| `RERANK_BASE_URL` | no | Default `http://localhost:8082` |
+| `RERANK_CANDIDATES` | no | `20` |
+| `RERANK_TOP_K` | no | `5`; sources sent to the chat model |
 | `SEARCH_SIMILARITY_FLOOR` | no | `0.3` |
 | `EXA_API_KEY` | no | Empty disables web search |
 | `EXA_BASE_URL` | no | Default Exa API |
@@ -128,14 +132,14 @@ Retrieval planning, KB and/or Exa grounding, structured answers with citations, 
 
 ### Engine OKF (`app/engine/okf/`)
 
-- `worker.py` — claim jobs with `FOR UPDATE … SKIP LOCKED`, reset stuck `processing`
-- `converter.py` + `prompt.txt` — LLM → OKF markdown
+- `worker.py` — claim jobs with `FOR UPDATE … SKIP LOCKED`, reset stuck `processing`, index source text, queue optional enrichment
+- `converter.py` + `prompt.txt` — optional enrichment: LLM → OKF markdown
 - `file_writer.py` — knowledge_base tree + indexes
 - Max **3** attempts per job
 
 ### Chunks & embeddings (`app/engine/chunks/`)
 
-Heading-based chunking, TEI embeddings, `chunk_sets` versioning (`building` → `active`, old → `superseded`).
+Structure-aware chunking of original text, TEI embeddings, `chunk_sets` versioning (`building` → `active`, old → `superseded`).
 
 ### Workspace settings (`app/workspace_settings.py`)
 

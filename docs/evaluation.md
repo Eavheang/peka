@@ -58,6 +58,7 @@ Per-question data for these runs is in git history (the `eval/results/` folder b
 | 2026-10-21 | 2 documents, 22 chunks; PEKA answered with a cloud Gemma model, judged by RAGAS | 20 | `doc_hit`, `heading_hit`, `context_recall` and `context_precision` 0.950, `faithfulness` 0.943 |
 | 2026-10-27, run A | 70 files, 519 chunks, built by a cloud model, answered locally | 74 (6 unanswerable) | `correct` 0.772, `doc_hit` 0.853, `heading_hit` 0.647 |
 | 2026-10-27, run B | 70 files, 372 chunks, built by the local model, answered locally | 74 | `correct` 0.544, `doc_hit` 0.676, `heading_hit` 0.147 |
+| 2026-11-07 | 70 files, 682 chunks of original text with no LLM, reranked, answered locally | 67 from set 2 (8 unanswerable), graded by reading each answer against its reference | 58 of 59 correct, 8 of 8 declined. Document in the top 5: 98.3%. Passage with the answer: 94.9% in the top 5, 88.1% first (49.2% first and 91.5% in the top 5 on the OKF-page index). Raw output: `eval/results-perf/2026-11-07-source-text/` |
 
 What those runs found:
 
@@ -71,7 +72,7 @@ What those runs found:
 
 ## How to improve accuracy
 
-Ordered by expected gain.
+Ordered by expected gain. These runs predate source-text indexing, which now covers items 2, 3 (a repeated heading no longer hides a chunk), 5 (search keeps one format per document), and 6, and makes OKF conversion optional. The 2026-11-07 run above uses them. `heading_hit` compares exact headings, and `eval/questions.jsonl` holds OKF-page headings, so its `heading` values also need updating: PDF chunks are now named `Page N`.
 
 1. **Use a larger model for OKF conversion.** Conversion runs once per file, so a slower or paid model costs little and gave far better page structure (run A). Answering can stay local.
 2. **Keep metric tables as their own chunk and include the row labels with the numbers.** A chunk like "Metrics table, Rate Limits: baseline 47%, target 82%, owner Finance Group" matches "who owns rate limits" much better than a markdown table under a generic heading.
@@ -80,7 +81,7 @@ Ordered by expected gain.
 5. **Deduplicate formats at upload or rank one format per topic,** so answers stop mixing conflicting figures from copies of the same report.
 6. **Cap chunk length below the embedding model's 512 tokens.** The chunker allows 3,000 characters.
 
-Already in the code: splitting on `##` and `#`, the document title and heading in each embedded chunk, and hybrid keyword plus vector search.
+Already in the code: splitting on every Markdown heading level, the file name and heading in each embedded chunk, and hybrid keyword plus vector search.
 
 ## Running it
 

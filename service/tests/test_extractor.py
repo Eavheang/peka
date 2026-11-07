@@ -11,6 +11,8 @@ from pptx import Presentation
 from pptx.util import Inches
 from fastapi import UploadFile
 
+from app.engine.chunks.chunker import chunk_extraction
+from app.engine.source_extractor import extract_file
 from app.files import service
 
 
@@ -79,3 +81,107 @@ def test_upload_extraction_supports_every_format(monkeypatch, tmp_path):
         assert record["source_sha256"] == hashlib.sha256(path.read_bytes()).hexdigest()
         assert record["source_extension"] == path.suffix
         assert expected_text in "\n".join(section["text"] for section in record["sections"])
+
+
+def test_docx_chunks_follow_unnumbered_headings_and_tables(tmp_path):
+    path = tmp_path / "policy.docx"
+    document = Document()
+    document.add_paragraph("Cover note.")
+    document.add_heading("Scope", level=1)
+    document.add_paragraph("Applies to staff.")
+    table = document.add_table(rows=2, cols=2)
+    for cell, text in zip(table._cells, ("Role", "Hours", "Nurse", "40")):
+        cell.text = text
+    document.add_heading("1. Approval", level=2)
+    document.add_paragraph("Managers approve.")
+    document.save(path)
+
+    chunks = chunk_extraction(extract_file(path))
+
+    assert [(chunk.heading, chunk.content, chunk.source_locations) for chunk in chunks] == [
+        ("Text", "Cover note.", ({"section": 0},)),
+        ("Scope", "Applies to staff.", ({"section": 1},)),
+        ("Scope", "| Role: Nurse | Hours: 40 |", ({"section": 1},)),
+        ("1. Approval", "Managers approve.", ({"section": 2},)),
+    ]
+
+
+def test_pdf_table_becomes_pipe_rows_apart_from_the_prose(tmp_path) -> None:
+    path = tmp_path / "ruled.pdf"
+    with pymupdf.open() as pdf:
+        page = pdf.new_page()
+        page.insert_text((72, 72), "Narrative before the table.")
+        for row, cells in enumerate([("Metric", "Owner"), ("Uptime", "Dana Lee")]):
+            for column, text in enumerate(cells):
+                cell = pymupdf.Rect(72 + 150 * column, 120 + 30 * row, 222 + 150 * column, 150 + 30 * row)
+                page.draw_rect(cell)
+                page.insert_text((cell.x0 + 5, cell.y0 + 20), text)
+        pdf.save(path)
+
+    chunks = chunk_extraction(extract_file(path))
+
+    prose, table = [chunk.content for chunk in chunks]
+    assert prose == "Narrative before the table."
+    assert "Metric: Uptime" in table and "Owner: Dana Lee" in table
+    assert all(chunk.source_locations == ({"page": 1},) for chunk in chunks)
+
+
+def test_plain_text_columns_under_a_ruler_become_their_own_table_chunk(tmp_path) -> None:
+    path = tmp_path / "plan.txt"
+    path.write_text(
+        "Some narrative.\n\n"
+        "Metric                Baseline  Target  Owner\n"
+        "--------------------  --------  ------  -----------\n"
+        "Performance Reviews   52%       91%     Quality Team\n"
+        "\nClosing words.\n"
+    )
+
+    chunks = chunk_extraction(extract_file(path))
+
+    assert [chunk.content for chunk in chunks] == [
+        "Some narrative.",
+        "| Metric: Performance Reviews | Baseline: 52% | Target: 91% | Owner: Quality Team |",
+        "Closing words.",
+    ]
+
+
+def test_pptx_table_text_is_extracted_as_its_own_chunk(tmp_path):
+    path = tmp_path / "deck.pptx"
+    presentation = Presentation()
+    slide = presentation.slides.add_slide(presentation.slide_layouts[6])
+    slide.shapes.add_textbox(Inches(1), Inches(1), Inches(4), Inches(1)).text = "Roadmap"
+    table = slide.shapes.add_table(2, 2, Inches(1), Inches(2), Inches(4), Inches(1)).table
+    for row, values in enumerate((("Phase", "Date"), ("Beta", "March"))):
+        for column, value in enumerate(values):
+            table.cell(row, column).text = value
+    presentation.save(path)
+
+    chunks = chunk_extraction(extract_file(path))
+
+    assert [(chunk.heading, chunk.content, chunk.source_locations) for chunk in chunks] == [
+        ("Slide 1", "Roadmap", ({"slide": 1},)),
+        ("Slide 1", "| Phase: Beta | Date: March |", ({"slide": 1},)),
+    ]
+
+
+def test_xlsx_keeps_cell_boundaries_and_skips_empty_rows(tmp_path):
+    path = tmp_path / "sales.xlsx"
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Q1"
+    sheet.append(["Region", "Sales", "Owner"])
+    sheet.append(["North Coast", None, "Dana Lee"])
+    sheet.append([None, None, None])
+    sheet.append(["South", 100])
+    workbook.save(path)
+    workbook.close()
+
+    chunks = chunk_extraction(extract_file(path))
+
+    assert [(chunk.heading, chunk.content, chunk.source_locations) for chunk in chunks] == [
+        (
+            "Sheet: Q1",
+            "| Region: North Coast | Owner: Dana Lee |\n| Region: South | Sales: 100 |",
+            ({"sheet": 1, "name": "Q1"},),
+        ),
+    ]

@@ -43,7 +43,15 @@ def test_generate_structured_rejects_non_structured_model_output() -> None:
         generate_structured(
             [ai.user_message("question")], ModelAnswer, model=model
         )
-    assert len(model.calls) == 2, "should retry once before failing"
+    assert len(model.calls) == 1, "invalid output must not trigger a second generation"
+
+
+def test_provider_failure_is_still_retried(monkeypatch) -> None:
+    calls = _flaky_stream(monkeypatch, ["fail", "ok"])
+
+    generate_structured([ai.user_message("question")], ModelAnswer, model=_fake_model())
+
+    assert calls == ["fail", "ok"]
 
 
 def test_generate_structured_accepts_json_markdown_fence() -> None:

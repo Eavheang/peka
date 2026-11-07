@@ -128,16 +128,9 @@ usually indicate guidance. Never turn optional language into mandatory rules.
 
    - [Concept Title](./concept-filename.md) - Concept description.
 
-7. Build retrieval metadata.
-   Create one entry for every H1 section in concept body. Do not split bullets,
-   rows, or one procedure into separate entries. Each entry contains concept
-   path, exact heading, lowercase kebab-case anchor, supporting PDF page numbers,
-   and concise summary. Use an empty `pages` array when source has no page
-   locators. Never invent page numbers.
-
-8. Verify final result internally.
+7. Verify final result internally.
    Confirm classification, title, paths, links, source values, content fidelity,
-   section metadata, existing index preservation, and valid JSON.
+   existing index preservation, and valid JSON.
 
 ## Output contract
 
@@ -157,15 +150,6 @@ Return exactly one JSON object with this structure:
       "path": "knowledge_base/<category>/<filename>.md",
       "file_type": "okf_concept",
       "content": "complete UTF-8 Markdown content"
-    }
-  ],
-  "retrieval_sections": [
-    {
-      "concept_path": "knowledge_base/<category>/<filename>.md",
-      "heading": "Exact Heading",
-      "anchor": "exact-heading",
-      "pages": [1],
-      "summary": "Source-supported section summary."
     }
   ]
 }

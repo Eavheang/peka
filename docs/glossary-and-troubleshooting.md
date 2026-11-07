@@ -3,11 +3,11 @@
 | Term | Meaning |
 |------|---------|
 | **PEKA** | Personal Knowledge Base — this product |
-| **OKF** | Open Knowledge Format (v0.2) — LLM-normalized Markdown concept + indexes under `knowledge_base/` |
+| **OKF** | Open Knowledge Format (v0.2) — optional LLM-normalized Markdown concept + indexes under `knowledge_base/`; search does not use it |
 | **Concept** | One OKF Markdown article for a source document (`knowledge_base/<category>/<file>.md`) |
-| **okf-worker** | Background process that drains `okf_jobs`, writes OKF, chunks, and embeds |
+| **okf-worker** | Background process that drains `okf_jobs`, chunks original text, embeds, and optionally writes OKF |
 | **chunk set** | Versioned embedding index for a file (`building` → `active` → `superseded`) |
-| **Retrieval router** | First LLM call each chat turn; chooses `none` / KB / web search |
+| **Retrieval router** | LLM call before the answer, only on a follow-up or with web search on; rewrites the search query and can choose web search |
 | **Grounded block** | Answer segment that cites current-turn source IDs |
 | **General block** | Answer segment from model knowledge with no citations |
 | **RAG** | Retrieval-augmented generation — chat grounded on search results |
@@ -22,8 +22,8 @@
 | Symptom | Checks |
 |---------|--------|
 | UI loads but API 401 loops | Clear storage/cookies; confirm JWT secret ≥32 chars; refresh token still valid |
-| Uploads stuck in `queued` | Is `okf-worker` running? LLM reachable? Check job `last_error` / file okf-status |
-| `failed` OKF jobs | `POST /files/{id}/retry-okf` or fix LLM/prompt; max 3 attempts |
+| Uploads stuck in `queued` | Is `okf-worker` running? Embeddings healthy? Check job `last_error` / file okf-status |
+| `failed` jobs | `No text to index` means extraction found no text, such as a scanned PDF. Otherwise check embeddings, then `POST /files/{id}/retry-okf`; max 3 attempts |
 | Empty / weak search | Embeddings healthy? Migration `012` applied (384-d)? Similarity floor too high? |
 | Web search never used | `EXA_API_KEY` set? Toggle enabled in UI? Chat body `web_search: true`? |
 | Admin pages redirect | User `role` must be `admin` (`GET /auth/me`) |

@@ -30,11 +30,14 @@ from `.env.example` when `.env` does not exist.
 Dockerfiles or dependency lockfiles change. Development containers hot reload
 normal source-code changes automatically.
 
-Uploaded documents are extracted immediately. The `okf-worker` processes queued
-OKF conversions one at a time and retries failed conversions up to three times.
-It parses OKF headings, sends sections to the local embedding service
+Uploaded documents are extracted immediately. The `okf-worker` indexes queued
+files one at a time and retries failures up to three times. It chunks the
+original text without an LLM, sends chunks to the local embedding service
 (`BAAI/bge-small-en-v1.5`, CPU TEI image), and stores 384-dimensional vectors in
-PostgreSQL with pgvector. The optional local LLM (`make llm`) needs the NVIDIA
+PostgreSQL with pgvector. Set `OKF_ENRICHMENT_ENABLED=true` in `service/.env` to
+also write LLM-generated OKF pages to `knowledge_base/` after a file is indexed;
+that competes with chat on the same model and search does not use the pages. See
+[re-indexing existing files](../docs/architecture/okf-and-indexing.md#re-indexing-existing-files). The optional local LLM (`make llm`) needs the NVIDIA
 Container Toolkit and a compatible NVIDIA driver.
 
 
@@ -75,8 +78,9 @@ optional; start it with `docker compose --profile llama up -d llama`. Set
 http://localhost:8080/v1/chat/completions
 ```
 
-The OKF worker uses `http://llama:8080/v1` when the llama profile is running; a
-worker started directly on the host uses `http://localhost:8080/v1`.
+With OKF enrichment on, the worker uses `http://llama:8080/v1` when the llama
+profile is running; a worker started directly on the host uses
+`http://localhost:8080/v1`.
 
 Set `model` in `config/llama/config.yaml` to use another filename. Test it from
 PowerShell:

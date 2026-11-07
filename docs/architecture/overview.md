@@ -41,10 +41,10 @@ PEKA is a three-tier stack: a Next.js UI, a FastAPI service with a sibling OKF w
 |-----------|------|
 | **webclient** | Auth UI, chat (SSE), knowledge library, admin user/provider settings |
 | **service** | REST + SSE API: auth, files, search, chat, admin provider settings |
-| **okf-worker** | Polls `okf_jobs`, LLM conversion to OKF markdown, chunk + embed, activate chunk sets |
+| **okf-worker** | Polls `okf_jobs`, chunks original text, embeds, activates chunk sets; optional OKF enrichment afterwards |
 | **postgres** | Users, files, jobs, chunks (vector), conversations, provider settings |
 | **embeddings** | Hugging Face Text Embeddings Inference (OpenAI-compatible `/v1/embeddings`) |
-| **llama** (optional) | Local OpenAI-compatible chat completions for OKF + chat |
+| **llama** (optional) | Local OpenAI-compatible chat completions for chat and optional OKF enrichment |
 | **nginx** | Single entry: UI + `/api` strip-proxy; long timeouts for streams |
 
 ## Backend layering
@@ -80,7 +80,7 @@ Workspace routes are gated by Next.js 16 `proxy.ts` (cookie presence) and furthe
 
 | Integration | Config | Use |
 |-------------|--------|-----|
-| OpenAI-compatible LLM | `LLM_*` env + optional DB overrides | Chat answers, OKF conversion, retrieval planning |
+| OpenAI-compatible LLM | `LLM_*` env + optional DB overrides | Chat answers, retrieval planning, optional OKF enrichment |
 | TEI embeddings | `EMBEDDING_*` | Query and chunk vectors |
 | Exa | `EXA_*` (optional) | Web search when user enables it |
 
@@ -88,7 +88,7 @@ Admin can override LLM/Exa URL, key, and model at runtime via `/admin/settings/p
 
 ## What is not in the stack
 
-- No Redis/Celery — OKF uses a Postgres job table and a single polling worker
+- No Redis/Celery — indexing uses a Postgres job table and a single polling worker
 - No FastAPI CORS middleware in code (browser hits same origin via nginx `/api` in Compose)
 - No message broker for chat history — conversations live in Postgres
 

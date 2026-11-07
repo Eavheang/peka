@@ -166,8 +166,8 @@ async def _stream_events(
                     yield "data: [DONE]\n\n"
     except (asyncio.CancelledError, GeneratorExit):
         # The client disconnected (Stop, closed tab). Closing the answer stream above
-        # cancels the model request; a search or retry already in a worker thread
-        # finishes on its own and its result is dropped.
+        # cancels the model request; a search or planning call already in a worker
+        # thread finishes on its own and its result is dropped.
         if not finished:
             with anyio.CancelScope(shield=True):
                 await asyncio.to_thread(_save_stopped, payload, user["id"], "".join(shown).strip(), metrics, replace_ids)

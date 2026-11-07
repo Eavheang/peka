@@ -93,8 +93,7 @@ def test_sync_complete_and_terminal_fail_write_rows(database, monkeypatch, tmp_p
         (file_id,),
     )
     monkeypatch.setattr(worker.settings, "file_storage_dir", tmp_path)
-    monkeypatch.setattr(worker, "convert_to_okf", lambda extraction, storage: {"files": []})
-    monkeypatch.setattr(worker, "parse_okf_chunks", lambda result: [])
+    monkeypatch.setattr(worker, "chunk_extraction", lambda extraction: [])
     monkeypatch.setattr(worker, "embed_chunks", lambda chunks: [])
     monkeypatch.setattr(
         worker, "knowledge_chunks_repository",
@@ -116,8 +115,8 @@ def test_sync_complete_and_terminal_fail_write_rows(database, monkeypatch, tmp_p
         (file_id,),
     )
     monkeypatch.setattr(
-        worker, "convert_to_okf",
-        lambda extraction, storage: (_ for _ in ()).throw(RuntimeError("terminal")),
+        worker, "chunk_extraction",
+        lambda extraction: (_ for _ in ()).throw(RuntimeError("terminal")),
     )
     assert worker.process_next_job()
     failed = execute(

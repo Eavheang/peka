@@ -28,7 +28,6 @@ def test_convert_to_okf_calls_llm_and_writes_files(monkeypatch, tmp_path):
             }
         ],
         "folder_structure": ["knowledge_base/policies/sign-in-policy.md"],
-        "retrieval_sections": [],
     }
     request = {}
 
@@ -70,7 +69,6 @@ def test_convert_to_okf_keeps_same_titled_sources_apart(monkeypatch, tmp_path):
         },
         "files": [{"path": "knowledge_base/reports/report.md", "file_type": "okf_concept", "content": "# Overview\n\nText.\n"}],
         "folder_structure": ["knowledge_base/reports/report.md"],
-        "retrieval_sections": [],
     }
     monkeypatch.setattr(main, "generate_structured", lambda messages, output_type, **kwargs: main.OKFResult.model_validate(result))
 

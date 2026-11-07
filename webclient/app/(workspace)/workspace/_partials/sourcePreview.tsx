@@ -61,7 +61,6 @@ export function SourcePreview({ citation, number }: { citation: Citation; number
           [{number}] {citation.title}
         </span>
         {citation.heading && ` · ${citation.heading}`}
-        {citation.page !== null && ` · p. ${citation.page}`}
       </DialogTrigger>
       <DialogContent className="max-h-[85dvh] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden bg-background text-foreground sm:max-w-3xl">
         <DialogHeader className="min-w-0 pr-8">
@@ -70,7 +69,6 @@ export function SourcePreview({ citation, number }: { citation: Citation; number
           </DialogTitle>
           <DialogDescription>
             {citation.heading || "Cited excerpt"}
-            {citation.page !== null && ` · Page ${citation.page}`}
           </DialogDescription>
         </DialogHeader>
         {open && <SourcePreviewContent citation={citation} />}

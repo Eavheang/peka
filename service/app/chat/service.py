@@ -67,6 +67,10 @@ _SYSTEM_PROMPT = (
     "Do not reuse historical source IDs. Return at least one nonempty block."
 )
 
+# Resolving a follow-up needs the last exchange or two, not the whole conversation.
+_REWRITE_HISTORY_MESSAGES = 4
+
+
 class SearchPlan(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
     tool: Literal["none", "search_knowledge_base", "web_search"]
@@ -428,10 +432,14 @@ def _search_plan(
     web_search: bool,
     timezone_name: str | None = None,
 ) -> SearchPlan:
+    # A first turn has nothing to rewrite, and the only other thing the model adds is choosing
+    # web search, so spend the model call only when the user has turned web search on.
+    if not history and not web_search:
+        return SearchPlan(tool="search_knowledge_base", query=query)
     try:
         plan = generate_structured(
             _conversation_messages(
-                query, history, _retrieval_prompt(web_search), timezone_name
+                query, (history or [])[-_REWRITE_HISTORY_MESSAGES:], _retrieval_prompt(web_search), timezone_name
             ),
             SearchPlan,
         )
@@ -607,34 +615,23 @@ async def _stream_answer(
             if delta:
                 yield ChatStreamText(delta)
 
+    raw = "".join(raw_output)
     try:
-        answer = _normalize_model_answer(
-            parse_structured_output("".join(raw_output), ModelAnswer), sources
-        )
+        answer = _normalize_model_answer(parse_structured_output(raw, ModelAnswer), sources)
     except (AIModelError, ValidationError) as error:
-        raw = "".join(raw_output)
         logger.warning(
-            "Streamed structured output was invalid, regenerating: %s | %d chars | start: %r | end: %r",
+            "Streamed structured output was invalid: %s | %d chars | start: %r | end: %r",
             first_error_line(error) if isinstance(error, ValidationError) else error,
             len(raw), raw[:300], raw[-300:],
         )
+        # No second generation: it would hold the model while others wait. The user can press Retry.
+        fallback = _plain_text_fallback(raw)
+        if fallback is None:
+            raise AIModelError("The model's answer was cut off or malformed. Please try again.") from error
+        logger.warning("Showing the model's plain-text answer without citations")
         yield ChatStreamReset()
-        yield ChatStreamStatus("Retrying response...")
-        try:
-            answer = _normalize_model_answer(
-                await asyncio.to_thread(generate_structured, messages, ModelAnswer), sources
-            )
-        except AIModelError:
-            fallback = _plain_text_fallback(raw)
-            if fallback is None:
-                raise
-            logger.warning("Showing the model's plain-text answer without citations")
-            yield ChatStreamText(fallback)
-            yield ChatStreamCompleted(ChatResponse(answer=fallback, refused=False, citations=[]))
-            return
-        response = _response_from_model_answer(answer, sources)
-        yield ChatStreamText(response.answer)
-        yield ChatStreamCompleted(response)
+        yield ChatStreamText(fallback)
+        yield ChatStreamCompleted(ChatResponse(answer=fallback, refused=False, citations=[]))
         return
 
     yield ChatStreamCompleted(_response_from_model_answer(answer, sources))

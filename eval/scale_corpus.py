@@ -3,9 +3,9 @@
   docker exec -i config-okf-worker-1 python - add [count]    < eval/scale_corpus.py   # also writes /tmp/question-scale.json
   docker exec -i config-okf-worker-1 python - remove         < eval/scale_corpus.py
 
-Documents go through the real chunker and embedding service, but skip the LLM conversion step: the OKF
-page is written here, so indexing 200+ documents takes minutes instead of hours. Every row it adds has a
-path starting with `others/scale-test-`; `remove` deletes exactly those (chunks and jobs cascade).
+Documents are written here as Markdown and go through the real chunker and embedding service, the same
+path as an upload. Every row it adds has a path starting with `others/scale-test-`; `remove` deletes
+exactly those (chunks and jobs cascade).
 """
 import hashlib
 import json
@@ -13,7 +13,7 @@ import random
 import sys
 
 from app.database import get_connection
-from app.engine.chunks.chunker import parse_okf_chunks
+from app.engine.chunks.chunker import chunk_extraction
 from app.engine.chunks.embeddings import embed_chunks
 from app.engine.chunks.repository import knowledge_chunks_repository
 
@@ -81,7 +81,7 @@ def add(count: int) -> None:
                 (doc["path"], author, sha),
             ).fetchone()["id"]
             connection.execute("INSERT INTO okf_jobs (file_id, status) VALUES (%s, 'completed')", (file_id,))
-        chunks = parse_okf_chunks({"files": [{"file_type": "okf_concept", "content": doc["markdown"]}], "document_analysis": {"title": doc["title"]}})
+        chunks = chunk_extraction({"source_filename": f"{doc['title']}.md", "source_extension": ".md", "sections": [{"text": doc["markdown"]}]})
         knowledge_chunks_repository.swap_active_set(file_id, chunks, embed_chunks(chunks))
         questions += [{"id": len(questions) + 1, "file": doc["path"].rsplit("/", 1)[-1], **q} for q in doc["questions"]]
     with open("/tmp/question-scale.json", "w") as f:

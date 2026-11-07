@@ -1,6 +1,6 @@
 # PEKA Documentation
 
-**PEKA** (Personal Knowledge Base) is an organization-private RAG assistant. Users upload documents, the system converts them into a structured knowledge base, embeds them for retrieval, and answers questions with citations—optionally augmented by web search.
+**PEKA** (Personal Knowledge Base) is an organization-private RAG assistant. Users upload documents, the system chunks their original text into a knowledge base, embeds it for retrieval, and answers questions with citations—optionally augmented by web search.
 
 ## Start here (understand the product)
 
@@ -11,7 +11,7 @@ Read these first if you want to know **what PEKA does** and **how it works**:
 | 1 | [What is PEKA?](what-is-peka.md) | Problem, audience, what it is / isn’t |
 | 2 | [How it works](how-it-works.md) | End-to-end: upload → index → cited answer |
 | 3 | [User guide](user-guide.md) | Screens and tasks by role |
-| 4 | [OKF & indexing](architecture/okf-and-indexing.md) | Document pipeline deep dive |
+| 4 | [Indexing & OKF](architecture/okf-and-indexing.md) | Document pipeline deep dive |
 | 5 | [Chat & RAG](architecture/chat-and-rag.md) | Question → retrieval → answer deep dive |
 
 ## Reference (build, operate, integrate)
@@ -38,7 +38,7 @@ Read these first if you want to know **what PEKA does** and **how it works**:
 ```text
 peka/
 ├── config/       # Docker Compose, Makefile, nginx, llama/model mounts
-├── service/      # FastAPI API + OKF background worker
+├── service/      # FastAPI API + indexing background worker
 ├── webclient/    # Next.js App Router UI
 ├── docs/         # This documentation
 ├── eval/         # Standalone answer-quality check (RAGAS)

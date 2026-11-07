@@ -2,26 +2,26 @@
 
 Deep dive into how a user question becomes a cited answer. Companion to [How it works](../how-it-works.md).
 
-## Two LLM calls per turn (usually)
+## One LLM call per turn by default
 
 ```text
 User query (+ history)
         │
         ▼
 ┌───────────────────┐
-│ 1. Retrieval      │  structured SearchPlan
-│    router         │  tool: none | search_knowledge_base | web_search
+│ Retrieval router  │  only on a follow-up, or when web search is on
+│ (optional)        │  structured SearchPlan
 └─────────┬─────────┘
           │
           ▼
 ┌───────────────────┐
-│ Server retrieval  │  KB vector search and/or Exa (at most one path)
+│ Server retrieval  │  KB vector search or Exa (at most one path)
 └─────────┬─────────┘
           │
           ▼
 ┌───────────────────┐
-│ 2. Answer model   │  structured ModelAnswer blocks
-│    "Peka"         │  general | grounded
+│ Answer model      │  structured ModelAnswer blocks
+│ "Peka"            │  general | grounded
 └─────────┬─────────┘
           │
           ▼
@@ -29,11 +29,13 @@ Server adds [n] markers + citations[] + persists messages
 ```
 
 Implementation: `service/app/chat/service.py`  
-Streaming: same plan/search, then `stream_structured_text` with a JSON text parser; falls back to one-shot generation if the stream is invalid.
+Streaming: same plan/search, then `stream_structured_text` with a JSON text parser. Invalid output is never regenerated (see [Failure and fallback behavior](#failure-and-fallback-behavior)).
 
 ## Retrieval router
 
-Prompt role: *decide whether to retrieve; do not answer the user.*
+Skipped on a first question with web search off: the server searches the knowledge base with the question as written.
+
+Otherwise, prompt role: *decide whether to retrieve; do not answer the user.*
 
 Rules of thumb encoded in the prompt:
 
@@ -46,7 +48,8 @@ Rules of thumb encoded in the prompt:
 Also:
 
 - Rewrite a concise, self-contained `query` when searching (resolve pronouns from history).
-- If client disabled web search, a `web_search` plan is coerced to `none`.
+- The server always searches the knowledge base unless the plan is a usable `web_search`: a `none` plan, or a `web_search` plan when the client disabled web search, still searches the knowledge base.
+- If the router call fails, the server searches with the question as written.
 - Historical citation markers are data, not reusable source IDs.
 
 Output shape:
@@ -63,7 +66,8 @@ Output shape:
 2. Rank by cosine similarity on **active** chunk embeddings  
 3. Filter `access_level` by role  
 4. Apply `SEARCH_SIMILARITY_FLOOR` (default `0.3`)  
-5. Limit `SEARCH_TOP_K` (default `5`)
+5. Rerank the top `RERANK_CANDIDATES` (default `20`) with the local cross-encoder; if it fails, log a warning and keep the hybrid order  
+6. Limit to `RERANK_TOP_K` (default `5`) for chat, or `SEARCH_TOP_K` for `POST /search`
 
 Returned fields become chat sources: title, heading, snippet/content, locations, scores, file ids.
 
@@ -103,6 +107,7 @@ For each grounded block, the server:
 |-------|------|
 | `status` | Human-readable progress (planning, searching, …) |
 | `text` | Incremental answer text |
+| `reset` | Discard the text shown so far; a replacement follows |
 | `done` | Final `ChatResponse`-like payload (citations, conversation id, messages) |
 | `error` | Failure |
 | `[DONE]` | Stream terminator |
@@ -130,15 +135,19 @@ The web client (`services/chat.ts`) parses `data:` lines and updates the UI; on 
 |------|--------|
 | Embedding model / dimensions | Must match DB column and re-index |
 | `SEARCH_TOP_K` / `SEARCH_SIMILARITY_FLOOR` | Recall vs precision |
-| OKF prompt / LLM quality | Structure and fidelity of indexed markdown |
+| Extraction / `MAX_CHUNK_TOKENS` | Structure and size of indexed source chunks |
+| `RERANK_CANDIDATES` / `RERANK_TOP_K` | Reranker CPU time; sources sent to the chat model |
 | `LLM_MAX_TOKENS` / model context | Answer length and plan quality |
 | Exa key + UI toggle | Whether public web grounding is possible |
 | File ACL | Hard filter on what can ever be retrieved |
 
 ## Failure and fallback behavior
 
-- Invalid retrieval plan → error (`AIModelError`)  
+- Invalid retrieval plan → search with the question as written  
 - Embed failure on `/search` → HTTP 503  
 - Empty search results → answer with general blocks only / admit unknown company facts  
-- Broken stream JSON → regenerate once with non-streaming structured output  
+- Invalid answer JSON → no second generation, so a busy model is not held longer:  
+  1. Repair it in place (markdown fence, surrounding text, unescaped quotes or line breaks)  
+  2. `/chat/stream` only: if the model wrote plain prose, show that without citations  
+  3. Otherwise fail: `/chat/stream` sends an `error` event, the UI keeps the partial text and offers Retry, and nothing is saved; `POST /chat` returns HTTP 503  
 - Provider misconfiguration → admin test endpoints + chat errors surfacing as stream `error`

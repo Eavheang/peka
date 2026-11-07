@@ -187,10 +187,8 @@ async def _generate_structured(
             try:
                 return await _run_structured_stream(model, messages, output_type, max_tokens)
             except (ValidationError, AIModelError) as error:
-                if attempt == _MAX_STRUCTURED_ATTEMPTS - 1:
-                    raise AIModelError(
-                        "Model returned an invalid structured response"
-                    ) from error
+                # A second full generation would hold the model while others wait.
+                raise AIModelError("Model returned an invalid structured response") from error
             except ai.AIError as error:
                 # Providers (free tiers especially) sometimes abort a call; retry once.
                 if attempt == _MAX_STRUCTURED_ATTEMPTS - 1:
