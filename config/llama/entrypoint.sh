@@ -17,5 +17,7 @@ exec /app/llama-server \
   --top-p "$(value top_p)" \
   --min-p "$(value min_p)" \
   --repeat-penalty "$(value repeat_penalty)" \
+  --parallel 2 \
+  --cache-ram 512 \
   --host 0.0.0.0 \
   --port 8080
