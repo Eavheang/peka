@@ -8,11 +8,11 @@ from pydantic import BaseModel
 AccessLevel = Literal["general", "confidential"]
 
 
-class OKFStatusResponse(BaseModel):
+class IndexStatusResponse(BaseModel):
     file_id: str
-    okf_status: str
-    okf_attempts: int
-    okf_error: str | None
+    index_status: str
+    index_attempts: int
+    index_error: str | None
 
 
 class FileResponse(BaseModel):
@@ -23,9 +23,9 @@ class FileResponse(BaseModel):
     author_id: UUID
     access_level: AccessLevel
     created_at: datetime
-    okf_status: Literal["queued", "processing", "completed", "failed"]
-    okf_attempts: int
-    okf_error: str | None
+    index_status: Literal["queued", "processing", "completed", "failed"]
+    index_attempts: int
+    index_error: str | None
 
 
 class AccessLevelUpdate(BaseModel):

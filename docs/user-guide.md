@@ -39,7 +39,7 @@ If your session expires, the client tries one token refresh; if that fails you r
 
 ### When PEKA does not answer
 
-- **Not enough evidence:** no passage in the documents you can access matches a question for a specific fact, so PEKA does not guess. Rephrase with the document's own terms, or upload a document that covers it.
+- **Need more detail:** no passage in the documents you can access clearly matches a question for a specific fact, so PEKA does not guess. It lists the closest documents and asks what you meant. Name one, add detail, or upload a document that covers it.
 - **"This answer was cut off":** the answer usually reached the length limit, and its last part has no sources attached. Ask for less, or for one part at a time.
 
 **Tips for better answers**
@@ -71,7 +71,7 @@ Path: `/workspace/knowledge`.
 | `queued` | Waiting for the indexing worker |
 | `processing` | Chunking / embedding |
 | `completed` | Searchable in chat |
-| `failed` | Error after attempts; use **Retry OKF** (author or admin) |
+| `failed` | Error after attempts; use **Retry indexing** (author or admin) |
 
 ### Table actions
 

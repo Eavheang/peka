@@ -13,7 +13,7 @@ export function useListFiles() {
     queryFn: async () => (await axiosInstance.get<StoredFile[]>("/files")).data,
     refetchInterval: (query) =>
       query.state.data?.some(
-        (file) => file.okf_status === "queued" || file.okf_status === "processing",
+        (file) => file.index_status === "queued" || file.index_status === "processing",
       )
         ? 3000
         : false,
@@ -39,7 +39,7 @@ export function useRetryFile() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) =>
-      (await axiosInstance.post<StoredFile>(`/files/${id}/retry-okf`)).data,
+      (await axiosInstance.post<StoredFile>(`/files/${id}/retry-indexing`)).data,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: filesKey }),
   });
 }

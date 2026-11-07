@@ -13,7 +13,7 @@ This page explains the system **as a story**: what happens from first login to a
               ┌─────────────┼─────────────┐
               ▼             ▼             ▼
         ┌──────────┐  ┌──────────┐  ┌────────────┐
-        │ OKF      │  │ TEI      │  │ LLM        │
+        │ Index    │  │ TEI      │  │ LLM        │
         │ worker   │  │ embed    │  │ (OpenAI-   │
         │          │  │ server   │  │ compatible)│
         └────┬─────┘  └──────────┘  └────────────┘
@@ -22,7 +22,7 @@ This page explains the system **as a story**: what happens from first login to a
                shared storage: uploads + extracted text
 ```
 
-The worker calls the LLM only when optional OKF enrichment is turned on.
+The worker never calls the LLM. Only chat does.
 
 Nginx (in Docker) sits in front so the browser talks to one origin: UI at `/`, API at `/api/…`.
 
@@ -38,14 +38,14 @@ Imagine an admin uploads `Q3-launch-plan.pdf` as **general**.
 2. Service checks type, size (default 25 MiB), and SHA-256 (duplicate content is rejected).
 3. File is written under `storage/pdf/…` (or another type folder).
 4. Text is **extracted** (pages/sections/slides/sheets) into `storage/extracted/{source_id}.json`.
-5. A row is inserted in `files`, and an `okf_jobs` row is created as **`queued`**.
+5. A row is inserted in `files`, and an `index_jobs` row is created as **`queued`**.
 6. The API returns immediately — indexing is **not** finished yet.
 
 The Knowledge page keeps polling the file list every few seconds while status is `queued` or `processing`.
 
 ### 2. Chunk + embed (worker, asynchronous, no LLM)
 
-The `okf-worker` process loops forever:
+The `index-worker` process loops forever:
 
 1. Claim the next `queued` job (`FOR UPDATE … SKIP LOCKED`).
 2. Load the extraction JSON. A file with no text fails here.
@@ -57,11 +57,7 @@ The `okf-worker` process loops forever:
 
 After this, search can find the document, and citations quote its source text with locators from the extractor. Status becomes **`completed`** (or **`failed`** after up to 3 attempts).
 
-### 3. Optional OKF enrichment
-
-Off by default (`OKF_ENRICHMENT_ENABLED`). When on, and only after the file is searchable, a background thread asks the LLM for a normalized OKF article and writes it to `storage/knowledge_base/`. Search does not use it, and if it fails the file stays indexed.
-
-Details: [Indexing & OKF](architecture/okf-and-indexing.md).
+Details: [Indexing](architecture/indexing.md).
 
 ---
 
@@ -167,7 +163,7 @@ Embeddings are **not** overridable from the admin UI — changing the embedding 
 | Situation | What users see |
 |-----------|----------------|
 | Indexing still running | File shows `queued` / `processing`; chat won’t find it yet |
-| Indexing failed, including a file with no text | `failed` + error; Retry OKF available |
+| Indexing failed, including a file with no text | `failed` + error; Retry indexing available |
 | No relevant chunks | Model answers generally or says it doesn’t know the company fact |
 | Web search off | Knowledge base is searched instead |
 | Web search on, no Exa key | If the model picks web search, the turn fails with “Web search is not configured” |
@@ -182,5 +178,5 @@ Embeddings are **not** overridable from the admin UI — changing the embedding 
 2. [User guide](user-guide.md)  
 3. [What is PEKA?](what-is-peka.md) (product framing)  
 4. [Architecture overview](architecture/overview.md)  
-5. [Indexing & OKF](architecture/okf-and-indexing.md) + [Chat & RAG](architecture/chat-and-rag.md)  
+5. [Indexing](architecture/indexing.md) + [Chat & RAG](architecture/chat-and-rag.md)  
 6. [API reference](service/api-reference.md) when integrating or debugging HTTP  

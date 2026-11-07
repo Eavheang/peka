@@ -9,7 +9,7 @@ export interface StoredFile {
   author_id: string;
   access_level: AccessLevel;
   created_at: string;
-  okf_status: FileIndexStatus;
-  okf_attempts: number;
-  okf_error: string | null;
+  index_status: FileIndexStatus;
+  index_attempts: number;
+  index_error: string | null;
 }

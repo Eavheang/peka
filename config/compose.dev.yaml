@@ -37,7 +37,7 @@ services:
       DEBUG: "true"
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
-  okf-worker:
+  index-worker:
     volumes:
       - ../service:/app
       - ../service/storage:/app/storage

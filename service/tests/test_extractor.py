@@ -4,7 +4,6 @@ from io import BytesIO
 from uuid import uuid4
 
 import pymupdf
-import pytest
 from docx import Document
 from openpyxl import Workbook
 from pptx import Presentation
@@ -58,12 +57,6 @@ def test_upload_extraction_supports_every_format(monkeypatch, tmp_path):
     monkeypatch.setattr(service.settings, "file_storage_dir", storage)
     monkeypatch.setattr(service.files_repository, "exists_by_sha256", lambda _: False)
     monkeypatch.setattr(service.files_repository, "create_many", lambda files, author_id: [])
-    monkeypatch.setattr(
-        service,
-        "convert_to_okf",
-        lambda extraction, storage_root: pytest.fail("OKF conversion must run in worker"),
-        raising=False,
-    )
     service.store_files(
         [UploadFile(file=BytesIO(path.read_bytes()), filename=path.name) for path in samples],
         uuid4(),

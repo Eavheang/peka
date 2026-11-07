@@ -11,20 +11,17 @@ class Settings(BaseSettings):
     file_storage_dir: Path = Path("storage")
     max_upload_bytes: int = 25 * 1024 * 1024
     llm_base_url: str
-    llm_api_key: SecretStr
+    # llama-server ignores the key, so a local model needs none. A hosted one must set its own.
+    llm_api_key: SecretStr = SecretStr("local")
     llm_model: str
     # Longest answer. Generated tokens share the context with every other turn, see _HISTORY_MAX_CHARS.
     llm_max_tokens: int = 2048
     llm_max_concurrent_chats: int = Field(default=2, ge=1)
-    # Off by default: enrichment sends each whole document to the model that serves chat.
-    okf_enrichment_enabled: bool = False
-    # Enrichment replies embed the whole converted document in one JSON string, so they need more room.
-    okf_max_tokens: int = 32768
     embedding_base_url: str = "http://localhost:8081/v1"
     embedding_model: str = "BAAI/bge-small-en-v1.5"
     embedding_dimensions: int = 384
     embedding_batch_size: int = 1
-    search_top_k: int = 8
+    search_top_k: int = 10
     search_similarity_floor: float = 0.3
     rerank_base_url: str = "http://localhost:8082"
     rerank_candidates: int = Field(default=20, ge=1, le=32)  # TEI rejects more than 32 texts per request.
@@ -88,7 +85,8 @@ class Settings(BaseSettings):
             raise ValueError("ADMIN_EMAIL must be a valid email")
         return value
 
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    # env_ignore_empty: `ADMIN_EMAIL=` in .env means unset, not an invalid empty email.
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore", env_ignore_empty=True)
 
 
 settings = Settings()

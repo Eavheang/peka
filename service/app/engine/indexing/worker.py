@@ -2,9 +2,6 @@ import json
 import logging
 import threading
 import time
-from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
-from uuid import UUID
 
 from app.audit.service import record_audit_event
 from app.config import settings
@@ -12,26 +9,14 @@ from app.engine.source_extractor import source_id_for
 from app.engine.chunks.chunker import chunk_extraction
 from app.engine.chunks.embeddings import embed_chunks
 from app.engine.chunks.repository import knowledge_chunks_repository
-from app.engine.okf.converter import convert_to_okf
-from app.engine.okf.job_repository import okf_jobs_repository
+from app.engine.indexing.job_repository import index_jobs_repository
 
 
 logger = logging.getLogger(__name__)
 
-# ponytail: pending enrichment lives in memory, so a restart skips it; add a job table if it must not be lost.
-_enrichment_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="okf-enrichment")
-
-
-def _enrich(file_id: UUID, extraction: dict, storage_root: Path) -> None:
-    """Best effort: the source chunks are already active, so a failure here changes nothing for search."""
-    try:
-        convert_to_okf(extraction, storage_root)
-    except Exception:
-        logger.exception("OKF enrichment failed for file %s", file_id)
-
 
 def process_next_job() -> bool:
-    job = okf_jobs_repository.claim_next()
+    job = index_jobs_repository.claim_next()
     if job is None:
         return False
 
@@ -47,20 +32,18 @@ def process_next_job() -> bool:
         knowledge_chunks_repository.swap_active_set(job["file_id"], chunks, vectors)
     except Exception as error:
         logger.exception("Indexing failed for file %s", job["file_id"])
-        status = okf_jobs_repository.fail(job["file_id"], str(error) or type(error).__name__)
+        status = index_jobs_repository.fail(job["file_id"], str(error) or type(error).__name__)
         if status == "failed":
             record_audit_event("sync_failed", metadata={"file_id": str(job["file_id"]), "status": status})
     else:
-        okf_jobs_repository.complete(job["file_id"])
+        index_jobs_repository.complete(job["file_id"])
         record_audit_event("sync_completed", metadata={"file_id": str(job["file_id"]), "status": "completed"})
-        if settings.okf_enrichment_enabled:
-            _enrichment_pool.submit(_enrich, job["file_id"], extraction, storage_root)
     return True
 
 
 def run_worker(stop: threading.Event | None = None) -> None:
     # ponytail: one worker serializes shared indexes; add per-organization locks before scaling.
-    okf_jobs_repository.reset_processing()
+    index_jobs_repository.reset_processing()
     while stop is None or not stop.is_set():
         if not process_next_job():
             if stop is None:

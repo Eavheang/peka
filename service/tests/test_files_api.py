@@ -27,7 +27,7 @@ def test_files_require_login_and_support_upload_list_download(client, monkeypatc
             {"id": uuid4(), "path": path, "content_type": content_type, "sha256": sha256,
              "author_id": author_id, "access_level": access_level,
              "created_at": datetime.now(timezone.utc),
-             "okf_status": "queued", "okf_attempts": 0, "okf_error": None}
+             "index_status": "queued", "index_attempts": 0, "index_error": None}
             for path, content_type, sha256, access_level in files
         ]
         records.extend(created)
@@ -54,12 +54,12 @@ def test_files_require_login_and_support_upload_list_download(client, monkeypatc
     )
     def retry_failed(file_id):
         record = next(record for record in records if record["id"] == file_id)
-        if record["okf_status"] != "failed":
+        if record["index_status"] != "failed":
             return False
-        record.update(okf_status="queued", okf_attempts=0, okf_error=None)
+        record.update(index_status="queued", index_attempts=0, index_error=None)
         return True
 
-    monkeypatch.setattr(service.okf_jobs_repository, "retry_failed", retry_failed)
+    monkeypatch.setattr(service.index_jobs_repository, "retry_failed", retry_failed)
 
     with pymupdf.open() as pdf:
         page = pdf.new_page()
@@ -102,12 +102,12 @@ def test_files_require_login_and_support_upload_list_download(client, monkeypatc
     intruder_token = auth_routes.create_access_token(
         str(intruder["id"]), intruder["role"], intruder["token_version"]
     )
-    records[0].update(okf_status="failed", okf_attempts=3, okf_error="llama unavailable")
-    retry = client.post(f"/files/{records[0]['id']}/retry-okf", headers=headers)
+    records[0].update(index_status="failed", index_attempts=3, index_error="llama unavailable")
+    retry = client.post(f"/files/{records[0]['id']}/retry-indexing", headers=headers)
     assert retry.status_code == 200
-    assert retry.json()["okf_status"] == "queued"
-    assert retry.json()["okf_attempts"] == 0
-    assert client.post(f"/files/{records[0]['id']}/retry-okf", headers=headers).status_code == 409
+    assert retry.json()["index_status"] == "queued"
+    assert retry.json()["index_attempts"] == 0
+    assert client.post(f"/files/{records[0]['id']}/retry-indexing", headers=headers).status_code == 409
     assert client.delete(
         f"/files/{records[0]['id']}",
         headers={"Authorization": f"Bearer {intruder_token}"},
@@ -131,7 +131,7 @@ def test_access_level_patch_requires_admin(client, monkeypatch):
     record = {"id": file_id, "path": "pdf/report.pdf", "content_type": "application/pdf",
               "sha256": None, "author_id": staff["id"], "access_level": "general",
               "created_at": datetime.now(timezone.utc),
-              "okf_status": "completed", "okf_attempts": 1, "okf_error": None}
+              "index_status": "completed", "index_attempts": 1, "index_error": None}
 
     def update_access_level(target_id, level):
         if target_id != file_id:
@@ -220,9 +220,9 @@ def test_list_hides_confidential_files_from_staff(client, monkeypatch):
             "author_id": admin["id"],
             "access_level": "general",
             "created_at": datetime.now(timezone.utc),
-            "okf_status": "completed",
-            "okf_attempts": 1,
-            "okf_error": None,
+            "index_status": "completed",
+            "index_attempts": 1,
+            "index_error": None,
         },
         {
             "id": uuid4(),
@@ -232,9 +232,9 @@ def test_list_hides_confidential_files_from_staff(client, monkeypatch):
             "author_id": admin["id"],
             "access_level": "confidential",
             "created_at": datetime.now(timezone.utc),
-            "okf_status": "completed",
-            "okf_attempts": 1,
-            "okf_error": None,
+            "index_status": "completed",
+            "index_attempts": 1,
+            "index_error": None,
         },
     ]
 
@@ -332,7 +332,7 @@ def test_upload_accepts_per_file_access_levels_and_restricts_confidential_to_adm
             {"id": uuid4(), "path": path, "content_type": content_type, "sha256": sha256,
              "author_id": author_id, "access_level": access_level,
              "created_at": datetime.now(timezone.utc),
-             "okf_status": "queued", "okf_attempts": 0, "okf_error": None}
+             "index_status": "queued", "index_attempts": 0, "index_error": None}
             for path, content_type, sha256, access_level in files
         ]
         records.extend(created)

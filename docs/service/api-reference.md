@@ -55,15 +55,15 @@ Roles: `admin` | `senior` | `staff`.
 | `POST` | `/files` | bearer | multipart `files` + optional `access_levels`; 413 size, 409 SHA dup, 415 bad type, 403 confidential non-admin | `FileResponse[]` 201 |
 | `GET` | `/files` | bearer | ACL-filtered list | `FileResponse[]` |
 | `GET` | `/files/{file_id}` | bearer | download stream | file bytes |
-| `GET` | `/files/{file_id}/okf-status` | bearer | — | `{ file_id, okf_status, okf_attempts, okf_error }` |
-| `POST` | `/files/{file_id}/retry-okf` | author or admin | only if failed | `FileResponse`; 409 otherwise |
+| `GET` | `/files/{file_id}/index-status` | bearer | — | `{ file_id, index_status, index_attempts, index_error }` |
+| `POST` | `/files/{file_id}/retry-indexing` | author or admin | only if failed | `FileResponse`; 409 otherwise |
 | `PATCH` | `/files/{file_id}/access-level` | admin | `{ access_level }` | `FileResponse` |
 | `DELETE` | `/files/{file_id}` | author or admin | — | 204 |
 
-**FileResponse:** `id`, `path`, `content_type`, `sha256`, `author_id`, `access_level`, `created_at`, `okf_status`, `okf_attempts`, `okf_error`
+**FileResponse:** `id`, `path`, `content_type`, `sha256`, `author_id`, `access_level`, `created_at`, `index_status`, `index_attempts`, `index_error`
 
 `access_level`: `general` | `confidential`  
-`okf_status`: `queued` | `processing` | `completed` | `failed`
+`index_status`: `queued` | `processing` | `completed` | `failed`
 
 ---
 

@@ -25,7 +25,7 @@ def passage_text(title: str, heading: str, content: str) -> str:
 
 
 @dataclass(frozen=True)
-class OKFChunk:
+class Chunk:
     title: str
     heading: str
     content: str
@@ -40,11 +40,11 @@ def estimate_tokens(text: str) -> int:
     return len(_TOKEN_RE.findall(text))
 
 
-def chunk_extraction(extraction: dict) -> list[OKFChunk]:
+def chunk_extraction(extraction: dict) -> list[Chunk]:
     """Build retrieval chunks from the extractor's original text, without any model."""
     title = Path(extraction.get("source_filename") or "Document").stem
     headed = extraction.get("source_extension") in _HEADED_FORMATS
-    chunks: list[OKFChunk] = []
+    chunks: list[Chunk] = []
 
     for section in extraction.get("sections", []):
         text = section["text"].replace("\x00", "")  # PostgreSQL text cannot hold NUL.
@@ -53,7 +53,7 @@ def chunk_extraction(extraction: dict) -> list[OKFChunk]:
             header = estimate_tokens(passage_text(title, heading, ""))
             room = max(MAX_CHUNK_TOKENS // 2, MAX_CHUNK_TOKENS - header)  # Long labels must leave room for text.
             pieces = _split_table(body, room) if "sheet" in section else _split_blocks(body, room)
-            chunks.extend(OKFChunk(title, heading, piece, (location,) if location else ()) for piece in pieces)
+            chunks.extend(Chunk(title, heading, piece, (location,) if location else ()) for piece in pieces)
 
     if not chunks:
         raise ValueError(f"No text to index in {extraction.get('source_filename') or 'this file'}")

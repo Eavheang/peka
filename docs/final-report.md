@@ -21,7 +21,7 @@ PEKA is an organization-private RAG assistant. Users upload documents, and a bac
 
 | Component | What runs it |
 |-----------|--------------|
-| API and indexing worker | FastAPI service and `okf-worker`, same image |
+| API and indexing worker | FastAPI service and `index-worker`, same image |
 | Database | Postgres 16 with pgvector |
 | Embeddings | `BAAI/bge-small-en-v1.5`, 384 dimensions, local TEI on the CPU |
 | Reranker | `cross-encoder/ms-marco-MiniLM-L6-v2`, local TEI on the CPU |
@@ -40,7 +40,7 @@ PEKA is an organization-private RAG assistant. Users upload documents, and a bac
 | Scale corpus (Objective 3, latency and load runs) | the real corpus plus 200 generated documents: 270 files, 1,682 chunks, 220 distinct documents |
 | Users | one admin account (concurrent users are separate logins of that account) |
 
-Raw output is in [`eval/results-perf/2026-11-07-final/`](../eval/results-perf/2026-11-07-final/). The model ran at about 85 tokens per second throughout, which the run checked before and after every step, and the service logged no `Context size has been exceeded` errors and no reranker failures.
+Raw output is kept locally and is not published in this repository. The model ran at about 85 tokens per second throughout, which the run checked before and after every step, and the service logged no `Context size has been exceeded` errors and no reranker failures.
 
 ## Objective 3: Recall@5 over 200+ documents
 
@@ -55,7 +55,7 @@ Each question is sent to `POST /search` exactly as written. A question is a hit 
 
 The 70-file corpus on its own gave the same 100% (set 1) and 98.3% (set 2), so adding 200 documents did not reduce recall. Compared with 2026-10-30, the reranker raised Recall@1 on the generated set from 82.0% to 100% and Recall@5 from 99.3% to 100%, at the cost of slower search (about 0.2 s before, 0.4 to 0.8 s now).
 
-How the scale corpus was built: 200 generated documents (a purpose section, a metrics table, a decisions section and a risks section, each with unique names, owners, numbers, vendors and dates) were chunked by the real chunker, embedded by the real embedding service and inserted directly by [`eval/scale_corpus.py`](../eval/scale_corpus.py). Two questions per document ask for a metric's owner and target, and for the vendor and contract start date.
+How the scale corpus was built: 200 generated documents (a purpose section, a metrics table, a decisions section and a risks section, each with unique names, owners, numbers, vendors and dates) were chunked by the real chunker, embedded by the real embedding service and inserted directly by a local script. Two questions per document ask for a metric's owner and target, and for the vendor and contract start date.
 
 The one miss at rank 5 is set 2 question 31, which is found by rank 10. Set 1 questions 18, 19, 31, 32, 54 to 57 and 68 to 70 ask about files that are not in the knowledge base and are left out of the counts. Counting them as misses would give set 1 a Recall@5 of 83.8%.
 
@@ -117,7 +117,7 @@ The wait is uneven. With 10 users the median first token is under 16 s but the s
 | Indexing without the model, one call per first question, reranker (#97, #98, #99), on 70 files | 20 of 20 | 20 of 20 | 5.9 s |
 | Long-conversation limits and refusal (#96, #101), on 270 files | 20 of 20 | 20 of 20 | 4.9 s |
 
-The early failures were `Context size has been exceeded` errors from llama.cpp. Its slots share one 16,384-token context, so three chats of about 4,500 tokens, or chats next to a document conversion, overflowed it. PEKA now answers two turns at a time and queues the rest, and indexing no longer uses the model.
+The early failures were `Context size has been exceeded` errors from llama.cpp. Its slots share one 16,384-token context, so three chats of about 4,500 tokens, or chats next to a document conversion, overflowed it. PEKA now answers two turns at a time and queues the rest, and indexing no longer uses the model. [From OKF pages to original text](evaluation.md#from-okf-pages-to-original-text) explains why the conversion was dropped, including what the tests could not show.
 
 ### Long conversations (#96)
 
@@ -161,7 +161,7 @@ An answer block that claims a source ID from outside the current turn already lo
 
 ## Answer quality
 
-67 questions from set 2 over the 70-file corpus, each in a new conversation, graded by reading each answer against its reference. Answers are in [`answers.json`](../eval/results-perf/2026-11-07-final/answers.json).
+67 questions from set 2 over the 70-file corpus, each in a new conversation, graded by reading each answer against its reference.
 
 | Result | Count | Questions |
 |--------|-------|-----------|
@@ -194,7 +194,7 @@ In order of value:
 1. **Test recall on real documents (#104).** A real set of 200+ independent reports with independently written questions is the proper proof of Objective 3.
 2. **Set a response-time target for NFR02 and NFR04.** Without one these results cannot pass or fail on speed.
 3. **Mark near misses as refused.** Letting the model flag "the sources do not contain this" as its own answer type would set `refused` on the 7 of 8 near misses that the score cannot catch. Not tried.
-4. **Leave OKF enrichment off on the local model.** It sends each whole document to the model that serves chat, and its worker is outside the chat queue. The last run with the model in indexing answered 4 of 20. A hosted model for enrichment avoids this.
+4. **Keep the model out of indexing.** OKF enrichment sent each whole document to the model that serves chat, outside the chat queue, and the last run with the model in indexing answered 4 of 20. Enrichment was off for this evaluation and has since been removed.
 5. **Make the queue first come, first served** if the longest waits matter more than the median.
 6. **Cap llama.cpp's prompt cache on a 16 GB machine** (`--cache-ram`) if memory gets tight, as described below. Not tried.
 
@@ -212,7 +212,7 @@ In order of value:
 
 ## Reproducing the results
 
-The stack must be running with the local model (see [System requirements](system-requirements.md)). The scripts use only the Python standard library. The scripts overwrite their output files, so point `RESULTS_DIR` at a new folder. A step that runs longer than the access token (`JWT_ACCESS_TOKEN_EXPIRE_MINUTES`, 30 by default) fails with HTTP 401. Before a run, keep the machine from sleeping and check that the model is fast: on this GPU, llama's log should show about 85 tokens per second.
+These commands need the local `eval/` folder, which is not in this repository. They are recorded to show the method. The stack must be running with the local model (see [System requirements](system-requirements.md)). The scripts use only the Python standard library. The scripts overwrite their output files, so point `RESULTS_DIR` at a new folder. A step that runs longer than the access token (`JWT_ACCESS_TOKEN_EXPIRE_MINUTES`, 30 by default) fails with HTTP 401. Before a run, keep the machine from sleeping and check that the model is fast: on this GPU, llama's log should show about 85 tokens per second.
 
 ```bash
 cd eval
@@ -224,11 +224,11 @@ python3 perf_eval.py recall                      # Recall@1/5/10 over the real q
 python3 perf_eval.py ramp 1 2 3 4 6 10           # concurrent users, one question each
 
 # Add the generated corpus for the runs on 200+ documents, then remove it
-docker exec -i config-okf-worker-1 python - add 200 < scale_corpus.py   # also writes /tmp/question-scale.json in the container
+docker exec -i config-index-worker-1 python - add 200 < scale_corpus.py   # also writes /tmp/question-scale.json in the container
 python3 perf_eval.py recall question-scale.json questions.jsonl question-2.json
 python3 perf_eval.py latency                     # 20 sequential chats, time to first token
 python3 perf_eval.py load 10 2 8                 # users, questions per user, files to index
-docker exec -i config-okf-worker-1 python - remove < scale_corpus.py
+docker exec -i config-index-worker-1 python - remove < scale_corpus.py
 ```
 
-`eval/question-scale.json` is already in the repo for the fixed seed, so the `add` step reproduces the same questions. `load` uploads generated files as the logged-in user and deletes them afterwards. The rerank scores, long-conversation test and refusal checks were run with one-off scripts, and their results and method are recorded in [`notes.md`](../eval/results-perf/2026-11-07-final/notes.md) next to the raw output.
+`question-scale.json` uses a fixed seed, so the `add` step reproduces the same questions. `load` uploads generated files as the logged-in user and deletes them afterwards. The rerank scores, long-conversation test and refusal checks were run with one-off scripts, and their results are recorded in this report.

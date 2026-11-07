@@ -1447,16 +1447,34 @@ def test_document_question_without_evidence_is_refused_without_an_answer_call(mo
     response = _ask(path, "What is the CEO's home address?")
 
     assert response.refused is True
-    assert response.answer == chat_service._NO_EVIDENCE_ANSWER
+    assert response.answer == chat_service._clarifying_answer(results)
     assert response.citations == []
 
 
-def test_stream_shows_the_refusal_text(monkeypatch) -> None:
+def test_clarifying_answer_names_the_closest_documents_once() -> None:
+    titles = ["a.pdf", "a.pdf", "b`.pdf", "c.pdf", "d.pdf"]
+
+    answer = chat_service._clarifying_answer([{"title": title} for title in titles])
+
+    assert "- `a.pdf`\n- `b.pdf`\n- `c.pdf`\n\n" in answer
+    assert "d.pdf" not in answer
+    assert answer.count("a.pdf") == 1
+
+
+def test_clarifying_answer_still_asks_back_without_results() -> None:
+    answer = chat_service._clarifying_answer([])
+
+    assert "?" in answer and "upload" in answer
+
+
+def test_stream_shows_the_clarifying_answer(monkeypatch) -> None:
+    monkeypatch.setattr(chat_service, "search_knowledge", lambda *args: _WEAK_EVIDENCE)
     monkeypatch.setattr(chat_service, "_needs_documents", lambda *args: True)
 
     events = _stream_events(monkeypatch, [])
 
-    assert _visible_text(events) == chat_service._NO_EVIDENCE_ANSWER
+    assert _visible_text(events) == chat_service._clarifying_answer(_WEAK_EVIDENCE)
+    assert "secret.pdf" in _visible_text(events)
 
 
 @pytest.mark.parametrize("path", ["plain", "stream"])

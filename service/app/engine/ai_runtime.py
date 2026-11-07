@@ -38,9 +38,9 @@ def _model() -> tuple[ai.Model, ai.Provider]:
     return ai.Model(id=config["llm_model"], provider=provider), provider
 
 
-def _inference_params(max_tokens: int | None = None) -> ai.InferenceRequestParams:
+def _inference_params() -> ai.InferenceRequestParams:
     return ai.InferenceRequestParams(
-        output=ai.OutputParams(max_tokens=max_tokens or settings.llm_max_tokens)
+        output=ai.OutputParams(max_tokens=settings.llm_max_tokens)
     )
 
 
@@ -141,10 +141,9 @@ async def _run_structured_stream(
     model: ai.Model,
     messages: list[ai.messages.Message],
     output_type: type[StructuredOutput],
-    max_tokens: int | None = None,
 ) -> StructuredOutput:
     async with ai.stream(
-        model, messages, output_type=output_type, params=_inference_params(max_tokens)
+        model, messages, output_type=output_type, params=_inference_params()
     ) as stream:
         async for _ in stream:
             pass
@@ -176,7 +175,6 @@ async def _generate_structured(
     output_type: type[StructuredOutput],
     *,
     model: ai.Model | None = None,
-    max_tokens: int | None = None,
 ) -> StructuredOutput:
     provider: ai.Provider | None = None
     try:
@@ -185,7 +183,7 @@ async def _generate_structured(
 
         for attempt in range(_MAX_STRUCTURED_ATTEMPTS):
             try:
-                return await _run_structured_stream(model, messages, output_type, max_tokens)
+                return await _run_structured_stream(model, messages, output_type)
             except (ValidationError, AIModelError) as error:
                 # A second full generation would hold the model while others wait.
                 raise AIModelError("Model returned an invalid structured response") from error
@@ -255,8 +253,5 @@ def generate_structured(
     output_type: type[StructuredOutput],
     *,
     model: ai.Model | None = None,
-    max_tokens: int | None = None,
 ) -> StructuredOutput:
-    return asyncio.run(
-        _generate_structured(messages, output_type, model=model, max_tokens=max_tokens)
-    )
+    return asyncio.run(_generate_structured(messages, output_type, model=model))

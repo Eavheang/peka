@@ -9,7 +9,7 @@ All local stack commands run from `config/`. This directory owns Compose files, 
 | `Makefile` | `setup`, `up`, `down`, `migrate`, `prod-up`, `prod-down` |
 | `compose.yaml` | Base services (prod-style) |
 | `compose.dev.yaml` | Hot-reload overlays (bind mounts, bun/uvicorn reload) |
-| `.env.example` / `.env` | Postgres, pgAdmin, embedding defaults, `LLM_API_KEY` |
+| `.env.example` / `.env` | Postgres, pgAdmin |
 | `nginx.conf` | `/` → webclient, `/api/` → service |
 | `llama/config.yaml` | llama.cpp generation / model settings |
 | `llama/entrypoint.sh` | Maps YAML → `llama-server` flags |
@@ -36,13 +36,13 @@ make prod-down # tear down the prod-style stack
 | `pgadmin` | `dpage/pgadmin4` | 5050 | DB UI |
 | `webclient` | `../webclient` Dockerfile | via proxy | Next.js UI |
 | `service` | `../service` Dockerfile | 8000 | FastAPI |
-| `okf-worker` | same service image | — | `python -m app.engine.okf.worker` |
+| `index-worker` | same service image | — | `python -m app.engine.indexing.worker` |
 | `embeddings` | TEI `cpu-1.9` | (internal 80) | BGE-small embeddings |
 | `reranker` | TEI `cpu-1.9` | (internal 80) | Cross-encoder that reranks search hits, on CPU |
 | `proxy` | `nginx:alpine` | `${WEBCLIENT_PORT:-3000}` | Public entry |
 | `llama` | llama.cpp CUDA (profile `llama`) | 8080 | Optional local LLM |
 
-Shared volume `file_storage` is mounted at `/app/storage` for `service` and `okf-worker`.
+Shared volume `file_storage` is mounted at `/app/storage` for `service` and `index-worker`.
 
 Service env overrides in Compose include `DATABASE_URL` → `postgres` and `EMBEDDING_BASE_URL` → `http://embeddings:80/v1` and `RERANK_BASE_URL` → `http://reranker:80`.
 
@@ -56,14 +56,9 @@ POSTGRES_USER=peka
 POSTGRES_PASSWORD=peka_dev_password
 PGADMIN_DEFAULT_EMAIL=admin@example.com
 PGADMIN_DEFAULT_PASSWORD=peka_admin_password
-LLM_API_KEY=replace-with-a-random-secret
-EMBEDDING_MODEL=BAAI/bge-small-en-v1.5
-EMBEDDING_DIMENSIONS=384
-EMBEDDING_BATCH_SIZE=1
-RERANK_MODEL=cross-encoder/ms-marco-MiniLM-L6-v2
 ```
 
-Optional: `WEBCLIENT_PORT`, `JWT_SECRET_KEY` (Compose default exists for service).
+Optional, with defaults in `compose.yaml`: `WEBCLIENT_PORT`, `EMBEDDING_MODEL`, `EMBEDDING_DIMENSIONS`, `EMBEDDING_BATCH_SIZE`, `RERANK_MODEL`. `JWT_SECRET_KEY` is read from `service/.env` only.
 
 ## nginx
 

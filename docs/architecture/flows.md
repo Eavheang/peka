@@ -11,27 +11,21 @@ POST /files  (auth + ACL)
   • stream to storage/{pdf|docx|pptx|xlsx|others}/…
   • SHA-256 dedup (unique on files.sha256)
   • extract text → storage/extracted/{source_id}.json
-  • insert files + okf_jobs(status=queued)
+  • insert files + index_jobs(status=queued)
         │
         ▼
-okf-worker (poll, SKIP LOCKED, max 3 attempts)
+index-worker (poll, SKIP LOCKED, max 3 attempts)
   • load extracted JSON (no text → job fails)
   • chunk the original text by heading, page, slide; tables and sheets separately
   • embed batches via TEI
   • insert chunk_sets(building) + knowledge_chunks
   • swap: supersede old active set → activate new set
   • mark job completed
-        │
-        ▼
-only if OKF_ENRICHMENT_ENABLED=true (background, best effort)
-  • LLM convert → Open Knowledge Format markdown
-  • write storage/knowledge_base/<category>/<concept>.md
-  • rebuild category / root index.md trees
 ```
 
 **Statuses** on a file (via job): `queued` → `processing` → `completed` | `failed`.
 
-Failed jobs can be requeued with `POST /files/{id}/retry-okf` (author or admin). The UI polls the file list every 3s while any file is queued/processing.
+Failed jobs can be requeued with `POST /files/{id}/retry-indexing` (author or admin). The UI polls the file list every 3s while any file is queued/processing.
 
 ### Access levels
 

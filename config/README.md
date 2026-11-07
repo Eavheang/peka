@@ -30,14 +30,12 @@ from `.env.example` when `.env` does not exist.
 Dockerfiles or dependency lockfiles change. Development containers hot reload
 normal source-code changes automatically.
 
-Uploaded documents are extracted immediately. The `okf-worker` indexes queued
+Uploaded documents are extracted immediately. The `index-worker` indexes queued
 files one at a time and retries failures up to three times. It chunks the
 original text without an LLM, sends chunks to the local embedding service
 (`BAAI/bge-small-en-v1.5`, CPU TEI image), and stores 384-dimensional vectors in
-PostgreSQL with pgvector. Set `OKF_ENRICHMENT_ENABLED=true` in `service/.env` to
-also write LLM-generated OKF pages to `knowledge_base/` after a file is indexed;
-that competes with chat on the same model and search does not use the pages. See
-[re-indexing existing files](../docs/architecture/okf-and-indexing.md#re-indexing-existing-files). The optional local LLM (`make llm`) needs the NVIDIA
+PostgreSQL with pgvector. See
+[re-indexing existing files](../docs/architecture/indexing.md#re-indexing-existing-files). The optional local LLM (`make llm`) needs the NVIDIA
 Container Toolkit and a compatible NVIDIA driver.
 
 
@@ -71,16 +69,12 @@ make down
 
 The GGUF file in `config/model` is mounted read-only into the official CUDA
 llama.cpp server image. Settings are in `config/llama/config.yaml`. Llama is
-optional; start it with `docker compose --profile llama up -d llama`. Set
-`LLM_API_KEY` in `.env` before starting it. The OpenAI-compatible endpoint is:
+optional; start it with `docker compose --profile llama up -d llama`. The
+OpenAI-compatible endpoint is:
 
 ```text
 http://localhost:8080/v1/chat/completions
 ```
-
-With OKF enrichment on, the worker uses `http://llama:8080/v1` when the llama
-profile is running; a worker started directly on the host uses
-`http://localhost:8080/v1`.
 
 Set `model` in `config/llama/config.yaml` to use another filename. Test it from
 PowerShell:

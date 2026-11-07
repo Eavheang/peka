@@ -1,6 +1,6 @@
 # Architecture overview
 
-PEKA is a three-tier stack: a Next.js UI, a FastAPI service with a sibling OKF worker, and supporting infrastructure (Postgres/pgvector, TEI embeddings, optional llama.cpp, nginx).
+PEKA is a three-tier stack: a Next.js UI, a FastAPI service with a sibling index worker, and supporting infrastructure (Postgres/pgvector, TEI embeddings, optional llama.cpp, nginx).
 
 ## Component diagram
 
@@ -22,7 +22,7 @@ PEKA is a three-tier stack: a Next.js UI, a FastAPI service with a sibling OKF w
                               └─┬──────────┬───┘
                                 │          │
                      ┌──────────▼──┐  ┌────▼────────────┐
-                     │  postgres   │  │  okf-worker     │
+                     │  postgres   │  │  index-worker     │
                      │  + pgvector │  │  same image     │
                      └─────────────┘  └────┬────────────┘
                                            │
@@ -41,10 +41,10 @@ PEKA is a three-tier stack: a Next.js UI, a FastAPI service with a sibling OKF w
 |-----------|------|
 | **webclient** | Auth UI, chat (SSE), knowledge library, admin user/provider settings |
 | **service** | REST + SSE API: auth, files, search, chat, admin provider settings |
-| **okf-worker** | Polls `okf_jobs`, chunks original text, embeds, activates chunk sets; optional OKF enrichment afterwards |
+| **index-worker** | Polls `index_jobs`, chunks original text, embeds, activates chunk sets |
 | **postgres** | Users, files, jobs, chunks (vector), conversations, provider settings |
 | **embeddings** | Hugging Face Text Embeddings Inference (OpenAI-compatible `/v1/embeddings`) |
-| **llama** (optional) | Local OpenAI-compatible chat completions for chat and optional OKF enrichment |
+| **llama** (optional) | Local OpenAI-compatible chat completions for chat |
 | **nginx** | Single entry: UI + `/api` strip-proxy; long timeouts for streams |
 
 ## Backend layering
@@ -80,7 +80,7 @@ Workspace routes are gated by Next.js 16 `proxy.ts` (cookie presence) and furthe
 
 | Integration | Config | Use |
 |-------------|--------|-----|
-| OpenAI-compatible LLM | `LLM_*` env + optional DB overrides | Chat answers, retrieval planning, optional OKF enrichment |
+| OpenAI-compatible LLM | `LLM_*` env + optional DB overrides | Chat answers, retrieval planning |
 | TEI embeddings | `EMBEDDING_*` | Query and chunk vectors |
 | Exa | `EXA_*` (optional) | Web search when user enables it |
 

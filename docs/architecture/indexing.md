@@ -1,4 +1,4 @@
-# Document indexing and optional OKF enrichment
+# Document indexing
 
 Deep dive into how PEKA turns an uploaded file into searchable knowledge. Companion to [How it works](../how-it-works.md).
 
@@ -8,31 +8,24 @@ Deep dive into how PEKA turns an uploaded file into searchable knowledge. Compan
 Upload bytes
   → store original (typed folder)
   → extract text + locators (JSON)
-  → queue okf_jobs
+  → queue index_jobs
   → chunk the original text (headings, pages, slides, tables, sheets)
   → embed (TEI)
   → activate chunk_set: the file is searchable, job is completed
-
-Only when OKF_ENRICHMENT_ENABLED=true, afterwards and in the background:
-  → LLM: OKF v0.2 concept Markdown
-  → write knowledge_base tree + indexes
 ```
 
-The default path makes no LLM call, so indexing does not compete with chat for the model. Chunks and citations are the source text, and locators come from the extractor.
+Indexing makes no LLM call, so it does not compete with chat for the model. Chunks and citations are the source text, and locators come from the extractor.
 
 Code map:
 
 | Step | Location |
 |------|----------|
 | Upload / extract trigger | `app/files/service.py`, `app/engine/source_extractor.py` |
-| Job queue | `app/engine/okf/job_repository.py`, `job_model.py` |
-| Worker loop | `app/engine/okf/worker.py` |
+| Job queue | `app/engine/indexing/job_repository.py`, `job_model.py` |
+| Worker loop | `app/engine/indexing/worker.py` |
 | Chunk | `app/engine/chunks/chunker.py` |
 | Embed | `app/engine/chunks/embeddings.py` |
 | Persist / swap active | `app/engine/chunks/repository.py` |
-| Optional enrichment | `app/engine/okf/converter.py`, `prompt.txt`, `file_writer.py` |
-
-The `okf_jobs` table, `okf_status` fields, `okf-worker` service, and `retry-okf` route keep their names, but they now track indexing, not OKF conversion.
 
 ## Extraction
 
@@ -102,7 +95,7 @@ Each re-index creates a new `chunk_sets` row (`building`), inserts chunks, then 
 - Stuck `processing` jobs are reset to `queued` on loop
 - Max **3** attempts; then `failed` with `last_error`
 - An extraction with no text fails the job with `No text to index in <file>`
-- API: `POST /files/{id}/retry-okf` requeues failed jobs
+- API: `POST /files/{id}/retry-indexing` requeues failed jobs
 - Path safety: all writes resolve under `FILE_STORAGE_DIR`
 
 Scaling note: code comments warn that org-level locking would be needed before running multiple concurrent workers safely.
@@ -112,7 +105,7 @@ Scaling note: code comments warn that org-level locking would be needed before r
 Files indexed before this format keep their old model-rewritten chunks until they are re-indexed. Nothing re-queues them automatically, because regenerating rewritten chunks later is expensive, so this is the owner's choice. Re-indexing deletes the old chunks, so previews of citations saved in older conversations stop working. To re-index every file from its original text:
 
 ```sql
-UPDATE okf_jobs SET status = 'queued', attempts = 0, last_error = NULL, updated_at = CURRENT_TIMESTAMP
+UPDATE index_jobs SET status = 'queued', attempts = 0, last_error = NULL, updated_at = CURRENT_TIMESTAMP
 WHERE status IN ('completed', 'failed');
 ```
 
@@ -122,56 +115,9 @@ docker compose -f config/compose.yaml exec postgres psql -U peka -d peka -c "<th
 
 The old chunks stay searchable until each file's new set is active, and a job that fails keeps them. The worker reads the stored extraction JSON, so files extracted earlier keep that extraction: XLSX cell boundaries are gone, PDF, DOCX and plain-text tables stay in the surrounding text, and PPTX tables stay missing. Getting table chunks with labelled cells and unnumbered DOCX headings needs a fresh upload.
 
-## Optional OKF enrichment
+## History: OKF pages
 
-Off by default. With `OKF_ENRICHMENT_ENABLED=true`, once a file's source chunks are active and its job is `completed`, the worker queues one LLM conversion in a single background thread:
-
-- The output goes only to `storage/knowledge_base/`. Search, citations, and chat do not read that folder, and it never replaces or adds chunks.
-- A failure is logged and changes nothing: the job stays `completed` and the file stays searchable. There is no retry.
-- Pending conversions live in memory, so a worker restart skips them.
-- It uses the same `LLM_*` model as chat, so it competes with chat there. `OKF_MAX_TOKENS` limits its reply and is not used anywhere else.
-
-An LLM rewrites the source into one **concept** Markdown file following the prompt in `prompt.txt`.
-
-### Classification
-
-The model picks exactly one category/type, for example:
-
-| Category folder | Type (examples) |
-|-----------------|-----------------|
-| `policies` | Policy Document |
-| `faqs` | FAQ |
-| `reports` | Report |
-| `meeting-notes` | Meeting Notes |
-| `procedures` | Procedure |
-| `guidelines` | Guideline |
-| `handbooks` | Handbook |
-| `announcements` | Announcement |
-| `technical-documents` | Technical Documentation |
-| `documents` | General Document (fallback) |
-
-Wording cues matter: *must/shall/required* → policy; *should/recommended* → guideline. The prompt forbids turning optional language into mandatory rules.
-
-### Concept file shape
-
-Path: `knowledge_base/<category>/<kebab-case-filename>.md`
-
-YAML frontmatter includes: `type`, `title`, `description`, `resource`, source ids/hashes/filename, `tags`, `timestamp`, `summary`, `keywords`.
-
-Body uses meaningful `#` headings (Overview, Requirements, Procedure, Findings, …). Empty sections are disallowed. Facts, dates, numbers, and obligation strength must stay faithful to the source—no invented URLs or requirements.
-
-### Indexes
-
-The application (not the LLM) rebuilds:
-
-- Root `knowledge_base/index.md` — OKF version frontmatter + links to non-empty categories  
-- Per-category `index.md` — links to every concept with short descriptions  
-
-Existing entries are preserved when rebuilding; duplicates are avoided.
-
-### LLM output contract
-
-Structured JSON with `document_analysis`, `folder_structure`, and `files` (exactly one `okf_concept`).
+PEKA first indexed LLM-written Open Knowledge Format (OKF) pages. Testing found no measurable gain in answers, and conversion caused failures under load on the local model, so indexing moved to the original text and the conversion was removed. See [From OKF pages to original text](../evaluation.md#from-okf-pages-to-original-text). Older results and migration `007_create_okf_jobs` still use the old name.
 
 ## What “indexed” means for chat
 

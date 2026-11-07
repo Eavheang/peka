@@ -1,7 +1,7 @@
 import httpx
 
 from app.config import settings
-from app.engine.chunks.chunker import OKFChunk
+from app.engine.chunks.chunker import Chunk
 
 
 class EmbeddingError(RuntimeError):
@@ -34,7 +34,7 @@ def embed_texts(
     return vectors
 
 
-def embed_chunks(chunks: list[OKFChunk]) -> list[list[float]]:
+def embed_chunks(chunks: list[Chunk]) -> list[list[float]]:
     vectors: list[list[float]] = []
     for start in range(0, len(chunks), settings.embedding_batch_size):
         batch = chunks[start : start + settings.embedding_batch_size]

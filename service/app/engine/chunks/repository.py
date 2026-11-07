@@ -5,19 +5,19 @@ from pgvector.psycopg import register_vector
 from psycopg.types.json import Jsonb
 
 from app.database import get_connection
-from app.engine.chunks.chunker import OKFChunk
+from app.engine.chunks.chunker import Chunk
 
 
 class KnowledgeChunksRepository:
     def swap_active_set(
         self,
         file_id: UUID,
-        chunks: list[OKFChunk],
+        chunks: list[Chunk],
         vectors: list[list[float]],
     ) -> None:
         """Build a new set and flip it active atomically; readers never see partial re-indexes."""
         if len(chunks) != len(vectors):
-            raise ValueError("Every OKF chunk requires one embedding")
+            raise ValueError("Every chunk requires one embedding")
         if not chunks:
             raise ValueError("Refusing to activate an empty chunk set")
         with get_connection() as connection:

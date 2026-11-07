@@ -26,14 +26,14 @@ PEKA’s answer:
 | **Staff** | Chat against *general* documents; upload general files; manage their own chats and profile |
 | **Senior** | Same as staff, plus *confidential* documents in search and chat |
 | **Admin** | Manage users/roles, set confidential access, configure LLM/Exa providers, full knowledge library control |
-| **Operators / developers** | Run Docker stack, migrations, OKF worker, embeddings, optional local LLM |
+| **Operators / developers** | Run Docker stack, migrations, index worker, embeddings, optional local LLM |
 
 ## What PEKA is (and is not)
 
 **It is:**
 
 - A **RAG** (retrieval-augmented generation) product with a full UI and API
-- A **document pipeline**: extract → chunk the original text → embed → retrieve, with optional LLM “OKF” enrichment
+- A **document pipeline**: extract → chunk the original text → embed → retrieve
 - **Multi-user** with JWT auth and document ACLs (`general` / `confidential`)
 - Deployable mostly **on your infrastructure** (Postgres, embeddings, optional llama.cpp)
 
@@ -68,6 +68,6 @@ Embeddings (TEI + pgvector) are the **lookup index**, not the “writer.” The 
 
 1. [How it works](how-it-works.md) — end-to-end system behavior  
 2. [User guide](user-guide.md) — screens and tasks by role  
-3. [Indexing & OKF](architecture/okf-and-indexing.md) — document pipeline deep dive  
+3. [Indexing](architecture/indexing.md) — document pipeline deep dive  
 4. [Chat & RAG](architecture/chat-and-rag.md) — question → answer deep dive  
 5. [Architecture overview](architecture/overview.md) — components and folders  

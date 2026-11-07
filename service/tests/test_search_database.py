@@ -21,7 +21,7 @@ import psycopg
 import pytest
 
 from app.config import settings
-from app.engine.chunks.chunker import OKFChunk
+from app.engine.chunks.chunker import Chunk
 from app.engine.chunks.repository import knowledge_chunks_repository
 from app.engine.search import service as search_service
 from app.engine.search.repository import search_repository
@@ -89,11 +89,11 @@ def corpus(database):
         # A second general chunk: staff's reranker request should hold every row they may see.
         (expenses, "Receipts", "Receipts are required above 50 dollars.", unit_vector(1, 0)),
     ):
-        chunk = OKFChunk(title=file["path"], heading=heading, content=content, source_locations=({"page": 1},))
+        chunk = Chunk(title=file["path"], heading=heading, content=content, source_locations=({"page": 1},))
         knowledge_chunks_repository.swap_active_set(file["id"], [chunk], [vector])
     yield SimpleNamespace(general=general, secret=secret, run=run)
     ids = [general["id"], secret["id"], expenses["id"]]
-    for table in ("knowledge_chunks", "chunk_sets", "okf_jobs", "files"):
+    for table in ("knowledge_chunks", "chunk_sets", "index_jobs", "files"):
         column = "id" if table == "files" else "file_id"
         execute(f"DELETE FROM {table} WHERE {column} = ANY(%s)", ids)
     execute("DELETE FROM users WHERE id = %s", user_id)
@@ -166,7 +166,7 @@ def test_one_format_of_a_document_keeps_all_its_sections_and_hides_its_copies(da
     )
     try:
         for file, heading, vector in ((pdf, "Page 1", unit_vector(0.6, 0.8)), (docx, "Costs", unit_vector(1, 0.6))):
-            chunks = [OKFChunk(file["path"], heading, f"Fact {part}.", ()) for part in (1, 2)]
+            chunks = [Chunk(file["path"], heading, f"Fact {part}.", ()) for part in (1, 2)]
             knowledge_chunks_repository.swap_active_set(file["id"], chunks, [vector, vector])
 
         results = search_repository.search_chunks(QUERY, ("general",), top_k=10)
@@ -176,7 +176,7 @@ def test_one_format_of_a_document_keeps_all_its_sections_and_hides_its_copies(da
         assert {row["content"] for row in ours} == {"Fact 1.", "Fact 2."}
     finally:
         ids = [pdf["id"], docx["id"]]
-        for table in ("knowledge_chunks", "chunk_sets", "okf_jobs", "files"):
+        for table in ("knowledge_chunks", "chunk_sets", "index_jobs", "files"):
             execute(f"DELETE FROM {table} WHERE {'id' if table == 'files' else 'file_id'} = ANY(%s)", ids)
         execute("DELETE FROM users WHERE id = %s", user_id)
 
@@ -249,7 +249,7 @@ def test_file_name_match_does_not_reveal_a_confidential_file_to_general_roles(co
 def index_file(path, access_level, user_id, sections):
     file = files_repository.create_many([(path, "text/plain", f"sha-{path}", access_level)], user_id)[0]
     chunks = [
-        OKFChunk(title=path, heading=heading, content=f"{heading} text.", source_locations=({"page": 1},))
+        Chunk(title=path, heading=heading, content=f"{heading} text.", source_locations=({"page": 1},))
         for heading, _ in sections
     ]
     knowledge_chunks_repository.swap_active_set(file["id"], chunks, [vector for _, vector in sections])
@@ -265,7 +265,7 @@ def owner(database):
     files = []
     yield SimpleNamespace(id=user_id, files=files)
     ids = [file["id"] for file in files]
-    for table in ("knowledge_chunks", "chunk_sets", "okf_jobs", "files"):
+    for table in ("knowledge_chunks", "chunk_sets", "index_jobs", "files"):
         execute(f"DELETE FROM {table} WHERE {'id' if table == 'files' else 'file_id'} = ANY(%s)", ids)
     execute("DELETE FROM users WHERE id = %s", user_id)
 

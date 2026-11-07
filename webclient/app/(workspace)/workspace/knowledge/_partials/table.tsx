@@ -32,13 +32,13 @@ function fileType(file: StoredFile) {
   return ext && ext !== fileName(file) ? ext.toUpperCase() : "File";
 }
 
-function statusLabel(status: StoredFile["okf_status"]) {
+function statusLabel(status: StoredFile["index_status"]) {
   return { queued: "Queued", processing: "Indexing", completed: "Indexed", failed: "Failed" }[
     status
   ];
 }
 
-function statusClass(status: StoredFile["okf_status"]) {
+function statusClass(status: StoredFile["index_status"]) {
   return status === "completed"
     ? "border-success bg-success text-success-foreground"
     : status === "failed"
@@ -192,16 +192,16 @@ export function KnowledgeTable({
                 <Badge variant="outline">{file.access_level}</Badge>
               </TableCell>
               <TableCell className="px-5 py-4">
-                <Badge className={statusClass(file.okf_status)}>
-                  {statusLabel(file.okf_status)}
+                <Badge className={statusClass(file.index_status)}>
+                  {statusLabel(file.index_status)}
                 </Badge>
-                {file.okf_status === "failed" && file.okf_error && (
-                  <p className="mt-1 max-w-48 text-xs text-danger">{file.okf_error}</p>
+                {file.index_status === "failed" && file.index_error && (
+                  <p className="mt-1 max-w-48 text-xs text-danger">{file.index_error}</p>
                 )}
               </TableCell>
               <TableCell className="px-5 py-4">
                 <div className="flex justify-end gap-1">
-                  {file.okf_status === "failed" && (
+                  {file.index_status === "failed" && (
                     <Button
                       aria-label={`Retry ${fileName(file)}`}
                       size="icon"
@@ -219,7 +219,7 @@ export function KnowledgeTable({
                   >
                     <Download size={16} />
                   </Button>
-                  {(file.okf_status === "queued" || file.okf_status === "failed") && (
+                  {(file.index_status === "queued" || file.index_status === "failed") && (
                     <Button
                       aria-label={`Remove ${fileName(file)}`}
                       size="icon"
