@@ -146,7 +146,7 @@ Even if a confidential PDF sits in storage, its chunks never enter a **staff** u
 - Messages alternate `user` / `assistant`; assistant rows store `citations` JSON.
 - Listing uses cursor pagination (`updated_at`, `id`).
 - Deleting a conversation is owner-only.
-- History is truncated for the model (~24k characters / last ~20 turns) so context stays bounded. Rewriting a follow-up's search query uses only the last 4 messages.
+- History is truncated for the model (5,000 characters including the question / last 20 turns) so context stays bounded. Rewriting a follow-up's search query uses only the last 4 messages.
 
 ---
 

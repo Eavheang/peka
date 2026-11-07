@@ -33,7 +33,8 @@ def access_levels_for_role(role: str) -> tuple[str, ...]:
 
 def rerank(query: str, rows: list[dict]) -> list[dict]:
     """Order rows by cross-encoder relevance, keeping the given order if the reranker fails."""
-    if len(rows) < 2:
+    # Even one row is scored: chat's evidence check reads the score.
+    if not rows:
         return rows
     try:
         response = httpx.post(

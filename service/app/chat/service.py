@@ -72,10 +72,12 @@ _REWRITE_HISTORY_MESSAGES = 4
 
 # One turn gets 16,384 context tokens / 2 concurrent chats = 8,192. Measured: system prompt 380, five
 # sources with their metadata at most 3,650, answer LLM_MAX_TOKENS 2,048. That leaves about 2,100
-# tokens for history plus question: 5,000 characters of table-heavy text (2.46 characters per token).
+# tokens, or 5,200 characters of table-heavy text (2.46 characters per token): 5,000 for history plus
+# question, and 200 for the search query, which repeats the question in the sources prompt.
 # ponytail: characters, not tokens. Denser text (pure digits) can still overflow when two such turns
 # overlap; count with llama's /tokenize if that shows up.
 _HISTORY_MAX_CHARS = 5000
+_SEARCH_QUERY_MAX_CHARS = 200
 
 _NO_EVIDENCE_ANSWER = (
     "I could not find this in the documents you have access to, so I will not guess. "
@@ -485,6 +487,8 @@ def _search_plan(
 
 def _weak_evidence(results: list[dict]) -> bool:
     """Whether the documents do not cover the question. Unknown without a rerank score, so not weak."""
+    if settings.search_evidence_floor <= 0:
+        return False
     if not results:
         return True
     score = results[0].get("rerank_score")
@@ -530,7 +534,7 @@ def _source_context(
         "the current-turn source IDs shown below when citing grounded blocks. "
         "Historical messages may contain old citation markers; ignore them.\n\n"
         f"Search type: {search_name}\n"
-        f"Search query: {query}\n"
+        f"Search query: {query[:_SEARCH_QUERY_MAX_CHARS]}\n"
         f"Current-turn source IDs: {', '.join(sources) or 'none'}\n"
         "<search_results>\n"
         f"{json.dumps(prompt_sources, ensure_ascii=False, default=str)}\n"
@@ -695,8 +699,9 @@ async def _stream_answer(
         if fallback is None:
             if not shown:
                 raise AIModelError("The model's answer was cut off or malformed. Please try again.") from error
-            # Usually LLM_MAX_TOKENS ending a long answer: keep what the user already read.
-            note = "\n\n_This answer was cut off because it reached the length limit._"
+            # Usually LLM_MAX_TOKENS ending a long answer: keep what the user already read. source_ids
+            # follow the text, so the unfinished block has none.
+            note = "\n\n_This answer was cut off, so its last part has no sources attached._"
             yield ChatStreamText(note)
             used = [sources[source_id] for source_id in parser._used_source_ids]
             yield ChatStreamCompleted(

@@ -101,6 +101,12 @@ def test_rerank_score_is_none_when_the_reranker_is_down(search) -> None:
     assert {r["rerank_score"] for r in search_service.search_knowledge("query", "staff")} == {None}
 
 
+def test_a_single_result_still_gets_a_rerank_score(search) -> None:
+    search(count=1, reranker=Reranker(reply=[{"index": 0, "score": 0.02}]))
+
+    assert [r["rerank_score"] for r in search_service.search_knowledge("query", "staff")] == [0.02]
+
+
 def test_search_route_can_still_return_ten_results(search) -> None:
     from app.auth.routes import authenticated
 
@@ -158,11 +164,10 @@ def test_reranker_error_status_keeps_rrf_order(search, monkeypatch) -> None:
     assert [r["heading"] for r in results] == [f"Section {i}" for i in range(5)]
 
 
-@pytest.mark.parametrize("count", [0, 1])
-def test_too_few_candidates_skip_the_reranker(search, count) -> None:
-    _, reranker = search(count=count)
+def test_no_candidates_skip_the_reranker(search) -> None:
+    _, reranker = search(count=0)
 
-    assert len(search_service.search_knowledge("query", "staff")) == count
+    assert search_service.search_knowledge("query", "staff") == []
     assert reranker.requests == []
 
 

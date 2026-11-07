@@ -86,7 +86,7 @@ def corpus(database):
     for file, heading, content, vector in (
         (general, "Leave policy", "Every employee gets 20 days of leave.", unit_vector(1, 0)),
         (secret, "Salary bands", "Senior engineers earn between 90k and 120k.", unit_vector(0, 1)),
-        # A second general chunk: staff need two candidates for the reranker to be called at all.
+        # A second general chunk: staff's reranker request should hold every row they may see.
         (expenses, "Receipts", "Receipts are required above 50 dollars.", unit_vector(1, 0)),
     ):
         chunk = OKFChunk(title=file["path"], heading=heading, content=content, source_locations=({"page": 1},))

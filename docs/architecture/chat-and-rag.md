@@ -118,7 +118,7 @@ The score only shows that no passage matches the question. When a passage matche
 
 ### Prompt size
 
-llama.cpp shares one context between the turns it is answering: 16,384 tokens / `LLM_MAX_CONCURRENT_CHATS` (2) = 8,192 tokens per turn, or the two turns can fail with `Context size has been exceeded`. Generated tokens count too. That budget holds a system prompt of about 380 tokens, sources of at most about 3,650, an answer of at most `LLM_MAX_TOKENS` (2,048), and a history plus question of at most 5,000 characters (`_HISTORY_MAX_CHARS`). Newer messages are kept first, and the oldest one that still fits is cut. Raise one of these only with a larger context or fewer concurrent chats.
+llama.cpp shares one context between the turns it is answering: 16,384 tokens / `LLM_MAX_CONCURRENT_CHATS` (2) = 8,192 tokens per turn, or the two turns can fail with `Context size has been exceeded`. Generated tokens count too. That budget holds a system prompt of about 380 tokens, sources of at most about 3,650, an answer of at most `LLM_MAX_TOKENS` (2,048), a history plus question of at most 5,000 characters (`_HISTORY_MAX_CHARS`), and a search query line of at most 200 (`_SEARCH_QUERY_MAX_CHARS`), which repeats the question in the sources prompt. Newer messages are kept first, and the oldest one that still fits is cut. Raise one of these only with a larger context or fewer concurrent chats.
 
 ## Streaming protocol
 
@@ -138,7 +138,7 @@ The web client (`services/chat.ts`) parses `data:` lines and updates the UI; on 
 ## Conversation memory
 
 - Load owned history; strip historical `[n]` markers before sending to the model.
-- Budget roughly **24k characters** / last **20** turns so local/small models stay in context.
+- Budget **5,000 characters** including the question / last **20** turns, so local/small models stay in context.
 - Create conversation on first message; title defaults from the first query.
 - Only the owner can `GET`/`DELETE` a conversation.
 

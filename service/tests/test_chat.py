@@ -1400,18 +1400,25 @@ def test_message_that_overflows_the_budget_is_cut_not_dropped() -> None:
     assert len(messages[1].text) == chat_service._HISTORY_MAX_CHARS - len("Shorten it.")
 
 
+def test_a_long_question_is_not_sent_again_whole_as_the_search_query() -> None:
+    context = chat_service._source_context("search_knowledge_base", "§" * 4000, {})
+
+    assert context.count("§") == chat_service._SEARCH_QUERY_MAX_CHARS
+
+
 def test_stream_keeps_the_shown_text_when_the_reply_is_cut_off(monkeypatch) -> None:
     results = [{"title": "report.pdf", "heading": "Sales", "snippet": "Sales rose.", "source_locations": []}]
     monkeypatch.setattr(chat_service, "search_knowledge", lambda *args: results)
 
     events = _stream_events(monkeypatch, [
         '{"blocks":[{"kind":"grounded","text":"Sales rose.","source_ids":["source-1"]},',
-        '{"kind":"general","text":"And then',
+        '{"kind":"grounded","text":"And then',
     ])
     completed = next(e for e in events if isinstance(e, chat_service.ChatStreamCompleted))
 
     assert completed.response.answer.startswith("Sales rose. [1]\n\nAnd then")
-    assert "cut off" in completed.response.answer
+    # The unfinished block never reached its source_ids, so the reader is told it has none.
+    assert "cut off" in completed.response.answer and "no sources" in completed.response.answer
     assert _visible_text(events) == completed.response.answer
     assert [citation.title for citation in completed.response.citations] == ["report.pdf"]
     assert completed.response.refused is False
@@ -1420,6 +1427,13 @@ def test_stream_keeps_the_shown_text_when_the_reply_is_cut_off(monkeypatch) -> N
 _WEAK_EVIDENCE = [{
     "title": "secret.pdf", "heading": "Pay", "snippet": "Salaries.", "source_locations": [], "rerank_score": 0.01,
 }]
+
+
+@pytest.mark.parametrize("results", [[], _WEAK_EVIDENCE], ids=["empty", "weak"])
+def test_evidence_floor_of_zero_turns_the_check_off(monkeypatch, results) -> None:
+    monkeypatch.setattr(chat_service.settings, "search_evidence_floor", 0)
+
+    assert chat_service._weak_evidence(results) is False
 
 
 @pytest.mark.parametrize("path", ["plain", "stream"])
