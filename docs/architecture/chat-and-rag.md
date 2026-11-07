@@ -109,7 +109,7 @@ An answer block that claims a source ID from outside this turn loses it and beco
 
 After a knowledge-base search, the evidence is weak when there are no results or the top rerank score is below `SEARCH_EVIDENCE_FLOOR` (default `0.1`). One short model call then classifies the question:
 
-- **A specific fact only the organization's records could hold** (a name, number, date, rule): the server returns a fixed answer with `refused: true` and no citations, and the answer model is not called. The text is the same whether the document is missing or the user may not read it. The UI labels it "Not enough evidence".
+- **A specific fact only the organization's records could hold** (a name, number, date, rule): the server returns a templated reply with `refused: true` and no citations, and the answer model is not called. The reply names up to three of the closest documents and asks the user which one they meant or for more detail. Search is access-filtered, so it never names a document the user may not read. The UI labels it "Need more detail".
 - **Anything else** (greetings, arithmetic, public knowledge, broad "summarize the documents" requests): the turn goes on to the answer model as usual.
 
 Web search, and a search with no rerank score because the reranker is down, skip this check. If the classifier call fails, the turn is answered normally.

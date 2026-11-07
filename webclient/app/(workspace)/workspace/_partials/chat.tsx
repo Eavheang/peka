@@ -571,7 +571,7 @@ function ChatMessageBubble({
       >
         {result?.refused && (
           <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary">
-            Not enough evidence
+            Need more detail
           </p>
         )}
         {message.text &&

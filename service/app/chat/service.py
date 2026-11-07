@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 # Turns being answered at once, so the shared llama.cpp context does not overflow. Held for the
 # whole turn so /chat/stream waiters use no worker thread. threading, not asyncio: POST /chat
 # waits on a worker thread and /chat/stream on the event loop.
-# ponytail: per process and not first-come-first-served. The OKF worker is not counted (#95), and
+# ponytail: per process and not first-come-first-served. The index worker is not counted (#95), and
 # a call already in a worker thread outlives Stop, so a third call can briefly overlap.
 _chat_slots = threading.BoundedSemaphore(settings.llm_max_concurrent_chats)
 
@@ -78,11 +78,6 @@ _REWRITE_HISTORY_MESSAGES = 4
 # overlap; count with llama's /tokenize if that shows up.
 _HISTORY_MAX_CHARS = 5000
 _SEARCH_QUERY_MAX_CHARS = 200
-
-_NO_EVIDENCE_ANSWER = (
-    "I could not find this in the documents you have access to, so I will not guess. "
-    "Try rephrasing the question, or upload a document that covers it."
-)
 
 _QUESTION_SCOPE_PROMPT = (
     "You are Peka's question classifier. A search of the organization's documents found no passage "
@@ -495,6 +490,25 @@ def _weak_evidence(results: list[dict]) -> bool:
     return score is not None and score < settings.search_evidence_floor
 
 
+def _clarifying_answer(results: list[dict]) -> str:
+    """Ask the user what they meant, naming the closest documents. Results are already access-filtered."""
+    # Backticks keep a crafted file name from rendering as a markdown link.
+    titles = list(dict.fromkeys(result["title"].replace("`", "") for result in results))[:3]
+    if not titles:
+        return (
+            "I couldn't find anything about that in the documents you have access to, but I'd like to help. "
+            "Could you tell me a little more, such as the tool, team, or document it relates to? "
+            "If the document isn't here yet, you can upload it and ask me again."
+        )
+    closest = "\n".join(f"- `{title}`" for title in titles)
+    return (
+        "I couldn't find a clear answer to that in the documents you have access to, but I'd like to help. "
+        f"These look closest:\n\n{closest}\n\n"
+        "Is one of these what you're after? Tell me which one, or add a little more detail, "
+        "such as the tool, team, or topic."
+    )
+
+
 def _needs_documents(query: str, history: list[dict] | None, timezone_name: str | None) -> bool:
     """Whether this asks for a fact only the documents could hold, so answering without them is a guess."""
     try:
@@ -597,7 +611,7 @@ def answer_from_knowledge(
                 and _weak_evidence(results)
                 and _needs_documents(query, history, timezone)
             ):
-                return ChatResponse(answer=_NO_EVIDENCE_ANSWER, refused=True, citations=[])
+                return ChatResponse(answer=_clarifying_answer(results), refused=True, citations=[])
             sources = {
                 f"source-{index}": result
                 for index, result in enumerate(results, 1)
@@ -662,8 +676,9 @@ async def _stream_answer(
         else:
             results = await asyncio.to_thread(search_knowledge, search_plan.query, user_role)
             if _weak_evidence(results) and await asyncio.to_thread(_needs_documents, query, history, timezone):
-                yield ChatStreamText(_NO_EVIDENCE_ANSWER)
-                yield ChatStreamCompleted(ChatResponse(answer=_NO_EVIDENCE_ANSWER, refused=True, citations=[]))
+                answer = _clarifying_answer(results)
+                yield ChatStreamText(answer)
+                yield ChatStreamCompleted(ChatResponse(answer=answer, refused=True, citations=[]))
                 return
         sources = {
             f"source-{index}": result
