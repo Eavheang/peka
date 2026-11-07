@@ -50,7 +50,7 @@ Vector search and chat retrieval always filter by the caller's role ACL.
 POST /chat  { query, conversation_id?, web_search? }
         │
         ▼
-Load owned conversation history (budget ~24k chars / last 20 turns)
+Load owned conversation history (budget 5,000 chars with the question / last 20 turns)
         │
         ▼
 LLM structured SearchPlan, only on a follow-up or with web_search=true

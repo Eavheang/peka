@@ -40,7 +40,7 @@ If your session expires, the client tries one token refresh; if that fails you r
 ### When PEKA does not answer
 
 - **Not enough evidence:** no passage in the documents you can access matches a question for a specific fact, so PEKA does not guess. Rephrase with the document's own terms, or upload a document that covers it.
-- **"This answer was cut off":** the answer reached the length limit. Ask for less, or for one part at a time.
+- **"This answer was cut off":** the answer usually reached the length limit, and its last part has no sources attached. Ask for less, or for one part at a time.
 
 **Tips for better answers**
 

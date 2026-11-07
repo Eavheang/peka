@@ -85,6 +85,7 @@ Documented in `service/.env.example`. Field names map to `app/config.py` (case-i
 | `LLM_API_KEY` | yes | SecretStr |
 | `LLM_MODEL` | yes | |
 | `LLM_MAX_TOKENS` | no | Default 2048; longest answer. An existing `.env` with 8192 keeps the old limit and can overflow a shared local context |
+| `LLM_MAX_CONCURRENT_CHATS` | no | Default 2; chats answered at once, the others wait. Raise it only with a larger context |
 | `OKF_ENRICHMENT_ENABLED` | no | Default `false`. After a file is searchable, also write an LLM OKF page to `knowledge_base/`. Competes with chat on the same model |
 | `OKF_MAX_TOKENS` | no | Default 32768; output limit for OKF enrichment only |
 | `EMBEDDING_BASE_URL` | no | Default `http://localhost:8081/v1` |
