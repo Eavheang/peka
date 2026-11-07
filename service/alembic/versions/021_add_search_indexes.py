@@ -3,7 +3,7 @@
 Chunks hold a copy of their file's path because a generated column cannot read another
 table. Paths never change after upload, so the copy cannot go stale.
 
-HNSW settings and the reasoning are in eval/results-perf/2026-11-07-search-indexes/notes.md.
+HNSW settings and the reasoning are in the local evaluation notes, which are not published.
 
 Revision ID: 021_add_search_indexes
 Revises: 020_allow_stopped_messages
