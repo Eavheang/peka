@@ -16,6 +16,7 @@ from types import SimpleNamespace
 from urllib.parse import urlparse
 from uuid import uuid4
 
+import httpx
 import psycopg
 import pytest
 
@@ -74,21 +75,24 @@ def corpus(database):
         "INSERT INTO users (email, password_hash, role) VALUES (%s, 'x', 'admin') RETURNING id",
         f"role-filter-{run}@example.test",
     )[0]
-    general, secret = files_repository.create_many(
+    general, secret, expenses = files_repository.create_many(
         [
             (f"role-filter/{run}-handbook.txt", "text/plain", f"sha-general-{run}", "general"),
             (f"role-filter/{run}-salaries.txt", "text/plain", f"sha-secret-{run}", "confidential"),
+            (f"role-filter/{run}-expenses.txt", "text/plain", f"sha-expenses-{run}", "general"),
         ],
         user_id,
     )
     for file, heading, content, vector in (
         (general, "Leave policy", "Every employee gets 20 days of leave.", unit_vector(1, 0)),
         (secret, "Salary bands", "Senior engineers earn between 90k and 120k.", unit_vector(0, 1)),
+        # A second general chunk: staff need two candidates for the reranker to be called at all.
+        (expenses, "Receipts", "Receipts are required above 50 dollars.", unit_vector(1, 0)),
     ):
         chunk = OKFChunk(title=file["path"], heading=heading, content=content, source_locations=({"page": 1},))
         knowledge_chunks_repository.swap_active_set(file["id"], [chunk], [vector])
     yield SimpleNamespace(general=general, secret=secret, run=run)
-    ids = [general["id"], secret["id"]]
+    ids = [general["id"], secret["id"], expenses["id"]]
     for table in ("knowledge_chunks", "chunk_sets", "okf_jobs", "files"):
         column = "id" if table == "files" else "file_id"
         execute(f"DELETE FROM {table} WHERE {column} = ANY(%s)", ids)
@@ -102,13 +106,13 @@ def found(results, corpus) -> set[str]:
 
 
 def test_general_only_search_never_returns_the_closer_confidential_chunk(corpus):
-    results = search_repository.search_chunks(QUERY, ("general",))
+    results = search_repository.search_chunks(QUERY, ("general",), top_k=10)
 
     assert found(results, corpus) == {"general"}
 
 
 def test_full_access_search_returns_both_with_the_closer_confidential_chunk_first(corpus):
-    results = search_repository.search_chunks(QUERY, ("general", "confidential"))
+    results = search_repository.search_chunks(QUERY, ("general", "confidential"), top_k=10)
     ours = {str(corpus.general["id"]): "general", str(corpus.secret["id"]): "confidential"}
 
     assert [ours[str(r["file_id"])] for r in results if str(r["file_id"]) in ours] == [
@@ -128,21 +132,70 @@ def test_search_knowledge_applies_the_role_mapping_end_to_end(monkeypatch, corpu
     assert found(results, corpus) == expected
 
 
+@pytest.mark.parametrize("role, sees_secret", [("staff", False), ("admin", True)])
+def test_reranker_only_receives_rows_the_role_may_see(monkeypatch, corpus, role, sees_secret):
+    monkeypatch.setattr(search_service, "embed_query", lambda query: QUERY)
+    sent = []
+
+    def post(url, **kwargs):
+        sent.extend(kwargs["json"]["texts"])
+        ranks = [{"index": index, "score": 0.0} for index in range(len(sent))]
+        return httpx.Response(200, json=ranks, request=httpx.Request("POST", url))
+
+    monkeypatch.setattr(search_service.httpx, "post", post)
+
+    search_service.search_knowledge("what are the rules?", role)
+
+    passages = "\n".join(sent)
+    assert "Every employee gets 20 days" in passages and "Receipts are required" in passages
+    assert ("Senior engineers" in passages) is sees_secret
+
+
+def test_one_format_of_a_document_keeps_all_its_sections_and_hides_its_copies(database):
+    run = uuid4().hex[:8]
+    user_id = execute(
+        "INSERT INTO users (email, password_hash, role) VALUES (%s, 'x', 'admin') RETURNING id",
+        f"formats-{run}@example.test",
+    )[0]
+    pdf, docx = files_repository.create_many(
+        [
+            (f"formats/{run}-report.pdf", "application/pdf", f"sha-pdf-{run}", "general"),
+            (f"formats/{run}-report.docx", "application/octet-stream", f"sha-docx-{run}", "general"),
+        ],
+        user_id,
+    )
+    try:
+        for file, heading, vector in ((pdf, "Page 1", unit_vector(0.1, 1)), (docx, "Costs", unit_vector(1, 0))):
+            chunks = [OKFChunk(file["path"], heading, f"Fact {part}.", ()) for part in (1, 2)]
+            knowledge_chunks_repository.swap_active_set(file["id"], chunks, [vector, vector])
+
+        results = search_repository.search_chunks(QUERY, ("general",), top_k=10)
+
+        ours = [row for row in results if row["stem"] == f"{run}-report"]
+        assert [row["heading"] for row in ours] == ["Page 1", "Page 1"]
+        assert {row["content"] for row in ours} == {"Fact 1.", "Fact 2."}
+    finally:
+        ids = [pdf["id"], docx["id"]]
+        for table in ("knowledge_chunks", "chunk_sets", "okf_jobs", "files"):
+            execute(f"DELETE FROM {table} WHERE {'id' if table == 'files' else 'file_id'} = ANY(%s)", ids)
+        execute("DELETE FROM users WHERE id = %s", user_id)
+
+
 def test_changing_a_file_to_confidential_hides_it_from_staff_immediately(corpus):
     files_repository.update_access_level(corpus.general["id"], "confidential")
     try:
-        assert found(search_repository.search_chunks(QUERY, ("general",)), corpus) == set()
-        assert found(search_repository.search_chunks(QUERY, ("general", "confidential")), corpus) == {
+        assert found(search_repository.search_chunks(QUERY, ("general",), top_k=10), corpus) == set()
+        assert found(search_repository.search_chunks(QUERY, ("general", "confidential"), top_k=10), corpus) == {
             "general", "confidential"}
     finally:
         files_repository.update_access_level(corpus.general["id"], "general")
-    assert found(search_repository.search_chunks(QUERY, ("general",)), corpus) == {"general"}
+    assert found(search_repository.search_chunks(QUERY, ("general",), top_k=10), corpus) == {"general"}
 
 
 def test_only_active_chunk_sets_are_searchable(corpus):
     execute("UPDATE chunk_sets SET status = 'superseded' WHERE file_id = %s", corpus.general["id"])
     try:
-        assert found(search_repository.search_chunks(QUERY, ("general", "confidential")), corpus) == {
+        assert found(search_repository.search_chunks(QUERY, ("general", "confidential"), top_k=10), corpus) == {
             "confidential"}
     finally:
         execute("UPDATE chunk_sets SET status = 'active' WHERE file_id = %s", corpus.general["id"])
@@ -169,7 +222,7 @@ def test_file_listing_hides_confidential_files_from_general_only_roles(corpus):
 def test_keyword_match_finds_a_chunk_the_vector_search_misses(corpus):
     unrelated = unit_vector(0, 0, 1)  # cosine 0 with both chunks: below the similarity floor
 
-    assert found(search_repository.search_chunks(unrelated, ("general",)), corpus) == set()
+    assert found(search_repository.search_chunks(unrelated, ("general",), top_k=10), corpus) == set()
     assert found(
-        search_repository.search_chunks(unrelated, ("general",), query_text="how many days of leave?"), corpus
+        search_repository.search_chunks(unrelated, ("general",), top_k=10, query_text="how many days of leave?"), corpus
     ) == {"general"}

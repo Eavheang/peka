@@ -63,8 +63,8 @@ Path: `/workspace/knowledge`.
 
 | Status | Meaning |
 |--------|---------|
-| `queued` | Waiting for the OKF worker |
-| `processing` | Converting / chunking / embedding |
+| `queued` | Waiting for the indexing worker |
+| `processing` | Chunking / embedding |
 | `completed` | Searchable in chat |
 | `failed` | Error after attempts; use **Retry OKF** (author or admin) |
 

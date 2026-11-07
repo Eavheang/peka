@@ -75,6 +75,8 @@ Roles: `admin` | `senior` | `staff`.
 
 **SearchResponse:** `file_id`, `title`, `heading`, `snippet`, `source_locations`, `score`
 
+`source_locations` holds extractor locators such as `{"page": 3}`, `{"slide": 3}`, `{"sheet": 1, "name": "Q1"}`, or `{"section": 2}`.
+
 ---
 
 ## Chat — `/chat`

@@ -33,7 +33,7 @@ PEKA’s answer:
 **It is:**
 
 - A **RAG** (retrieval-augmented generation) product with a full UI and API
-- A **document pipeline**: extract → LLM “OKF” conversion → chunk → embed → retrieve
+- A **document pipeline**: extract → chunk the original text → embed → retrieve, with optional LLM “OKF” enrichment
 - **Multi-user** with JWT auth and document ACLs (`general` / `confidential`)
 - Deployable mostly **on your infrastructure** (Postgres, embeddings, optional llama.cpp)
 
@@ -48,9 +48,9 @@ PEKA’s answer:
 
 ```text
 Upload documents
-      → background indexing (OKF + embeddings)
+      → background indexing (chunks + embeddings)
             → ask a question in chat
-                  → router decides: no search | knowledge base | web
+                  → search the knowledge base (or the web, when enabled)
                         → answer (+ citations when grounded)
 ```
 
@@ -58,8 +58,8 @@ Upload documents
 
 | Piece | Job |
 |-------|-----|
-| **Knowledge base (OKF + vectors)** | Structured, searchable memory of your files |
-| **Retrieval router (LLM)** | Decides *whether* to search and *what query* to use |
+| **Knowledge base (source chunks + vectors)** | Searchable memory of your files, cited from their original text |
+| **Retrieval router (LLM)** | On follow-ups, or with web search on: rewrites the search query and can choose the web |
 | **Answer model (LLM)** | Writes the reply; server attaches `[1]`, `[2]` citation markers |
 
 Embeddings (TEI + pgvector) are the **lookup index**, not the “writer.” The LLM never sees whole file shares—only retrieved snippets for that turn (plus recent chat history).
@@ -68,6 +68,6 @@ Embeddings (TEI + pgvector) are the **lookup index**, not the “writer.” The 
 
 1. [How it works](how-it-works.md) — end-to-end system behavior  
 2. [User guide](user-guide.md) — screens and tasks by role  
-3. [OKF & indexing](architecture/okf-and-indexing.md) — document pipeline deep dive  
+3. [Indexing & OKF](architecture/okf-and-indexing.md) — document pipeline deep dive  
 4. [Chat & RAG](architecture/chat-and-rag.md) — question → answer deep dive  
 5. [Architecture overview](architecture/overview.md) — components and folders  

@@ -7,15 +7,21 @@ from fastapi.testclient import TestClient
 from datetime import datetime, timezone
 from uuid import uuid4
 
+import ai
 import pytest
 
 from app.chat import service as chat_service
 from app.auth.routes import authenticated
+from app.engine import ai_runtime
 from app.main import app
 
 
 def _search_plan(tool="none", query=None):
     return chat_service.SearchPlan(tool=tool, query=query)
+
+
+def _no_generation(*args, **kwargs):
+    pytest.fail("This turn must not make a one-shot model call")
 
 
 @pytest.fixture(autouse=True)
@@ -36,9 +42,6 @@ WAITING = chat_service.ChatStreamStatus("Waiting for other answers to finish..."
 def two_slots(monkeypatch) -> threading.BoundedSemaphore:
     slots = threading.BoundedSemaphore(2)
     monkeypatch.setattr(chat_service, "_chat_slots", slots)
-    monkeypatch.setattr(
-        chat_service, "generate_structured", lambda messages, output_type: _search_plan()
-    )
     return slots
 
 
@@ -80,8 +83,6 @@ def test_non_streaming_chats_share_the_same_slots(monkeypatch, two_slots) -> Non
         time.sleep(0.1)
         with lock:
             running -= 1
-        if output_type is chat_service.SearchPlan:
-            return _search_plan()
         return chat_service.ModelAnswer.model_validate_json(ANSWER_JSON)
 
     monkeypatch.setattr(chat_service, "generate_structured", generate)
@@ -123,28 +124,138 @@ def test_stopping_a_chat_frees_its_slot_and_cancels_its_model_call(monkeypatch, 
     assert two_slots._value == 2
 
 
-def test_router_none_still_searches_knowledge_base(monkeypatch) -> None:
+_EARLIER_TURN = [
+    {"role": "user", "content": "What is the refund policy?"},
+    {"role": "assistant", "content": "Refunds take 14 days."},
+]
+both_chat_paths = pytest.mark.parametrize("path", ["plain", "stream"])
+
+
+def _count_model_calls(monkeypatch, plan=None) -> list:
+    """Fake the model on both chat paths and return what it was asked for, in order."""
+    calls = []
+
+    def generate(messages, output_type):
+        calls.append(output_type)
+        if output_type is chat_service.SearchPlan:
+            return plan
+        return chat_service.ModelAnswer.model_validate_json(ANSWER_JSON)
+
+    async def stream_text(messages, output_type):
+        calls.append(output_type)
+        yield ANSWER_JSON
+
+    monkeypatch.setattr(chat_service, "generate_structured", generate)
+    monkeypatch.setattr(chat_service, "stream_structured_text", stream_text)
+    return calls
+
+
+def _record_searches(monkeypatch) -> list:
+    searches = []
+    monkeypatch.setattr(
+        chat_service, "search_knowledge", lambda query, role: searches.append(query) or []
+    )
+    return searches
+
+
+def _ask(path, query, history=None, web_search=False):
+    if path == "plain":
+        return chat_service.answer_from_knowledge(query, "staff", history, web_search=web_search)
+
+    async def collect():
+        return [
+            event
+            async for event in chat_service.stream_answer_from_knowledge(
+                query, "staff", history, web_search=web_search
+            )
+        ]
+
+    return asyncio.run(collect())[-1].response
+
+
+@both_chat_paths
+def test_first_turn_searches_the_raw_question_with_one_model_call(monkeypatch, path) -> None:
+    calls = _count_model_calls(monkeypatch)
+    searches = _record_searches(monkeypatch)
+
+    response = _ask(path, "What is the refund window?")
+
+    assert calls == [chat_service.ModelAnswer]
+    assert searches == ["What is the refund window?"]
+    assert response.answer == "Answer"
+
+
+@both_chat_paths
+def test_first_turn_with_web_search_on_still_plans(monkeypatch, path) -> None:
+    calls = _count_model_calls(monkeypatch, _search_plan("web_search", "latest release"))
     searched = []
     monkeypatch.setattr(
-        chat_service, "search_knowledge", lambda query, role: searched.append(query) or []
-    )
-    monkeypatch.setattr(
-        chat_service,
-        "generate_structured",
-        lambda messages, output_type: (
-            _search_plan()
-            if output_type is chat_service.SearchPlan
-            else chat_service.ModelAnswer(
-                blocks=[{"kind": "general", "text": "2", "source_ids": []}]
-            )
-        ),
+        chat_service, "perform_web_search", lambda query: searched.append(query) or []
     )
 
-    response = chat_service.answer_from_knowledge("What is 1+1?", "staff")
-    assert searched == ["What is 1+1?"]
-    assert response.answer == "2"
-    assert response.citations == []
-    assert response.refused is False
+    _ask(path, "What is the newest release?", web_search=True)
+
+    assert calls == [chat_service.SearchPlan, chat_service.ModelAnswer]
+    assert searched == ["latest release"]
+
+
+def test_query_rewrite_sends_only_the_last_exchanges(monkeypatch) -> None:
+    sent = []
+
+    def generate(messages, output_type):
+        sent.extend(messages)
+        return chat_service.SearchPlan(tool="search_knowledge_base", query="rewritten")
+
+    monkeypatch.setattr(chat_service, "generate_structured", generate)
+    history = [{"role": "user" if i % 2 == 0 else "assistant", "content": f"turn {i}"} for i in range(10)]
+
+    plan = chat_service._search_plan("and the target?", history, web_search=False)
+
+    assert plan.query == "rewritten"
+    assert len(sent) == 1 + chat_service._REWRITE_HISTORY_MESSAGES + 1  # System, recent history, question.
+
+
+@both_chat_paths
+def test_follow_up_rewrites_the_search_query(monkeypatch, path) -> None:
+    calls = _count_model_calls(
+        monkeypatch, _search_plan("search_knowledge_base", "refund policy duration")
+    )
+    searches = _record_searches(monkeypatch)
+
+    _ask(path, "How long does that take?", _EARLIER_TURN)
+
+    assert calls == [chat_service.SearchPlan, chat_service.ModelAnswer]
+    assert searches == ["refund policy duration"]
+
+
+@both_chat_paths
+@pytest.mark.parametrize("web_search", [False, True])
+def test_none_plan_still_searches_the_knowledge_base(monkeypatch, path, web_search) -> None:
+    calls = _count_model_calls(monkeypatch, _search_plan())
+    searches = _record_searches(monkeypatch)
+    monkeypatch.setattr(
+        chat_service, "perform_web_search", lambda query: pytest.fail("A none plan must not search the web")
+    )
+
+    _ask(path, "And the deadline?", _EARLIER_TURN, web_search)
+
+    assert calls == [chat_service.SearchPlan, chat_service.ModelAnswer]
+    assert searches == ["And the deadline?"]
+
+
+def test_invalid_answer_json_is_not_regenerated_without_streaming(monkeypatch) -> None:
+    models = []
+
+    def generate(messages, output_type, **kwargs):
+        models.append(ai.testing.FakeModel([*messages, ai.assistant_message("not json")]))
+        return ai_runtime.generate_structured(messages, output_type, model=models[-1], **kwargs)
+
+    monkeypatch.setattr(chat_service, "generate_structured", generate)
+
+    with pytest.raises(chat_service.AIModelError, match="invalid structured"):
+        chat_service.answer_from_knowledge("question", "staff")
+
+    assert [len(model.calls) for model in models] == [1]
 
 
 def test_search_plan_without_query_searches_with_raw_question(monkeypatch) -> None:
@@ -164,7 +275,7 @@ def test_search_plan_without_query_searches_with_raw_question(monkeypatch) -> No
         ),
     )
 
-    response = chat_service.answer_from_knowledge("hi", "staff")
+    response = chat_service.answer_from_knowledge("hi", "staff", _EARLIER_TURN)
     assert searched == ["hi"]
     assert response.answer == "Hello"
     assert response.citations == []
@@ -214,8 +325,6 @@ def test_grounded_answer_carries_citations(monkeypatch) -> None:
     seen: dict = {}
 
     def fake_generation(messages, output_type):
-        if output_type is chat_service.SearchPlan:
-            return _search_plan("search_knowledge_base", "refund time?")
         seen["prompt"] = messages[-1].text
         return chat_service.ModelAnswer(
             blocks=[
@@ -337,8 +446,6 @@ def test_empty_search_falls_back_without_citations(monkeypatch):
 
     def generate(messages, output_type):
         calls.append(output_type)
-        if output_type is chat_service.SearchPlan:
-            return _search_plan("search_knowledge_base", "improve sales")
         assert "<search_results>\n{}\n</search_results>" in messages[-1].text
         return chat_service.ModelAnswer(
             blocks=[
@@ -356,7 +463,7 @@ def test_empty_search_falls_back_without_citations(monkeypatch):
     assert response.answer == "Consider customer feedback."
     assert response.citations == []
     assert response.refused is False
-    assert calls == [chat_service.SearchPlan, chat_service.ModelAnswer]
+    assert calls == [chat_service.ModelAnswer]
 
 
 @pytest.mark.parametrize("blocks", [
@@ -368,11 +475,7 @@ def test_invalid_answer_sources_are_dropped_without_retry(monkeypatch, blocks):
     monkeypatch.setattr(
         chat_service,
         "generate_structured",
-        lambda messages, output_type: (
-            _search_plan()
-            if output_type is chat_service.SearchPlan
-            else chat_service.ModelAnswer(blocks=blocks)
-        ),
+        lambda messages, output_type: chat_service.ModelAnswer(blocks=blocks),
     )
     response = chat_service.answer_from_knowledge("question", "staff")
 
@@ -392,8 +495,6 @@ def test_mixed_answer_remaps_and_deduplicates_sources(monkeypatch):
         return results
 
     def generate(messages, output_type):
-        if output_type is chat_service.SearchPlan:
-            return _search_plan("search_knowledge_base", "sales report")
         return chat_service.ModelAnswer(
             blocks=[
                 {
@@ -416,15 +517,13 @@ def test_mixed_answer_remaps_and_deduplicates_sources(monkeypatch):
         "Sales increased. [1]\n\nConsider expanding distribution."
     )
     assert [citation.title for citation in response.citations] == ["report.pdf"]
-    assert searches == [("sales report", "staff")]
+    assert searches == [("Report and your opinion?", "staff")]
 
 
 def test_answer_formats_markdown_bullets_without_changing_stream_content(monkeypatch):
     results = [{"title": "report.pdf", "heading": "Sales", "snippet": "Sales increased.", "source_locations": []}]
 
     def generate(messages, output_type):
-        if output_type is chat_service.SearchPlan:
-            return _search_plan("search_knowledge_base", "sales report")
         return chat_service.ModelAnswer(
             blocks=[
                 {
@@ -459,8 +558,6 @@ def test_answer_formats_markdown_bullets_without_changing_stream_content(monkeyp
 def test_enforces_one_search_per_turn(monkeypatch):
     searches = []
     def generate(messages, output_type):
-        if output_type is chat_service.SearchPlan:
-            return _search_plan("search_knowledge_base", "sales")
         return chat_service.ModelAnswer(
             blocks=[{"kind": "general", "text": "No results.", "source_ids": []}]
         )
@@ -818,13 +915,7 @@ def test_stream_answer_parses_incremental_json_and_validates_answer(monkeypatch)
             yield chunk
 
     monkeypatch.setattr(chat_service, "stream_structured_text", stream_text)
-    monkeypatch.setattr(
-        chat_service,
-        "generate_structured",
-        lambda messages, output_type: _search_plan()
-        if output_type is chat_service.SearchPlan
-        else pytest.fail("Answer generation should use the streaming path"),
-    )
+    monkeypatch.setattr(chat_service, "generate_structured", _no_generation)
 
     async def collect():
         return [
@@ -877,13 +968,7 @@ def test_streamed_markdown_matches_final_answer(monkeypatch) -> None:
 
     monkeypatch.setattr(chat_service, "stream_structured_text", stream_text)
     monkeypatch.setattr(chat_service, "search_knowledge", lambda *args: [result])
-    monkeypatch.setattr(
-        chat_service,
-        "generate_structured",
-        lambda messages, output_type: _search_plan("search_knowledge_base", "policy")
-        if output_type is chat_service.SearchPlan
-        else pytest.fail("Answer generation should use the streaming path"),
-    )
+    monkeypatch.setattr(chat_service, "generate_structured", _no_generation)
 
     async def collect():
         return [
@@ -999,20 +1084,13 @@ def test_endpoint_authorizes_history_before_calling_model(monkeypatch, found):
     assert seen == ([history] if found else [])
 
 
-def _stream_events(monkeypatch, chunks: list[str], regenerate_error: bool = True):
+def _stream_events(monkeypatch, chunks: list[str]):
     async def stream_text(*args, **kwargs):
         for chunk in chunks:
             yield chunk
 
-    def generate(messages, output_type):
-        if output_type is chat_service.SearchPlan:
-            return _search_plan()
-        if regenerate_error:
-            raise chat_service.AIModelError("Model returned an invalid structured response")
-        pytest.fail("A repairable answer must not be regenerated")
-
     monkeypatch.setattr(chat_service, "stream_structured_text", stream_text)
-    monkeypatch.setattr(chat_service, "generate_structured", generate)
+    monkeypatch.setattr(chat_service, "generate_structured", _no_generation)
 
     async def collect():
         return [event async for event in chat_service.stream_answer_from_knowledge("hello", "staff")]
@@ -1025,13 +1103,13 @@ def test_stream_repairs_unescaped_quotes_without_regenerating(monkeypatch) -> No
         '{"blocks":[{"kind":"general","text":"Systems use "reranking" to sort.","source_ids":[]}]}'
     )
 
-    events = _stream_events(monkeypatch, [broken[:40], broken[40:]], regenerate_error=False)
+    events = _stream_events(monkeypatch, [broken[:40], broken[40:]])
     completed = next(e for e in events if isinstance(e, chat_service.ChatStreamCompleted))
 
     assert completed.response.answer == 'Systems use "reranking" to sort.'
 
 
-def test_stream_falls_back_to_the_plain_text_answer_when_regeneration_fails(monkeypatch) -> None:
+def test_stream_falls_back_to_the_plain_text_answer_without_regenerating(monkeypatch) -> None:
     prose = "RAG evolved in three stages [1]. Advanced systems rerank results [1, 2]."
 
     events = _stream_events(monkeypatch, [prose])
@@ -1045,9 +1123,21 @@ def test_stream_falls_back_to_the_plain_text_answer_when_regeneration_fails(monk
     assert shown == completed.response.answer
 
 
-def test_stream_still_fails_when_the_output_is_broken_json_and_regeneration_fails(monkeypatch) -> None:
-    with pytest.raises(chat_service.AIModelError):
-        _stream_events(monkeypatch, ['{"blocks":[{"kind":"general","text":"cut off'])
+def test_stream_fails_clearly_on_broken_json_without_regenerating(monkeypatch, two_slots) -> None:
+    calls = []
+
+    async def stream_text(messages, output_type):
+        calls.append(output_type)
+        yield '{"blocks":[{"kind":"general","text":"cut off'
+
+    monkeypatch.setattr(chat_service, "stream_structured_text", stream_text)
+    monkeypatch.setattr(chat_service, "generate_structured", _no_generation)
+
+    with pytest.raises(chat_service.AIModelError, match="cut off or malformed"):
+        _ask("stream", "hello")
+
+    assert calls == [chat_service.ModelAnswer]
+    assert two_slots._value == 2, "a failed answer must release its slot"
 
 
 def test_plain_text_fallback_cleans_markers_and_rejects_json_and_empty() -> None:
@@ -1095,11 +1185,7 @@ def test_streamed_text_matches_final_answer_in_any_field_order(monkeypatch, bloc
 
     monkeypatch.setattr(chat_service, "stream_structured_text", stream_text)
     monkeypatch.setattr(chat_service, "search_knowledge", lambda *args: [_POLICY_SOURCE])
-    monkeypatch.setattr(
-        chat_service,
-        "generate_structured",
-        lambda messages, output_type: _search_plan("search_knowledge_base", "policy"),
-    )
+    monkeypatch.setattr(chat_service, "generate_structured", _no_generation)
 
     async def collect():
         return [event async for event in chat_service.stream_answer_from_knowledge("policy", "staff")]
@@ -1112,26 +1198,13 @@ def test_streamed_text_matches_final_answer_in_any_field_order(monkeypatch, bloc
     assert not any(isinstance(e, chat_service.ChatStreamReset) for e in events)
 
 
-def test_stream_resets_shown_text_before_a_regenerated_answer(monkeypatch) -> None:
-    def generate(messages, output_type):
-        if output_type is chat_service.SearchPlan:
-            return _search_plan()
-        return chat_service.ModelAnswer(blocks=[{"kind": "general", "text": "Fresh answer."}])
-
-    async def stream_text(*args, **kwargs):
-        yield '{"blocks":[{"kind":"general","text":"Broken ans'
-
-    monkeypatch.setattr(chat_service, "stream_structured_text", stream_text)
-    monkeypatch.setattr(chat_service, "generate_structured", generate)
-
-    async def collect():
-        return [event async for event in chat_service.stream_answer_from_knowledge("hello", "staff")]
-
-    events = asyncio.run(collect())
+def test_stream_resets_shown_text_before_the_plain_text_answer(monkeypatch) -> None:
+    events = _stream_events(monkeypatch, ['Note "text":"Shown" and the rest.'])
     completed = next(e for e in events if isinstance(e, chat_service.ChatStreamCompleted))
 
-    assert "".join(e.delta for e in events if isinstance(e, chat_service.ChatStreamText)).startswith("Broken")
-    assert _visible_text(events) == completed.response.answer == "Fresh answer."
+    assert next(e for e in events if isinstance(e, chat_service.ChatStreamText)).delta == "Shown"
+    assert _visible_text(events) == completed.response.answer
+    assert completed.response.answer.startswith('Note "text":"Shown" and the rest.')
 
 
 class _StreamRecorder:
@@ -1219,15 +1292,14 @@ def test_stop_while_streaming_saves_the_shown_text_as_stopped(monkeypatch) -> No
     assert recorder.saved[0][2]["ttft_ms"] is not None
 
 
-def test_stop_during_a_retry_saves_nothing(monkeypatch) -> None:
+def test_stop_right_after_a_reset_saves_nothing(monkeypatch) -> None:
     recorder = _StreamRecorder(monkeypatch, [
         chat_service.ChatStreamText("Broken"),
         chat_service.ChatStreamReset(),
-        chat_service.ChatStreamStatus("Retrying response..."),
-        _done("Regenerated"),
+        _done("Fallback"),
     ])
 
-    recorder.stop_after(3)
+    recorder.stop_after(2)
 
     assert recorder.closed
     assert recorder.saved == []
@@ -1265,6 +1337,18 @@ def test_save_failure_sends_an_error_event_and_is_audited(monkeypatch) -> None:
 
     assert events[-1] == {"type": "error", "message": "We could not save this answer. Please try again."}
     assert recorder.audited == [("chat_turn_failed", {"model": "test-model", "ttft_ms": recorder.audited[0][1]["ttft_ms"], "reason": "save_failed"})]
+
+
+def test_model_failure_sends_its_message_and_saves_nothing(monkeypatch) -> None:
+    recorder = _StreamRecorder(
+        monkeypatch, [chat_service.ChatStreamText("Cut "), chat_service.AIModelError("Please try again.")]
+    )
+
+    events = recorder.run()
+
+    assert events[-1] == {"type": "error", "message": "Please try again."}
+    assert recorder.saved == []
+    assert recorder.audited[0][0] == "chat_turn_failed"
 
 
 def test_unexpected_stream_failure_sends_an_error_event_and_is_audited(monkeypatch) -> None:

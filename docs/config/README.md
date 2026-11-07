@@ -38,12 +38,13 @@ make prod-down # tear down the prod-style stack
 | `service` | `../service` Dockerfile | 8000 | FastAPI |
 | `okf-worker` | same service image | — | `python -m app.engine.okf.worker` |
 | `embeddings` | TEI `cpu-1.9` | (internal 80) | BGE-small embeddings |
+| `reranker` | TEI `cpu-1.9` | (internal 80) | Cross-encoder that reranks search hits, on CPU |
 | `proxy` | `nginx:alpine` | `${WEBCLIENT_PORT:-3000}` | Public entry |
 | `llama` | llama.cpp CUDA (profile `llama`) | 8080 | Optional local LLM |
 
 Shared volume `file_storage` is mounted at `/app/storage` for `service` and `okf-worker`.
 
-Service env overrides in Compose include `DATABASE_URL` → `postgres` and `EMBEDDING_BASE_URL` → `http://embeddings:80/v1`.
+Service env overrides in Compose include `DATABASE_URL` → `postgres` and `EMBEDDING_BASE_URL` → `http://embeddings:80/v1` and `RERANK_BASE_URL` → `http://reranker:80`.
 
 ## Config `.env` variables
 
@@ -59,6 +60,7 @@ LLM_API_KEY=replace-with-a-random-secret
 EMBEDDING_MODEL=BAAI/bge-small-en-v1.5
 EMBEDDING_DIMENSIONS=384
 EMBEDDING_BATCH_SIZE=1
+RERANK_MODEL=cross-encoder/ms-marco-MiniLM-L6-v2
 ```
 
 Optional: `WEBCLIENT_PORT`, `JWT_SECRET_KEY` (Compose default exists for service).

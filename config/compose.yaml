@@ -60,6 +60,7 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-peka}:${POSTGRES_PASSWORD:-peka_dev_password}@postgres:5432/${POSTGRES_DB:-peka}
       EMBEDDING_BASE_URL: http://embeddings:80/v1
+      RERANK_BASE_URL: http://reranker:80
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-peka-dev-jwt-secret-change-for-production-32chars}
     depends_on:
       postgres:
@@ -97,6 +98,19 @@ services:
   embeddings:
     image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.9
     command: ["--model-id", "${EMBEDDING_MODEL:-BAAI/bge-small-en-v1.5}", "--max-client-batch-size", "1"]
+    volumes:
+      - embedding_models:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10m
+    restart: unless-stopped
+
+  reranker:
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.9
+    command: ["--model-id", "${RERANK_MODEL:-cross-encoder/ms-marco-MiniLM-L6-v2}"]
     volumes:
       - embedding_models:/data
     healthcheck:

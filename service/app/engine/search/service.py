@@ -1,5 +1,13 @@
+import logging
+
+import httpx
+
+from app.config import settings
+from app.engine.chunks.chunker import passage_text
 from app.engine.chunks.embeddings import EmbeddingError, embed_texts
 from app.engine.search.repository import search_repository
+
+logger = logging.getLogger(__name__)
 
 
 def embed_query(query: str) -> list[float]:
@@ -23,10 +31,41 @@ def access_levels_for_role(role: str) -> tuple[str, ...]:
     return ROLE_ACCESS_LEVELS.get(role, ("general",))
 
 
-def search_knowledge(query: str, user_role: str) -> list[dict]:
+def rerank(query: str, rows: list[dict]) -> list[dict]:
+    """Order rows by cross-encoder relevance, keeping the given order if the reranker fails."""
+    if len(rows) < 2:
+        return rows
+    try:
+        response = httpx.post(
+            f"{settings.rerank_base_url.rstrip('/')}/rerank",
+            json={
+                "query": query,
+                # Same shape the embedder sees: a query can name the document instead of the section.
+                "texts": [passage_text(row["stem"], row["heading"], row["content"]) for row in rows],
+                # The model reads 512 tokens per pair; TEI can reject longer pairs unless asked to cut.
+                "truncate": True,
+            },
+            timeout=10,
+        )
+        response.raise_for_status()
+        ranks = sorted(response.json(), key=lambda rank: rank["score"], reverse=True)
+        return [rows[rank["index"]] for rank in ranks]
+    except (httpx.HTTPError, httpx.InvalidURL, IndexError, KeyError, TypeError, ValueError) as error:
+        # Hybrid order is still a good answer: a reranker outage must not fail a chat turn.
+        logger.warning("Reranker failed, keeping hybrid search order: %r", error)
+        return rows
+
+
+def search_knowledge(query: str, user_role: str, top_k: int | None = None) -> list[dict]:
+    """Best permitted chunks for a query. Without top_k, returns the small set chat prompts use."""
+    limit = top_k or settings.rerank_top_k
     vector = embed_query(query)
+    # Candidates come from the access-filtered SQL, so the reranker only ever sees permitted rows.
     results = search_repository.search_chunks(
-        vector, access_levels_for_role(user_role), query_text=query
+        vector,
+        access_levels_for_role(user_role),
+        top_k=max(limit, settings.rerank_candidates),
+        query_text=query,
     )
     return [
         {
@@ -39,5 +78,5 @@ def search_knowledge(query: str, user_role: str) -> list[dict]:
             "source_locations": row["source_locations"],
             "score": float(row["score"]),
         }
-        for row in results
+        for row in rerank(query, results)[:limit]
     ]

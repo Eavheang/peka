@@ -15,14 +15,18 @@ POST /files  (auth + ACL)
         │
         ▼
 okf-worker (poll, SKIP LOCKED, max 3 attempts)
-  • load extracted JSON
-  • LLM convert → Open Knowledge Format markdown
-  • write storage/knowledge_base/<category>/<concept>.md
-  • rebuild category / root index.md trees
-  • chunk by # headings (max ~3000 chars, overlap)
+  • load extracted JSON (no text → job fails)
+  • chunk the original text by heading, page, slide; tables and sheets separately
   • embed batches via TEI
   • insert chunk_sets(building) + knowledge_chunks
   • swap: supersede old active set → activate new set
+  • mark job completed
+        │
+        ▼
+only if OKF_ENRICHMENT_ENABLED=true (background, best effort)
+  • LLM convert → Open Knowledge Format markdown
+  • write storage/knowledge_base/<category>/<concept>.md
+  • rebuild category / root index.md trees
 ```
 
 **Statuses** on a file (via job): `queued` → `processing` → `completed` | `failed`.
@@ -49,8 +53,8 @@ POST /chat  { query, conversation_id?, web_search? }
 Load owned conversation history (budget ~24k chars / last 20 turns)
         │
         ▼
-LLM structured SearchPlan
-  none | search_knowledge_base | web_search
+LLM structured SearchPlan, only on a follow-up or with web_search=true
+  (otherwise: search the knowledge base with the question as written)
         │
         ├─ KB → embed query → cosine on active chunks (floor + top_k + ACL)
         └─ Web → Exa /search (if key configured and web_search=true)

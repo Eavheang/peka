@@ -15,7 +15,9 @@ class Settings(BaseSettings):
     llm_model: str
     llm_max_tokens: int = 8192
     llm_max_concurrent_chats: int = Field(default=2, ge=1)
-    # OKF replies embed the whole converted document in one JSON string, so they need more room.
+    # Off by default: enrichment sends each whole document to the model that serves chat.
+    okf_enrichment_enabled: bool = False
+    # Enrichment replies embed the whole converted document in one JSON string, so they need more room.
     okf_max_tokens: int = 32768
     embedding_base_url: str = "http://localhost:8081/v1"
     embedding_model: str = "BAAI/bge-small-en-v1.5"
@@ -23,6 +25,9 @@ class Settings(BaseSettings):
     embedding_batch_size: int = 1
     search_top_k: int = 8
     search_similarity_floor: float = 0.3
+    rerank_base_url: str = "http://localhost:8082"
+    rerank_candidates: int = Field(default=20, ge=1, le=32)  # TEI rejects more than 32 texts per request.
+    rerank_top_k: int = 5
     exa_api_key: SecretStr | None = None
     exa_base_url: str = "https://api.exa.ai"
     web_search_top_k: int = 5

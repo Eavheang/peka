@@ -19,8 +19,10 @@ This page explains the system **as a story**: what happens from first login to a
         └────┬─────┘  └──────────┘  └────────────┘
              │                ▲             ▲
              └────────────────┴─────────────┘
-               shared storage: uploads + knowledge_base/
+               shared storage: uploads + extracted text
 ```
+
+The worker calls the LLM only when optional OKF enrichment is turned on.
 
 Nginx (in Docker) sits in front so the browser talks to one origin: UI at `/`, API at `/api/…`.
 
@@ -41,30 +43,25 @@ Imagine an admin uploads `Q3-launch-plan.pdf` as **general**.
 
 The Knowledge page keeps polling the file list every few seconds while status is `queued` or `processing`.
 
-### 2. OKF conversion (worker, asynchronous)
+### 2. Chunk + embed (worker, asynchronous, no LLM)
 
 The `okf-worker` process loops forever:
 
 1. Claim the next `queued` job (`FOR UPDATE … SKIP LOCKED`).
-2. Load the extraction JSON.
-3. Call the LLM with the **OKF v0.2 prompt** (`service/app/engine/okf/prompt.txt`).
-4. The model returns JSON: classification (category/type), one Markdown **concept** file, and retrieval section metadata.
-5. The worker writes `storage/knowledge_base/<category>/<concept>.md` and rebuilds category/root `index.md` files.
+2. Load the extraction JSON. A file with no text fails here.
+3. Chunk the **original text**: one chunk per heading, page, or slide, with tables and sheets as their own chunks. Each chunk fits the embedder's 512-token window; longer parts split into `Page 3`, `Page 3 (part 2)`, and so on.
+4. Each chunk’s embedding text looks like:  
+   `Document: <file name>\nSection: <heading>\n\n<content>`
+5. Send batches to the TEI embeddings server (`BAAI/bge-small-en-v1.5`, **384** dimensions).
+6. Insert a new `chunk_sets` row in `building`, store `knowledge_chunks`, then **atomically** mark the new set `active` and old ones `superseded`.
 
-OKF is not raw OCR dump: it is a **normalized knowledge article** (frontmatter + H1 sections) meant for retrieval, while preserving mandatory vs optional wording from the source.
+After this, search can find the document, and citations quote its source text with locators from the extractor. Status becomes **`completed`** (or **`failed`** after up to 3 attempts).
 
-### 3. Chunk + embed
+### 3. Optional OKF enrichment
 
-1. Split the concept Markdown by `#` headings (plus a Summary chunk from frontmatter).
-2. Long sections split at ~3000 characters with ~200 overlap.
-3. Each chunk’s embedding text looks like:  
-   `Document: <title>\nSection: <heading>\n\n<content>`
-4. Send batches to the TEI embeddings server (`BAAI/bge-small-en-v1.5`, **384** dimensions).
-5. Insert a new `chunk_sets` row in `building`, store `knowledge_chunks`, then **atomically** mark the new set `active` and old ones `superseded`.
+Off by default (`OKF_ENRICHMENT_ENABLED`). When on, and only after the file is searchable, a background thread asks the LLM for a normalized OKF article and writes it to `storage/knowledge_base/`. Search does not use it, and if it fails the file stays indexed.
 
-After this, vector search can find the document. Status becomes **`completed`** (or **`failed`** after up to 3 attempts).
-
-Details: [OKF & indexing](architecture/okf-and-indexing.md).
+Details: [Indexing & OKF](architecture/okf-and-indexing.md).
 
 ---
 
@@ -77,19 +74,21 @@ A staff user asks: *“What changed in our Q3 launch plan?”*
 - UI posts to `POST /chat/stream` (SSE) with `{ query, conversation_id?, web_search? }`.
 - It shows optimistic bubbles and updates text as events arrive.
 
-### 2. Retrieval plan (LLM #1 — router)
+### 2. Retrieval plan (only when it is needed)
 
-Before answering, the API asks the model for a **SearchPlan** only:
+A first question with web search off makes no planning call: the server searches the knowledge base with the question as written, so the answer is the only model call.
+
+For a follow-up, or whenever the user has web search on, the API first asks the model for a **SearchPlan**:
 
 | `tool` | Meaning |
 |--------|---------|
-| `none` | Small talk, math, no external evidence needed |
-| `search_knowledge_base` | Needs company/docs the user may access |
+| `search_knowledge_base` | Search the company/docs the user may access |
 | `web_search` | Public/current info — **only if** the user enabled web search |
+| `none` | Not honored: the knowledge base is still searched |
 
 The router may rewrite the question into a self-contained search `query` using conversation context (follow-ups like “what about the date?”).
 
-If the user disabled web search, a `web_search` plan is forced to `none`.
+If the user disabled web search, a `web_search` plan falls back to knowledge-base search.
 
 ### 3. Retrieval (server)
 
@@ -99,13 +98,13 @@ If the user disabled web search, a `web_search` plan is forced to `none`.
 2. Cosine similarity against **active** chunks: `1 - (embedding <=> query)`.
 3. Filter by role ACL (`staff` → `general` only; `senior`/`admin` → also `confidential`).
 4. Drop hits below `SEARCH_SIMILARITY_FLOOR` (default `0.3`).
-5. Keep top `SEARCH_TOP_K` (default `5`).
+5. Rerank the top `RERANK_CANDIDATES` (default `20`) with a local cross-encoder. Chat keeps `RERANK_TOP_K` (default `5`); `POST /search` keeps `SEARCH_TOP_K`. If the reranker fails, the hybrid order is kept.
 
 **Web path:** call Exa when configured; results become citation sources with URLs.
 
 Retrieved snippets are truncated for the prompt (content ~1200 chars) but full metadata remains available for citations.
 
-### 4. Answer (LLM #2 — Peka)
+### 4. Answer (Peka)
 
 The model receives:
 
@@ -147,7 +146,7 @@ Even if a confidential PDF sits in storage, its chunks never enter a **staff** u
 - Messages alternate `user` / `assistant`; assistant rows store `citations` JSON.
 - Listing uses cursor pagination (`updated_at`, `id`).
 - Deleting a conversation is owner-only.
-- History is truncated for the model (~24k characters / last ~20 turns) so context stays bounded.
+- History is truncated for the model (~24k characters / last ~20 turns) so context stays bounded. Rewriting a follow-up's search query uses only the last 4 messages.
 
 ---
 
@@ -168,9 +167,11 @@ Embeddings are **not** overridable from the admin UI — changing the embedding 
 | Situation | What users see |
 |-----------|----------------|
 | Indexing still running | File shows `queued` / `processing`; chat won’t find it yet |
-| OKF failed | `failed` + error; Retry OKF available |
+| Indexing failed, including a file with no text | `failed` + error; Retry OKF available |
 | No relevant chunks | Model answers generally or says it doesn’t know the company fact |
-| Web search off / no Exa key | Router cannot usefully choose web; falls back to none/KB |
+| Web search off | Knowledge base is searched instead |
+| Web search on, no Exa key | If the model picks web search, the turn fails with “Web search is not configured” |
+| Model's answer is not valid JSON | Repaired if possible; plain prose is shown without citations; otherwise an error with a Retry button (no automatic second generation) |
 | Token revoked (logout, password, role change) | API 401; UI refresh fails → sign-in |
 
 ---
@@ -181,5 +182,5 @@ Embeddings are **not** overridable from the admin UI — changing the embedding 
 2. [User guide](user-guide.md)  
 3. [What is PEKA?](what-is-peka.md) (product framing)  
 4. [Architecture overview](architecture/overview.md)  
-5. [OKF & indexing](architecture/okf-and-indexing.md) + [Chat & RAG](architecture/chat-and-rag.md)  
+5. [Indexing & OKF](architecture/okf-and-indexing.md) + [Chat & RAG](architecture/chat-and-rag.md)  
 6. [API reference](service/api-reference.md) when integrating or debugging HTTP  
