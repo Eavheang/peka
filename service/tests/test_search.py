@@ -89,6 +89,18 @@ def test_score_stays_cosine_similarity_after_reranking(search) -> None:
     assert [r["score"] for r in results] == pytest.approx([0.9 - i / 100 for i in (19, 18, 17, 16, 15)])
 
 
+def test_results_carry_the_rerank_score_for_the_evidence_check(search) -> None:
+    search()
+
+    assert [r["rerank_score"] for r in search_service.search_knowledge("query", "staff")] == [19, 18, 17, 16, 15]
+
+
+def test_rerank_score_is_none_when_the_reranker_is_down(search) -> None:
+    search(reranker=Reranker(error=httpx.ConnectError("down")))
+
+    assert {r["rerank_score"] for r in search_service.search_knowledge("query", "staff")} == {None}
+
+
 def test_search_route_can_still_return_ten_results(search) -> None:
     from app.auth.routes import authenticated
 

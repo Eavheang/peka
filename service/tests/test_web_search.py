@@ -114,6 +114,7 @@ def test_router_none_searches_knowledge_base_not_web(monkeypatch) -> None:
 
     monkeypatch.setattr(chat_service, "perform_web_search", no_web)
     monkeypatch.setattr(chat_service, "search_knowledge", lambda query, role: [])
+    monkeypatch.setattr(chat_service, "_needs_documents", lambda *args: False)
     monkeypatch.setattr(
         chat_service,
         "generate_structured",

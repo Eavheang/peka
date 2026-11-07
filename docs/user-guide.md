@@ -37,6 +37,11 @@ If your session expires, the client tries one token refresh; if that fails you r
 - Open a citation to preview source text (knowledge) or follow a web URL/excerpt.
 - Where a file id is available, download the original upload.
 
+### When PEKA does not answer
+
+- **Not enough evidence:** no passage in the documents you can access matches a question for a specific fact, so PEKA does not guess. Rephrase with the document's own terms, or upload a document that covers it.
+- **"This answer was cut off":** the answer reached the length limit. Ask for less, or for one part at a time.
+
 **Tips for better answers**
 
 - Prefer specific questions (“What is the October launch date in the Q3 plan?”).

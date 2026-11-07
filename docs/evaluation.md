@@ -46,7 +46,7 @@ Remaining problems:
 - **Q2 and Q23 are correct but uncited**, so nothing backs them. RAGAS faithfulness and recall would score them 0.
 - **Q60 declines correctly but still cites a document** (the handbook). The `abstained` metric requires no citations, so it would score 0 and the unanswerable set would read 7/8.
 - **Unrequested detail**: Q14 lists payment terms for four other suppliers, and Q29 hedges with "likely".
-- **`refused` is never `true`**, even on correct "I do not have information" replies.
+- **`refused` is never `true`**, even on correct "I do not have information" replies. The server has since started refusing when no passage matches; see [No-evidence refusal](final-report.md#no-evidence-refusal-101).
 - **Citations were not checked against the answers.** Correctness is judged on the answer text alone.
 
 ## Earlier runs
@@ -59,6 +59,7 @@ Per-question data for these runs is in git history (the `eval/results/` folder b
 | 2026-10-27, run A | 70 files, 519 chunks, built by a cloud model, answered locally | 74 (6 unanswerable) | `correct` 0.772, `doc_hit` 0.853, `heading_hit` 0.647 |
 | 2026-10-27, run B | 70 files, 372 chunks, built by the local model, answered locally | 74 | `correct` 0.544, `doc_hit` 0.676, `heading_hit` 0.147 |
 | 2026-11-07 | 70 files, 682 chunks of original text with no LLM, reranked, answered locally | 67 from set 2 (8 unanswerable), graded by reading each answer against its reference | 58 of 59 correct, 8 of 8 declined. Document in the top 5: 98.3%. Passage with the answer: 94.9% in the top 5, 88.1% first (49.2% first and 91.5% in the top 5 on the OKF-page index). Raw output: `eval/results-perf/2026-11-07-source-text/` |
+| 2026-11-07, final | Same, on the code with the prompt limits and refusal | Same 67 | 57 of 59 correct, 1 partly (Q29), 1 wrongly declined (Q31). 8 of 8 declined: 1 refused by the server (Q66), 7 in words. Raw output: `eval/results-perf/2026-11-07-final/` |
 
 What those runs found:
 
@@ -77,7 +78,7 @@ Ordered by expected gain. These runs predate source-text indexing, which now cov
 1. **Use a larger model for OKF conversion.** Conversion runs once per file, so a slower or paid model costs little and gave far better page structure (run A). Answering can stay local.
 2. **Keep metric tables as their own chunk and include the row labels with the numbers.** A chunk like "Metrics table, Rate Limits: baseline 47%, target 82%, owner Finance Group" matches "who owns rate limits" much better than a markdown table under a generic heading.
 3. **Make headings unique within a page.** Two sections with the same heading hid a delivery calendar.
-4. **Reject or retry answers with no citations,** and set `refused` when the answer says the information is not available.
+4. **Reject or retry answers with no citations,** and set `refused` when the answer says the information is not available. The server now refuses when no passage matches. A reply the model declines in words still has `refused: false`.
 5. **Deduplicate formats at upload or rank one format per topic,** so answers stop mixing conflicting figures from copies of the same report.
 6. **Cap chunk length below the embedding model's 512 tokens.** The chunker allows 3,000 characters.
 

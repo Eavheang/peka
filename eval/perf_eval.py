@@ -3,9 +3,10 @@
   recall   Recall@5 / @10 of POST /search over the question files (no LLM involved)
   latency  time to first token and total time of POST /chat/stream, one user at a time
   load     N concurrent chat users, without and then with documents being indexed
+  answers  each question on its own, keeping the reply, for grading by hand
 
-Env: PEKA_URL (default http://localhost:8000), PEKA_EMAIL, PEKA_PASSWORD.
-Output: results-perf/<step>.json
+Env: PEKA_URL (default http://localhost:8000), PEKA_EMAIL, PEKA_PASSWORD, RESULTS_DIR (default results-perf).
+Output: <RESULTS_DIR>/<step>.json
 """
 import json
 import os
@@ -20,7 +21,7 @@ from pathlib import Path
 from statistics import mean, median
 
 HERE = Path(__file__).parent
-OUT = HERE / "results-perf"
+OUT = HERE / os.environ.get("RESULTS_DIR", "results-perf")
 URL = os.environ.get("PEKA_URL", "http://localhost:8000")
 
 
@@ -78,6 +79,9 @@ def stream_chat(token, query):
                 elif ev["type"] == "done":
                     row["ok"] = True
                     row["citations"] = len(ev["response"].get("citations", []))
+                    row["cited"] = sorted({c["title"] for c in ev["response"].get("citations", [])})
+                    row["answer"] = ev["response"]["answer"]
+                    row["refused"] = ev["response"]["refused"]
                     try:
                         call("DELETE", f"/chat/conversations/{ev['response']['conversation_id']}", token=token)
                     except Exception:
@@ -136,6 +140,13 @@ def latency(n=20):
     stream_chat(token, "warm up: what does Mekong Harvest Foods do?")  # first request loads caches
     rows = [stream_chat(token, q["question"]) for q in qs[:n]]
     save("latency", {"questions": [q["id"] for q in qs[:n]], "summary": summarize_turns(rows), "rows": rows})
+
+
+def answers(name="question-2.json"):
+    token = login()
+    stream_chat(token, "warm up: what does Mekong Harvest Foods do?")
+    rows = [{**q, **stream_chat(token, q["question"])} for q in questions(name)]
+    save("answers", {"summary": summarize_turns(rows), "rows": rows})
 
 
 def fake_doc(i):
@@ -219,11 +230,11 @@ def ramp(*levels):
 
 
 def save(name, report):
-    OUT.mkdir(exist_ok=True)
+    OUT.mkdir(parents=True, exist_ok=True)
     (OUT / f"{name}.json").write_text(json.dumps(report, indent=2))
-    print(json.dumps(report if name != "latency" else report["summary"], indent=2))
+    print(json.dumps(report["summary"] if "summary" in report else report, indent=2))
 
 
 if __name__ == "__main__":
     step, args = sys.argv[1], [int(a) if a.isdigit() else a for a in sys.argv[2:]]
-    {"recall": recall, "latency": latency, "load": load, "ramp": ramp}[step](*args)
+    {"recall": recall, "latency": latency, "load": load, "ramp": ramp, "answers": answers}[step](*args)
