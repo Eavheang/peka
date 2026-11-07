@@ -132,7 +132,7 @@ The 6 GB GPU already holds about 3.7 GB for the model at the current context, so
 4. **Keep indexing off the chat model**: a hosted or larger model for OKF conversion (also recommended in the answer-quality findings) or indexing outside working hours.
 5. **Re-run Objective 3 on real documents.** The generated corpus shows retrieval holds at 220 documents, but a real set of 200+ independent reports with independently written questions is the proper proof.
 
-None of these were tried.
+None of these were tried for this report. Items 1 and 2 have since been added (issue #95), so the concurrency figures above describe the system before that change. Two later chat-only runs, with one question per user and no indexing, answered every question: 3 of 3 users (slowest 22 to 25 s), 4 of 4 (31 to 35 s) and 10 of 10 (82 to 89 s), with no `Context size has been exceeded` errors. One repeat of the load tests above gave: 1 user 3 of 3 chat only and 3 of 3 while indexing; 2 users 6 of 6 chat only and **0 of 6** while indexing; 10 users 20 of 20 chat only (slowest 134 s) and **4 of 20** while indexing. So the queue fixes chat alone, but chat while indexing still fails above 1 user, because the OKF worker is outside the queue. All 22 delayed retries in those indexing runs failed too.
 
 ## Limitations
 

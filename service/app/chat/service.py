@@ -4,7 +4,9 @@ import binascii
 import json
 import logging
 import re
+import threading
 from collections.abc import AsyncIterator
+from contextlib import aclosing
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal
@@ -17,6 +19,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from app.audit.service import record_audit_event
 from app.chat.repository import chat_repository
 from app.chat.schemas import ChatMessage, ChatResponse, Citation, SourcePreviewRequest
+from app.config import settings
 from app.engine.ai_runtime import (
     AIModelError,
     first_error_line,
@@ -30,6 +33,13 @@ from app.engine.web_search.service import web_search as perform_web_search
 from app.workspace_settings import provider_config
 
 logger = logging.getLogger(__name__)
+
+# Turns being answered at once, so the shared llama.cpp context does not overflow. Held for the
+# whole turn so /chat/stream waiters use no worker thread. threading, not asyncio: POST /chat
+# waits on a worker thread and /chat/stream on the event loop.
+# ponytail: per process and not first-come-first-served. The OKF worker is not counted (#95), and
+# a call already in a worker thread outlives Stop, so a third call can briefly overlap.
+_chat_slots = threading.BoundedSemaphore(settings.llm_max_concurrent_chats)
 
 _SYSTEM_PROMPT = (
     "You are Peka, a helpful assistant. Answer general questions, arithmetic, and casual "
@@ -503,27 +513,28 @@ def answer_from_knowledge(
     web_search: bool = False,
     timezone: str | None = None,
 ) -> ChatResponse:
-    search_plan = _search_plan(query, history, web_search, timezone)
-    sources = {}
-    messages = _conversation_messages(query, history, _SYSTEM_PROMPT, timezone)
+    with _chat_slots:
+        search_plan = _search_plan(query, history, web_search, timezone)
+        sources = {}
+        messages = _conversation_messages(query, history, _SYSTEM_PROMPT, timezone)
 
-    if search_plan.tool != "none":
-        if search_plan.query is None:
-            raise AIModelError("Model returned an invalid retrieval plan")
-        results = (
-            perform_web_search(search_plan.query)
-            if search_plan.tool == "web_search"
-            else search_knowledge(search_plan.query, user_role)
-        )
-        sources = {
-            f"source-{index}": result
-            for index, result in enumerate(results, 1)
-        }
-        messages.append(
-            ai.user_message(_source_context(search_plan.tool, search_plan.query, sources))
-        )
+        if search_plan.tool != "none":
+            if search_plan.query is None:
+                raise AIModelError("Model returned an invalid retrieval plan")
+            results = (
+                perform_web_search(search_plan.query)
+                if search_plan.tool == "web_search"
+                else search_knowledge(search_plan.query, user_role)
+            )
+            sources = {
+                f"source-{index}": result
+                for index, result in enumerate(results, 1)
+            }
+            messages.append(
+                ai.user_message(_source_context(search_plan.tool, search_plan.query, sources))
+            )
 
-    answer = _generate_valid_answer(messages, sources)
+        answer = _generate_valid_answer(messages, sources)
 
     # Preserve the existing persisted answer format so old and new chats render identically.
     return _response_from_model_answer(answer, sources)
@@ -535,6 +546,27 @@ async def stream_answer_from_knowledge(
     history: list[dict] | None = None,
     web_search: bool = False,
     timezone: str | None = None,
+) -> AsyncIterator[ChatStreamEvent]:
+    """Wait for a free model slot, then stream one answer."""
+    if not _chat_slots.acquire(blocking=False):
+        yield ChatStreamStatus("Waiting for other answers to finish...")
+        while not _chat_slots.acquire(blocking=False):
+            await asyncio.sleep(0.2)
+    try:
+        # aclosing: Stop must end the streaming model call before the slot is released.
+        async with aclosing(_stream_answer(query, user_role, history, web_search, timezone)) as events:
+            async for event in events:
+                yield event
+    finally:
+        _chat_slots.release()
+
+
+async def _stream_answer(
+    query: str,
+    user_role: str,
+    history: list[dict] | None,
+    web_search: bool,
+    timezone: str | None,
 ) -> AsyncIterator[ChatStreamEvent]:
     """Generate and stream one answer while validating its final metadata."""
     yield ChatStreamStatus("Thinking...")
@@ -568,11 +600,12 @@ async def stream_answer_from_knowledge(
     yield ChatStreamStatus("Writing response...")
     raw_output: list[str] = []
     parser = _JsonTextStreamParser(sources)
-    async for chunk in stream_structured_text(messages, ModelAnswer):
-        raw_output.append(chunk)
-        delta = parser.feed(chunk)
-        if delta:
-            yield ChatStreamText(delta)
+    async with aclosing(stream_structured_text(messages, ModelAnswer)) as chunks:
+        async for chunk in chunks:
+            raw_output.append(chunk)
+            delta = parser.feed(chunk)
+            if delta:
+                yield ChatStreamText(delta)
 
     try:
         answer = _normalize_model_answer(

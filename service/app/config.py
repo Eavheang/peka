@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from pydantic import SecretStr, field_validator, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     llm_api_key: SecretStr
     llm_model: str
     llm_max_tokens: int = 8192
+    llm_max_concurrent_chats: int = Field(default=2, ge=1)
     # OKF replies embed the whole converted document in one JSON string, so they need more room.
     okf_max_tokens: int = 32768
     embedding_base_url: str = "http://localhost:8081/v1"

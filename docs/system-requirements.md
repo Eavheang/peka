@@ -72,14 +72,14 @@ If the machine has no 6 GB NVIDIA GPU, skip steps 1 and `make llm` and point `LL
 | Question | Answer |
 |----------|--------|
 | How fast is an answer? | The first words appear after about **8 s** (12 s at the slowest 5%), and the full answer after about 9 s. |
-| How many people can ask at once? | **2** at the same moment. A third at the same time gets an error. |
+| How many people can ask at once? | **2** are answered at the same moment. Anyone else waits for a free slot, then gets an answer. |
 | Can people chat while documents are indexing? | **1** person. With 2 people, most questions failed during indexing. |
 | How accurate is retrieval? | The right document is in the top 5 results for **99%** of questions over 220 documents. |
 | How accurate are answers? | 59 of 59 answerable questions in the latest hand-graded set were correct. Declining unanswerable questions worked 8 of 8. |
 | How long does indexing take? | About 1 minute per small file, one file at a time. |
-| Can it serve 10 people at once? | **No.** With 10 simultaneous questions only 2 of 20 were answered. |
+| Can it serve 10 people at once? | **Not in parallel.** They take turns: in two runs of 10 simultaneous questions, all 10 were answered and the last finished after 82 to 89 s. Before the queue was added, only 2 of 20 questions were answered with 10 users asking 2 questions each. |
 
-"At the same moment" means questions being answered at the same time. People who only ask now and then share the capacity, so a team of a few occasional users works, while 10 people asking together does not. The reason and the options for raising the limit are in the [final report](final-report.md#how-many-users-does-this-system-serve).
+"At the same moment" means questions being answered at the same time. People who only ask now and then share the capacity, so a team of a few occasional users rarely waits, while 10 people asking together wait in turn. Indexing is not part of the queue, so chats can still fail while documents are indexing. The reason and the options for raising the limit are in the [final report](final-report.md#how-many-users-does-this-system-serve). `LLM_MAX_CONCURRENT_CHATS` sets the limit for a larger context or a hosted model.
 
 Good habits on this hardware:
 

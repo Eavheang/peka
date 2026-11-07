@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 StructuredOutput = TypeVar("StructuredOutput", bound=BaseModel)
 _JSON_CODE_FENCE = re.compile(r"```(?:json)?\s*(.*?)\s*```", re.IGNORECASE | re.DOTALL)
 _MAX_STRUCTURED_ATTEMPTS = 2
+_CONTEXT_FULL_RETRY_SECONDS = 10.0  # about one answer on the minimum hardware
 
 
 class AIModelError(RuntimeError):
@@ -129,6 +130,13 @@ def parse_structured_output(
             raise error from None
 
 
+async def _log_and_back_off(error: ai.AIError) -> None:
+    logger.warning("AI provider request failed, retrying", exc_info=True)
+    # llama.cpp: "Context size has been exceeded". An immediate retry would overflow again.
+    if "context size" in str(error).lower():
+        await asyncio.sleep(_CONTEXT_FULL_RETRY_SECONDS)
+
+
 async def _run_structured_stream(
     model: ai.Model,
     messages: list[ai.messages.Message],
@@ -183,11 +191,11 @@ async def _generate_structured(
                     raise AIModelError(
                         "Model returned an invalid structured response"
                     ) from error
-            except ai.AIError:
+            except ai.AIError as error:
                 # Providers (free tiers especially) sometimes abort a call; retry once.
                 if attempt == _MAX_STRUCTURED_ATTEMPTS - 1:
                     raise
-                logger.warning("AI provider request failed, retrying", exc_info=True)
+                await _log_and_back_off(error)
     except AIModelError:
         raise
     except ai.AIError as error:
@@ -227,12 +235,12 @@ async def stream_structured_text(
                             emitted = True
                             yield event.chunk
                 return
-            except ai.AIError:
+            except ai.AIError as error:
                 # Retry a provider failure once, but only if nothing was streamed yet: after
                 # that a retry would repeat text the caller has already shown.
                 if emitted or attempt == _MAX_STRUCTURED_ATTEMPTS - 1:
                     raise
-                logger.warning("AI provider request failed, retrying", exc_info=True)
+                await _log_and_back_off(error)
     except AIModelError:
         raise
     except ai.AIError as error:
