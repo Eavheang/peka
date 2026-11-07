@@ -1,5 +1,8 @@
 import asyncio
 import json
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
 from fastapi.testclient import TestClient
 from datetime import datetime, timezone
 from uuid import uuid4
@@ -23,6 +26,101 @@ def _empty_knowledge_base(monkeypatch) -> None:
 
 def _override_admin() -> None:
     app.dependency_overrides[authenticated] = lambda: {"id": "u1", "role": "admin"}
+
+
+ANSWER_JSON = '{"blocks":[{"kind":"general","text":"Answer","source_ids":[]}]}'
+WAITING = chat_service.ChatStreamStatus("Waiting for other answers to finish...")
+
+
+@pytest.fixture
+def two_slots(monkeypatch) -> threading.BoundedSemaphore:
+    slots = threading.BoundedSemaphore(2)
+    monkeypatch.setattr(chat_service, "_chat_slots", slots)
+    monkeypatch.setattr(
+        chat_service, "generate_structured", lambda messages, output_type: _search_plan()
+    )
+    return slots
+
+
+def test_third_simultaneous_chat_waits_then_answers(monkeypatch, two_slots) -> None:
+    running = peak = 0
+
+    async def stream_text(messages, output_type):
+        nonlocal running, peak
+        running += 1
+        peak = max(peak, running)
+        await asyncio.sleep(0.2)
+        running -= 1
+        yield ANSWER_JSON
+
+    monkeypatch.setattr(chat_service, "stream_structured_text", stream_text)
+
+    async def chat():
+        return [event async for event in chat_service.stream_answer_from_knowledge("q", "staff")]
+
+    async def three_chats():
+        return await asyncio.gather(chat(), chat(), chat())
+
+    results = asyncio.run(three_chats())
+
+    assert peak == 2
+    assert [events[-1].response.answer for events in results] == ["Answer"] * 3
+    assert sum(WAITING in events for events in results) == 1
+
+
+def test_non_streaming_chats_share_the_same_slots(monkeypatch, two_slots) -> None:
+    lock = threading.Lock()
+    running = peak = 0
+
+    def generate(messages, output_type):
+        nonlocal running, peak
+        with lock:
+            running += 1
+            peak = max(peak, running)
+        time.sleep(0.1)
+        with lock:
+            running -= 1
+        if output_type is chat_service.SearchPlan:
+            return _search_plan()
+        return chat_service.ModelAnswer.model_validate_json(ANSWER_JSON)
+
+    monkeypatch.setattr(chat_service, "generate_structured", generate)
+
+    with ThreadPoolExecutor(3) as pool:
+        answers = list(pool.map(lambda _: chat_service.answer_from_knowledge("q", "staff"), range(3)))
+
+    assert peak == 2
+    assert [answer.answer for answer in answers] == ["Answer"] * 3
+
+
+def test_stopping_a_chat_frees_its_slot_and_cancels_its_model_call(monkeypatch, two_slots) -> None:
+    closed = []
+
+    async def stream_text(messages, output_type):
+        try:
+            yield '{"blocks":[{"kind":"general","text":"Ans'
+            await asyncio.sleep(60)
+        finally:
+            closed.append(two_slots._value)
+
+    monkeypatch.setattr(chat_service, "stream_structured_text", stream_text)
+
+    async def stop_chats():
+        answering = chat_service.stream_answer_from_knowledge("q", "staff")
+        holding = chat_service.stream_answer_from_knowledge("q", "staff")
+        waiting = chat_service.stream_answer_from_knowledge("q", "staff")
+        while not isinstance(await anext(answering), chat_service.ChatStreamText):
+            pass
+        await anext(holding)
+        assert await anext(waiting) == WAITING
+        await waiting.aclose()
+        await holding.aclose()
+        await answering.aclose()
+
+    asyncio.run(stop_chats())
+
+    assert closed == [1], "the model call must end before its slot is released"
+    assert two_slots._value == 2
 
 
 def test_router_none_still_searches_knowledge_base(monkeypatch) -> None:

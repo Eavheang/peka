@@ -7,6 +7,7 @@ import pytest
 from pydantic import ValidationError
 
 from app.chat.service import ModelAnswer
+from app.engine import ai_runtime
 from app.engine.ai_runtime import (
     AIModelError,
     _repair_json_strings,
@@ -88,7 +89,9 @@ def _fake_model() -> "ai.testing.FakeModel":
     return ai.testing.FakeModel([ai.user_message("question"), ai.assistant_message(ANSWER)])
 
 
-def _flaky_stream(monkeypatch, plan: list[str]) -> list[str]:
+def _flaky_stream(
+    monkeypatch, plan: list[str], message: str = "The operation was aborted"
+) -> list[str]:
     """Make ai.stream fail as planned per call: "ok", "fail" (on entry) or "fail_after_text"."""
     real_stream, calls = ai.stream, []
 
@@ -98,7 +101,7 @@ def _flaky_stream(monkeypatch, plan: list[str]) -> list[str]:
 
         async def __aenter__(self):
             if self.mode == "fail":
-                raise ai.errors.ProviderAPIError("The operation was aborted")
+                raise ai.errors.ProviderAPIError(message)
             self.stream = await self.inner.__aenter__()
             return self
 
@@ -112,7 +115,7 @@ def _flaky_stream(monkeypatch, plan: list[str]) -> list[str]:
             async for event in self.stream:
                 yield event
                 if self.mode == "fail_after_text" and isinstance(event, ai.events.TextDelta):
-                    raise ai.errors.ProviderAPIError("The operation was aborted")
+                    raise ai.errors.ProviderAPIError(message)
 
     def fake(*args, **kwargs):
         mode = plan[len(calls)] if len(calls) < len(plan) else "ok"
@@ -165,6 +168,34 @@ def test_generate_structured_retries_a_provider_failure(monkeypatch) -> None:
 
     assert result.blocks[0].text == "Answer"
     assert calls == ["fail", "ok"]
+
+
+@pytest.mark.parametrize(
+    "message, waits",
+    [("Context size has been exceeded.", True), ("The operation was aborted", False)],
+)
+@pytest.mark.parametrize(
+    "call",
+    [
+        lambda: _collect_stream(_fake_model()),
+        lambda: generate_structured([ai.user_message("question")], ModelAnswer, model=_fake_model()),
+    ],
+    ids=["stream", "generate"],
+)
+def test_only_a_context_overflow_delays_the_retry(monkeypatch, call, message, waits) -> None:
+    calls = _flaky_stream(monkeypatch, ["fail", "ok"], message)
+    real_sleep, delays = asyncio.sleep, []
+
+    async def sleep(delay, *args):
+        delays.append(delay)
+        await real_sleep(0)
+
+    monkeypatch.setattr(asyncio, "sleep", sleep)
+
+    call()
+
+    assert calls == ["fail", "ok"]
+    assert (ai_runtime._CONTEXT_FULL_RETRY_SECONDS in delays) is waits
 
 
 QUOTED = 'Systems moved toward "agentic" workflows and use "reranking" to sort.'
