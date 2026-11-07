@@ -13,7 +13,8 @@ class Settings(BaseSettings):
     llm_base_url: str
     llm_api_key: SecretStr
     llm_model: str
-    llm_max_tokens: int = 8192
+    # Longest answer. Generated tokens share the context with every other turn, see _HISTORY_MAX_CHARS.
+    llm_max_tokens: int = 2048
     llm_max_concurrent_chats: int = Field(default=2, ge=1)
     # Off by default: enrichment sends each whole document to the model that serves chat.
     okf_enrichment_enabled: bool = False
@@ -28,6 +29,8 @@ class Settings(BaseSettings):
     rerank_base_url: str = "http://localhost:8082"
     rerank_candidates: int = Field(default=20, ge=1, le=32)  # TEI rejects more than 32 texts per request.
     rerank_top_k: int = 5
+    # Below this top rerank score the documents do not cover the question. Depends on the rerank model; 0 turns it off.
+    search_evidence_floor: float = 0.1
     exa_api_key: SecretStr | None = None
     exa_base_url: str = "https://api.exa.ai"
     web_search_top_k: int = 5

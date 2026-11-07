@@ -24,10 +24,15 @@ def _no_generation(*args, **kwargs):
     pytest.fail("This turn must not make a one-shot model call")
 
 
+_real_needs_documents = chat_service._needs_documents
+
+
 @pytest.fixture(autouse=True)
 def _empty_knowledge_base(monkeypatch) -> None:
     # Chat always searches; tests that need results patch search_knowledge again.
     monkeypatch.setattr(chat_service, "search_knowledge", lambda query, role: [])
+    # With no evidence the question counts as general unless a test says otherwise.
+    monkeypatch.setattr(chat_service, "_needs_documents", lambda *args: False)
 
 
 def _override_admin() -> None:
@@ -1128,7 +1133,7 @@ def test_stream_fails_clearly_on_broken_json_without_regenerating(monkeypatch, t
 
     async def stream_text(messages, output_type):
         calls.append(output_type)
-        yield '{"blocks":[{"kind":"general","text":"cut off'
+        yield '{"blocks":[{"kind":"gen'
 
     monkeypatch.setattr(chat_service, "stream_structured_text", stream_text)
     monkeypatch.setattr(chat_service, "generate_structured", _no_generation)
@@ -1371,3 +1376,143 @@ def test_stop_in_a_new_conversation_saves_under_the_client_chosen_id(monkeypatch
     recorder.stop_after(1)
 
     assert recorder.new_conversation_ids == [new_id]
+
+
+def test_history_and_question_share_one_character_budget() -> None:
+    history = [{"role": "user", "content": "x" * 1000}] * 20
+    query = "q" * 1500
+
+    messages = chat_service._conversation_messages(query, history, "system")
+
+    assert sum(len(message.text) for message in messages[1:]) == chat_service._HISTORY_MAX_CHARS
+    assert messages[-1].text == query
+
+
+def test_message_that_overflows_the_budget_is_cut_not_dropped() -> None:
+    history = [
+        {"role": "user", "content": "Write the report."},
+        {"role": "assistant", "content": "r" * 50_000},
+    ]
+
+    messages = chat_service._conversation_messages("Shorten it.", history, "system")
+
+    assert [message.text[0] for message in messages[1:]] == ["r", "S"]
+    assert len(messages[1].text) == chat_service._HISTORY_MAX_CHARS - len("Shorten it.")
+
+
+def test_stream_keeps_the_shown_text_when_the_reply_is_cut_off(monkeypatch) -> None:
+    results = [{"title": "report.pdf", "heading": "Sales", "snippet": "Sales rose.", "source_locations": []}]
+    monkeypatch.setattr(chat_service, "search_knowledge", lambda *args: results)
+
+    events = _stream_events(monkeypatch, [
+        '{"blocks":[{"kind":"grounded","text":"Sales rose.","source_ids":["source-1"]},',
+        '{"kind":"general","text":"And then',
+    ])
+    completed = next(e for e in events if isinstance(e, chat_service.ChatStreamCompleted))
+
+    assert completed.response.answer.startswith("Sales rose. [1]\n\nAnd then")
+    assert "cut off" in completed.response.answer
+    assert _visible_text(events) == completed.response.answer
+    assert [citation.title for citation in completed.response.citations] == ["report.pdf"]
+    assert completed.response.refused is False
+
+
+_WEAK_EVIDENCE = [{
+    "title": "secret.pdf", "heading": "Pay", "snippet": "Salaries.", "source_locations": [], "rerank_score": 0.01,
+}]
+
+
+@pytest.mark.parametrize("path", ["plain", "stream"])
+@pytest.mark.parametrize("results", [[], _WEAK_EVIDENCE], ids=["empty", "weak"])
+def test_document_question_without_evidence_is_refused_without_an_answer_call(monkeypatch, path, results) -> None:
+    monkeypatch.setattr(chat_service, "search_knowledge", lambda *args: results)
+    monkeypatch.setattr(chat_service, "_needs_documents", lambda *args: True)
+    monkeypatch.setattr(chat_service, "generate_structured", _no_generation)
+    monkeypatch.setattr(chat_service, "stream_structured_text", _no_generation)
+
+    response = _ask(path, "What is the CEO's home address?")
+
+    assert response.refused is True
+    assert response.answer == chat_service._NO_EVIDENCE_ANSWER
+    assert response.citations == []
+
+
+def test_stream_shows_the_refusal_text(monkeypatch) -> None:
+    monkeypatch.setattr(chat_service, "_needs_documents", lambda *args: True)
+
+    events = _stream_events(monkeypatch, [])
+
+    assert _visible_text(events) == chat_service._NO_EVIDENCE_ANSWER
+
+
+@pytest.mark.parametrize("path", ["plain", "stream"])
+def test_other_question_without_evidence_still_reaches_the_model(monkeypatch, path) -> None:
+    async def stream_text(messages, output_type):
+        yield ANSWER_JSON
+
+    monkeypatch.setattr(chat_service, "search_knowledge", lambda *args: _WEAK_EVIDENCE)
+    monkeypatch.setattr(
+        chat_service,
+        "generate_structured",
+        lambda messages, output_type: chat_service.ModelAnswer(
+            blocks=[{"kind": "general", "text": "Answer", "source_ids": []}]
+        ),
+    )
+    monkeypatch.setattr(chat_service, "stream_structured_text", stream_text)
+
+    response = _ask(path, "Summarize the documents")
+
+    assert response.answer == "Answer" and response.refused is False
+
+
+@pytest.mark.parametrize("score", [0.9, None], ids=["strong", "reranker down"])
+def test_usable_evidence_reaches_the_model_without_the_classifier(monkeypatch, score) -> None:
+    prompts = []
+
+    def generate(messages, output_type):
+        prompts.append(messages[-1].text)
+        return chat_service.ModelAnswer(blocks=[{"kind": "general", "text": "Answer", "source_ids": []}])
+
+    results = [{**_WEAK_EVIDENCE[0], "rerank_score": score}]
+    monkeypatch.setattr(chat_service, "search_knowledge", lambda *args: results)
+    monkeypatch.setattr(chat_service, "_needs_documents", _no_generation)
+    monkeypatch.setattr(chat_service, "generate_structured", generate)
+
+    assert chat_service.answer_from_knowledge("Who is paid what?", "staff").refused is False
+    assert "secret.pdf" in prompts[-1] and "rerank_score" not in prompts[-1]
+
+
+def test_web_search_results_are_not_gated(monkeypatch) -> None:
+    def generate(messages, output_type):
+        if output_type is chat_service.SearchPlan:
+            return _search_plan("web_search", "latest news")
+        return chat_service.ModelAnswer(blocks=[{"kind": "general", "text": "Answer", "source_ids": []}])
+
+    monkeypatch.setattr(chat_service, "generate_structured", generate)
+    monkeypatch.setattr(chat_service, "perform_web_search", lambda query: [])
+    monkeypatch.setattr(chat_service, "_needs_documents", _no_generation)
+
+    assert chat_service.answer_from_knowledge("Any news?", "staff", web_search=True).refused is False
+
+
+def test_needs_documents_reads_the_classifier_with_recent_history(monkeypatch) -> None:
+    seen = []
+
+    def generate(messages, output_type):
+        seen.append(messages)
+        return output_type(scope="organization_fact")
+
+    monkeypatch.setattr(chat_service, "generate_structured", generate)
+    history = [{"role": "user", "content": str(index)} for index in range(10)]
+
+    assert _real_needs_documents("And its risks?", history, None) is True
+    assert [message.text for message in seen[0][1:]] == ["6", "7", "8", "9", "And its risks?"]
+
+
+def test_needs_documents_answers_normally_when_the_classifier_fails(monkeypatch) -> None:
+    def fail(messages, output_type):
+        raise chat_service.AIModelError("down")
+
+    monkeypatch.setattr(chat_service, "generate_structured", fail)
+
+    assert _real_needs_documents("hello", None, None) is False

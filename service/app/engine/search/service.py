@@ -49,7 +49,7 @@ def rerank(query: str, rows: list[dict]) -> list[dict]:
         )
         response.raise_for_status()
         ranks = sorted(response.json(), key=lambda rank: rank["score"], reverse=True)
-        return [rows[rank["index"]] for rank in ranks]
+        return [{**rows[rank["index"]], "rerank_score": rank["score"]} for rank in ranks]
     except (httpx.HTTPError, httpx.InvalidURL, IndexError, KeyError, TypeError, ValueError) as error:
         # Hybrid order is still a good answer: a reranker outage must not fail a chat turn.
         logger.warning("Reranker failed, keeping hybrid search order: %r", error)
@@ -77,6 +77,8 @@ def search_knowledge(query: str, user_role: str, top_k: int | None = None) -> li
             "content": row["content"],
             "source_locations": row["source_locations"],
             "score": float(row["score"]),
+            # None when the reranker did not run, which says nothing about the evidence.
+            "rerank_score": row.get("rerank_score"),
         }
         for row in rerank(query, results)[:limit]
     ]

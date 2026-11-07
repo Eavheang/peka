@@ -20,6 +20,12 @@ User query (+ history)
           │
           ▼
 ┌───────────────────┐
+│ Evidence check    │  no or weak hits: one short call asks whether this needs a
+│ (only if weak)    │  specific organization fact; if so, refuse without answering
+└─────────┬─────────┘
+          │
+          ▼
+┌───────────────────┐
 │ Answer model      │  structured ModelAnswer blocks
 │ "Peka"            │  general | grounded
 └─────────┬─────────┘
@@ -97,7 +103,22 @@ For each grounded block, the server:
 2. Appends `[1]`, `[2]`, … to the block text  
 3. Builds the `citations` array for the API/UI  
 
-`refused` exists on the schema/persistence path; normal successful answers set it `false` in the main assembly path—product copy still emphasizes “say you don’t know” via the system prompt rather than a separate refusal tool.
+An answer block that claims a source ID from outside this turn loses it and becomes a general block, so a citation always points at retrieved text.
+
+### No-evidence refusal
+
+After a knowledge-base search, the evidence is weak when there are no results or the top rerank score is below `SEARCH_EVIDENCE_FLOOR` (default `0.1`). One short model call then classifies the question:
+
+- **A specific fact only the organization's records could hold** (a name, number, date, rule): the server returns a fixed answer with `refused: true` and no citations, and the answer model is not called. The text is the same whether the document is missing or the user may not read it. The UI labels it "Not enough evidence".
+- **Anything else** (greetings, arithmetic, public knowledge, broad "summarize the documents" requests): the turn goes on to the answer model as usual.
+
+Web search, and a search with no rerank score because the reranker is down, skip this check. If the classifier call fails, the turn is answered normally.
+
+The score only shows that no passage matches the question. When a passage matches but does not contain the fact (the score is high and the fact is missing), the answer model declines in words and `refused` stays `false`.
+
+### Prompt size
+
+llama.cpp shares one context between the turns it is answering: 16,384 tokens / `LLM_MAX_CONCURRENT_CHATS` (2) = 8,192 tokens per turn, or the two turns can fail with `Context size has been exceeded`. Generated tokens count too. That budget holds a system prompt of about 380 tokens, sources of at most about 3,650, an answer of at most `LLM_MAX_TOKENS` (2,048), and a history plus question of at most 5,000 characters (`_HISTORY_MAX_CHARS`). Newer messages are kept first, and the oldest one that still fits is cut. Raise one of these only with a larger context or fewer concurrent chats.
 
 ## Streaming protocol
 
@@ -137,7 +158,8 @@ The web client (`services/chat.ts`) parses `data:` lines and updates the UI; on 
 | `SEARCH_TOP_K` / `SEARCH_SIMILARITY_FLOOR` | Recall vs precision |
 | Extraction / `MAX_CHUNK_TOKENS` | Structure and size of indexed source chunks |
 | `RERANK_CANDIDATES` / `RERANK_TOP_K` | Reranker CPU time; sources sent to the chat model |
-| `LLM_MAX_TOKENS` / model context | Answer length and plan quality |
+| `SEARCH_EVIDENCE_FLOOR` | Top rerank score below which a question for a specific fact is refused; `0` turns it off. Calibrated for the default rerank model |
+| `LLM_MAX_TOKENS` / model context | Longest answer; see [Prompt size](#prompt-size) |
 | Exa key + UI toggle | Whether public web grounding is possible |
 | File ACL | Hard filter on what can ever be retrieved |
 
@@ -145,9 +167,10 @@ The web client (`services/chat.ts`) parses `data:` lines and updates the UI; on 
 
 - Invalid retrieval plan → search with the question as written  
 - Embed failure on `/search` → HTTP 503  
-- Empty search results → answer with general blocks only / admit unknown company facts  
+- Empty or weak search results → [refuse a question for a specific fact](#no-evidence-refusal); answer anything else with general blocks  
 - Invalid answer JSON → no second generation, so a busy model is not held longer:  
   1. Repair it in place (markdown fence, surrounding text, unescaped quotes or line breaks)  
   2. `/chat/stream` only: if the model wrote plain prose, show that without citations  
-  3. Otherwise fail: `/chat/stream` sends an `error` event, the UI keeps the partial text and offers Retry, and nothing is saved; `POST /chat` returns HTTP 503  
+  3. `/chat/stream` only: if answer text was already shown, usually because the reply hit `LLM_MAX_TOKENS`, keep it with a "cut off" note and the citations finished so far  
+  4. Otherwise fail: `/chat/stream` sends an `error` event, the UI offers Retry, and nothing is saved; `POST /chat` returns HTTP 503  
 - Provider misconfiguration → admin test endpoints + chat errors surfacing as stream `error`

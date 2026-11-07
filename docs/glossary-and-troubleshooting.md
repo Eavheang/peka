@@ -10,6 +10,7 @@
 | **Retrieval router** | LLM call before the answer, only on a follow-up or with web search on; rewrites the search query and can choose web search |
 | **Grounded block** | Answer segment that cites current-turn source IDs |
 | **General block** | Answer segment from model knowledge with no citations |
+| **Refusal** | Fixed "not enough evidence" reply (`refused: true`) when no passage matches a question for a specific organization fact; no answer is generated |
 | **RAG** | Retrieval-augmented generation — chat grounded on search results |
 | **TEI** | Hugging Face Text Embeddings Inference server |
 | **ACL / access_level** | `general` vs `confidential` document visibility by role |
@@ -25,6 +26,10 @@
 | Uploads stuck in `queued` | Is `okf-worker` running? Embeddings healthy? Check job `last_error` / file okf-status |
 | `failed` jobs | `No text to index` means extraction found no text, such as a scanned PDF. Otherwise check embeddings, then `POST /files/{id}/retry-okf`; max 3 attempts |
 | Empty / weak search | Embeddings healthy? Migration `012` applied (384-d)? Similarity floor too high? |
+| "Not enough evidence" on a question the documents answer | Is the file `completed`, and can this role see it? Rephrase with the document's own terms, or lower `SEARCH_EVIDENCE_FLOOR` (`0` turns the check off) |
+| Answer ends with "cut off" | It reached `LLM_MAX_TOKENS` (default 2048). Ask for less, or for one part at a time |
+| `Context size has been exceeded` | Check `service/.env`: `LLM_MAX_TOKENS` should be 2048, not 8192, and `LLM_MAX_CONCURRENT_CHATS` should be 2 |
+| Answers take over 30 s on a machine that was fast | Did the laptop suspend? llama's log shows about 10 tokens per second instead of about 85 when the GPU is stuck at low clocks after a resume. Restarting containers does not help; reboot |
 | Web search never used | `EXA_API_KEY` set? Toggle enabled in UI? Chat body `web_search: true`? |
 | Admin pages redirect | User `role` must be `admin` (`GET /auth/me`) |
 | Compose UI can't reach API | `NEXT_PUBLIC_API_URL` should be `/api` in Docker builds; nginx up? |

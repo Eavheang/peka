@@ -84,7 +84,7 @@ Documented in `service/.env.example`. Field names map to `app/config.py` (case-i
 | `LLM_BASE_URL` | yes | OpenAI-compatible base |
 | `LLM_API_KEY` | yes | SecretStr |
 | `LLM_MODEL` | yes | |
-| `LLM_MAX_TOKENS` | no | Default 8192 |
+| `LLM_MAX_TOKENS` | no | Default 2048; longest answer. An existing `.env` with 8192 keeps the old limit and can overflow a shared local context |
 | `OKF_ENRICHMENT_ENABLED` | no | Default `false`. After a file is searchable, also write an LLM OKF page to `knowledge_base/`. Competes with chat on the same model |
 | `OKF_MAX_TOKENS` | no | Default 32768; output limit for OKF enrichment only |
 | `EMBEDDING_BASE_URL` | no | Default `http://localhost:8081/v1` |
@@ -95,6 +95,7 @@ Documented in `service/.env.example`. Field names map to `app/config.py` (case-i
 | `RERANK_BASE_URL` | no | Default `http://localhost:8082` |
 | `RERANK_CANDIDATES` | no | `20` |
 | `RERANK_TOP_K` | no | `5`; sources sent to the chat model |
+| `SEARCH_EVIDENCE_FLOOR` | no | `0.1`; below this top rerank score, chat refuses a question for a specific fact. `0` turns it off. Retune it if the rerank model changes |
 | `SEARCH_SIMILARITY_FLOOR` | no | `0.3` |
 | `EXA_API_KEY` | no | Empty disables web search |
 | `EXA_BASE_URL` | no | Default Exa API |
