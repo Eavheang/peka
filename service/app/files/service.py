@@ -9,7 +9,7 @@ from fastapi import UploadFile
 from psycopg.errors import UniqueViolation
 
 from app.config import settings
-from app.engine.okf.job_repository import okf_jobs_repository
+from app.engine.indexing.job_repository import index_jobs_repository
 from app.engine.source_extractor import extract_file, source_id_for
 from app.files.repository import files_repository
 
@@ -21,7 +21,7 @@ class DuplicateFileError(ValueError):
 class FileTooLargeError(ValueError):
     pass
 
-class OKFJobStateError(ValueError):
+class IndexJobStateError(ValueError):
     pass
 
 FILE_CATEGORIES = {
@@ -99,18 +99,18 @@ def list_files(allowed_access_levels: tuple[str, ...]) -> list[dict]:
     return files_repository.list_all(allowed_access_levels)
 
 
-def retry_okf(file_id: UUID, user_id: UUID, is_admin: bool = False) -> dict | None:
+def retry_indexing(file_id: UUID, user_id: UUID, is_admin: bool = False) -> dict | None:
     record = files_repository.find_by_id(file_id)
     if record is None:
         return None
     if record["author_id"] != user_id and not is_admin:
         raise PermissionError
-    if not okf_jobs_repository.retry_failed(file_id):
-        raise OKFJobStateError("Only failed OKF jobs can be retried")
+    if not index_jobs_repository.retry_failed(file_id):
+        raise IndexJobStateError("Only failed indexing jobs can be retried")
     return files_repository.find_by_id(file_id)
 
 
-def get_okf_status(file_id: UUID) -> dict | None:
+def get_index_status(file_id: UUID) -> dict | None:
     return files_repository.find_by_id(file_id)
 
 

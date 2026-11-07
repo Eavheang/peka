@@ -8,14 +8,14 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
 
 
-class OKFJob(Base):
-    __tablename__ = "okf_jobs"
+class IndexJob(Base):
+    __tablename__ = "index_jobs"
     __table_args__ = (
         CheckConstraint(
             "status IN ('queued', 'processing', 'completed', 'failed')",
-            name="okf_jobs_status_check",
+            name="index_jobs_status_check",
         ),
-        CheckConstraint("attempts BETWEEN 0 AND 3", name="okf_jobs_attempts_check"),
+        CheckConstraint("attempts BETWEEN 0 AND 3", name="index_jobs_attempts_check"),
     )
 
     file_id: Mapped[UUID] = mapped_column(

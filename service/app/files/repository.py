@@ -20,8 +20,8 @@ class FilesRepository:
                 if row is None:
                     raise RuntimeError("Unable to create file record")
                 record = cast(dict[str, Any], row)
-                connection.execute("INSERT INTO okf_jobs (file_id) VALUES (%s)", (record["id"],))
-                record.update(okf_status="queued", okf_attempts=0, okf_error=None)
+                connection.execute("INSERT INTO index_jobs (file_id) VALUES (%s)", (record["id"],))
+                record.update(index_status="queued", index_attempts=0, index_error=None)
                 created.append(record)
         return created
 
@@ -29,9 +29,9 @@ class FilesRepository:
         with get_connection() as connection:
             rows = connection.execute(
                 "SELECT files.id, files.path, files.content_type, files.sha256, files.author_id, "
-                "files.access_level, files.created_at, jobs.status AS okf_status, "
-                "jobs.attempts AS okf_attempts, jobs.last_error AS okf_error FROM files "
-                "JOIN okf_jobs jobs ON jobs.file_id = files.id "
+                "files.access_level, files.created_at, jobs.status AS index_status, "
+                "jobs.attempts AS index_attempts, jobs.last_error AS index_error FROM files "
+                "JOIN index_jobs jobs ON jobs.file_id = files.id "
                 "WHERE files.access_level = ANY(%s) "
                 "ORDER BY files.created_at DESC",
                 (list(allowed_access_levels),),
@@ -50,9 +50,9 @@ class FilesRepository:
         with get_connection() as connection:
             row = connection.execute(
                 "SELECT files.id, files.path, files.content_type, files.sha256, files.author_id, "
-                "files.access_level, files.created_at, jobs.status AS okf_status, "
-                "jobs.attempts AS okf_attempts, jobs.last_error AS okf_error FROM files "
-                "JOIN okf_jobs jobs ON jobs.file_id = files.id WHERE files.id = %s",
+                "files.access_level, files.created_at, jobs.status AS index_status, "
+                "jobs.attempts AS index_attempts, jobs.last_error AS index_error FROM files "
+                "JOIN index_jobs jobs ON jobs.file_id = files.id WHERE files.id = %s",
                 (file_id,),
             ).fetchone()
             return cast(dict[str, Any] | None, row)

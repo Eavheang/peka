@@ -7,16 +7,16 @@ from fastapi.responses import FileResponse as DownloadResponse
 from app.auth.routes import admin_only, authenticated
 from app.engine.search.service import access_levels_for_role
 
-from app.files.schemas import AccessLevel, AccessLevelUpdate, FileResponse, OKFStatusResponse
+from app.files.schemas import AccessLevel, AccessLevelUpdate, FileResponse, IndexStatusResponse
 from app.files import service as files_service
 from app.files.service import (
     DuplicateFileError,
     FileTooLargeError,
-    OKFJobStateError,
+    IndexJobStateError,
     delete_file,
     find_file,
     list_files,
-    retry_okf,
+    retry_indexing,
     set_access_level,
     store_files,
 )
@@ -50,29 +50,29 @@ def get_files(user: dict = Depends(authenticated)) -> list[dict]:
     return list_files(access_levels_for_role(user["role"]))
 
 
-@router.post("/{file_id}/retry-okf", response_model=FileResponse)
-def retry_file_okf(file_id: UUID, user: dict = Depends(authenticated)) -> dict:
+@router.post("/{file_id}/retry-indexing", response_model=FileResponse)
+def retry_file_indexing(file_id: UUID, user: dict = Depends(authenticated)) -> dict:
     try:
-        record = retry_okf(file_id, user["id"], user["role"] == "admin")
+        record = retry_indexing(file_id, user["id"], user["role"] == "admin")
     except PermissionError:
         raise HTTPException(status_code=403, detail="Only file author or admin can retry this job") from None
-    except OKFJobStateError as error:
+    except IndexJobStateError as error:
         raise HTTPException(status_code=409, detail=str(error)) from None
     if record is None:
         raise HTTPException(status_code=404, detail="File not found")
     return record
 
 
-@router.get("/{file_id}/okf-status", response_model=OKFStatusResponse)
-def get_okf_status(file_id: UUID, user: dict = Depends(authenticated)) -> dict:
-    record = files_service.get_okf_status(file_id)
+@router.get("/{file_id}/index-status", response_model=IndexStatusResponse)
+def get_index_status(file_id: UUID, user: dict = Depends(authenticated)) -> dict:
+    record = files_service.get_index_status(file_id)
     if record is None:
         raise HTTPException(status_code=404, detail="File not found")
     return {
         "file_id": str(record["id"]),
-        "okf_status": record["okf_status"],
-        "okf_attempts": record["okf_attempts"],
-        "okf_error": record["okf_error"],
+        "index_status": record["index_status"],
+        "index_attempts": record["index_attempts"],
+        "index_error": record["index_error"],
     }
 
 

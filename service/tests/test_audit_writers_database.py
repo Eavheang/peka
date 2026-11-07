@@ -23,7 +23,7 @@ from app.chat.schemas import ChatResponse
 from app.chat.service import persist_response
 from app.config import settings
 from app.engine import source_extractor as extractor
-from app.engine.okf import worker
+from app.engine.indexing import worker
 
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
 pytestmark = pytest.mark.skipif(
@@ -89,7 +89,7 @@ def test_sync_complete_and_terminal_fail_write_rows(database, monkeypatch, tmp_p
         (relative, f"sha-{run}", author["id"]),
     )[0]["id"]
     execute(
-        "INSERT INTO okf_jobs (file_id, status, attempts) VALUES (%s, 'queued', 0)",
+        "INSERT INTO index_jobs (file_id, status, attempts) VALUES (%s, 'queued', 0)",
         (file_id,),
     )
     monkeypatch.setattr(worker.settings, "file_storage_dir", tmp_path)
@@ -111,7 +111,7 @@ def test_sync_complete_and_terminal_fail_write_rows(database, monkeypatch, tmp_p
     assert completed[0]["metadata"] == {"event": "sync_completed", "file_id": str(file_id), "status": "completed"}
 
     execute(
-        "UPDATE okf_jobs SET status = 'queued', attempts = 2, last_error = NULL WHERE file_id = %s",
+        "UPDATE index_jobs SET status = 'queued', attempts = 2, last_error = NULL WHERE file_id = %s",
         (file_id,),
     )
     monkeypatch.setattr(

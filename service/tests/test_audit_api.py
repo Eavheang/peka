@@ -10,7 +10,7 @@ from app.auth.security import create_access_token
 from app.chat import service as chat_service
 from app.chat.schemas import ChatResponse
 from app.engine import source_extractor as extractor
-from app.engine.okf import worker
+from app.engine.indexing import worker
 
 
 def account(role="staff"):
@@ -97,7 +97,7 @@ def _write_extraction(storage, relative_source):
 
 def _prepare_worker(monkeypatch, tmp_path, jobs, chunk):
     _write_extraction(tmp_path, jobs.path)
-    monkeypatch.setattr(worker, "okf_jobs_repository", jobs)
+    monkeypatch.setattr(worker, "index_jobs_repository", jobs)
     monkeypatch.setattr(worker.settings, "file_storage_dir", tmp_path)
     monkeypatch.setattr(worker, "chunk_extraction", chunk)
     monkeypatch.setattr(worker, "embed_chunks", lambda chunks: [])

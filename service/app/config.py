@@ -17,10 +17,6 @@ class Settings(BaseSettings):
     # Longest answer. Generated tokens share the context with every other turn, see _HISTORY_MAX_CHARS.
     llm_max_tokens: int = 2048
     llm_max_concurrent_chats: int = Field(default=2, ge=1)
-    # Off by default: enrichment sends each whole document to the model that serves chat.
-    okf_enrichment_enabled: bool = False
-    # Enrichment replies embed the whole converted document in one JSON string, so they need more room.
-    okf_max_tokens: int = 32768
     embedding_base_url: str = "http://localhost:8081/v1"
     embedding_model: str = "BAAI/bge-small-en-v1.5"
     embedding_dimensions: int = 384

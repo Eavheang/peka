@@ -2,7 +2,7 @@ from app.database import Base
 from app.audit.model import AuditEventRecord
 from app.auth.model import Invitation, User
 from app.files.model import StoredFile
-from app.engine.okf.job_model import OKFJob
+from app.engine.indexing.job_model import IndexJob
 from app.engine.chunks.chunk_model import KnowledgeChunk
 from app.engine.chunks.chunk_set_model import ChunkSet
 
@@ -82,8 +82,8 @@ def test_file_model_keeps_minimal_metadata() -> None:
     )
 
 
-def test_okf_job_model_keeps_minimal_queue_state() -> None:
-    table = Base.metadata.tables[OKFJob.__tablename__]
+def test_index_job_model_keeps_minimal_queue_state() -> None:
+    table = Base.metadata.tables[IndexJob.__tablename__]
 
     assert {column.name for column in table.columns} == {
         "file_id",

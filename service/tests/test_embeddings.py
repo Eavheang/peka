@@ -1,10 +1,10 @@
 from app.engine.chunks import embeddings
-from app.engine.chunks.chunker import OKFChunk
+from app.engine.chunks.chunker import Chunk
 
 
 def test_embed_chunks_batches_and_preserves_response_order(monkeypatch):
     chunks = [
-        OKFChunk("A", "One", text, ())
+        Chunk("A", "One", text, ())
         for text in ("first", "second", "third")
     ]
     requests = []

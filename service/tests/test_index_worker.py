@@ -1,9 +1,7 @@
 import json
-import threading
 
-from app.config import Settings
 from app.engine import source_extractor as extractor
-from app.engine.okf import converter, worker
+from app.engine.indexing import worker
 
 
 class FakeJobsRepository:
@@ -49,14 +47,13 @@ def _write_extraction(storage, relative_source, sections=None):
     )
 
 
-def _prepare(monkeypatch, tmp_path, *, enrichment=False, sections=None):
+def _prepare(monkeypatch, tmp_path, *, sections=None):
     relative_source = "pdf/policy.pdf"
     _write_extraction(tmp_path, relative_source, sections)
     repository = FakeJobsRepository(relative_source)
     stored = []
-    monkeypatch.setattr(worker, "okf_jobs_repository", repository)
+    monkeypatch.setattr(worker, "index_jobs_repository", repository)
     monkeypatch.setattr(worker.settings, "file_storage_dir", tmp_path)
-    monkeypatch.setattr(worker.settings, "okf_enrichment_enabled", enrichment)
     monkeypatch.setattr(worker, "embed_chunks", lambda chunks: [[0.1] for _ in chunks])
     monkeypatch.setattr(
         worker,
@@ -66,23 +63,12 @@ def _prepare(monkeypatch, tmp_path, *, enrichment=False, sections=None):
     return repository, stored
 
 
-def test_enrichment_is_off_by_default():
-    assert Settings.model_fields["okf_enrichment_enabled"].default is False
-
-
-def test_default_path_indexes_source_text_without_calling_the_model(monkeypatch, tmp_path):
+def test_indexes_source_text(monkeypatch, tmp_path):
     repository, stored = _prepare(monkeypatch, tmp_path)
-    model_calls = []
-    # convert_to_okf stays real, so any route to the model ends here.
-    monkeypatch.setattr(converter, "generate_structured", lambda *args, **kwargs: model_calls.append(args))
-    submitted = []
-    monkeypatch.setattr(worker._enrichment_pool, "submit", lambda *args: submitted.append(args))
 
     assert worker.process_next_job()
 
     assert repository.status == "completed"
-    assert model_calls == []
-    assert submitted == []
     file_id, chunks, vectors = stored[0]
     assert file_id == "file-1"
     assert [(chunk.heading, chunk.content, chunk.source_locations) for chunk in chunks] == [
@@ -117,49 +103,3 @@ def test_embed_failure_leaves_old_chunks_intact(monkeypatch, tmp_path):
     assert repository.attempts == 1
     assert repository.error == "embedding endpoint down"
     assert stored == []
-
-
-def test_enrichment_runs_after_activation_and_does_not_hold_the_queue(monkeypatch, tmp_path):
-    repository, stored = _prepare(monkeypatch, tmp_path, enrichment=True)
-    release, finished = threading.Event(), threading.Event()
-    seen = []
-
-    def convert(extraction, storage):
-        seen.append((repository.status, len(stored), extraction["source_id"]))
-        release.wait(5)
-        finished.set()
-        return {"files": []}
-
-    monkeypatch.setattr(worker, "convert_to_okf", convert)
-
-    # Returns while enrichment is still waiting: the next upload does not queue behind the model.
-    assert worker.process_next_job()
-    assert not finished.is_set()
-    release.set()
-    assert finished.wait(5)
-
-    assert seen == [("completed", 1, "source-1")]
-    assert len(stored) == 1
-
-
-def test_enrichment_failure_keeps_the_file_indexed(monkeypatch, tmp_path):
-    repository, stored = _prepare(monkeypatch, tmp_path, enrichment=True)
-    called = []
-
-    def convert(extraction, storage):
-        called.append(extraction)
-        raise RuntimeError("Context size has been exceeded")
-
-    class ImmediatePool:
-        def submit(self, function, *args):
-            function(*args)
-
-    monkeypatch.setattr(worker, "convert_to_okf", convert)
-    monkeypatch.setattr(worker, "_enrichment_pool", ImmediatePool())
-
-    assert worker.process_next_job()
-
-    assert called
-    assert repository.status == "completed"
-    assert repository.error is None
-    assert len(stored) == 1

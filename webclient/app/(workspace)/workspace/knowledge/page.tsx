@@ -25,11 +25,11 @@ export default function KnowledgePage() {
   useEffect(() => setToken(getStoredToken("peka_access_token") ?? ""), []);
   const counts = useMemo(
     () => ({
-      indexed: sources.filter((file) => file.okf_status === "completed").length,
+      indexed: sources.filter((file) => file.index_status === "completed").length,
       active: sources.filter(
-        (file) => file.okf_status === "queued" || file.okf_status === "processing",
+        (file) => file.index_status === "queued" || file.index_status === "processing",
       ).length,
-      failed: sources.filter((file) => file.okf_status === "failed").length,
+      failed: sources.filter((file) => file.index_status === "failed").length,
     }),
     [sources],
   );
