@@ -26,34 +26,47 @@ class SearchRepository:
         with get_connection() as connection:
             register_vector(connection)
             rows = connection.execute(
-                # ponytail: tsvector computed per query; add a generated column + GIN index if the corpus grows.
+                # ponytail: exact vector scan, about 150-190 ms at 50,000 chunks. See migration 021 before adding HNSW.
                 r"""
-                WITH allowed AS (
-                    SELECT kc.*, regexp_replace(f.path, '^.*/|\.[^./]*$', '', 'g') AS stem,
-                        to_tsvector('english', regexp_replace(f.path, '[^[:alnum:]]+', ' ', 'g')
-                            || ' ' || kc.heading || ' ' || kc.content) AS words
-                    FROM knowledge_chunks kc
-                    JOIN chunk_sets cs ON cs.id = kc.chunk_set_id AND cs.status = 'active'
-                    JOIN files f ON f.id = kc.file_id
-                    WHERE f.access_level = ANY(%(levels)s)
-                ), terms AS (
+                WITH terms AS (
                     SELECT replace(plainto_tsquery('english', coalesce(%(text)s, ''))::text, '&', '|')::tsquery AS q
+                ), matches AS (  -- not access-filtered: the keyword ranking below must filter these rows
+                    SELECT id FROM knowledge_chunks WHERE search_words @@ (SELECT q FROM terms)
+                    UNION
+                    SELECT kc.id FROM knowledge_chunks kc JOIN files f ON f.id = kc.file_id
+                    WHERE f.path_words @@ (SELECT q FROM terms)
                 ), ranked AS (
-                    (SELECT id, row_number() OVER (ORDER BY embedding <=> %(vector)s) AS rank FROM allowed
-                     WHERE 1 - (embedding <=> %(vector)s) >= %(floor)s
-                     ORDER BY embedding <=> %(vector)s LIMIT %(pool)s)
+                    (SELECT kc.id, row_number() OVER (ORDER BY kc.embedding <=> %(vector)s) AS rank
+                     FROM knowledge_chunks kc
+                     JOIN chunk_sets cs ON cs.id = kc.chunk_set_id AND cs.status = 'active'
+                     JOIN files f ON f.id = kc.file_id
+                     WHERE f.access_level = ANY(%(levels)s)
+                        AND 1 - (kc.embedding <=> %(vector)s) >= %(floor)s
+                     ORDER BY kc.embedding <=> %(vector)s LIMIT %(pool)s)
                     UNION ALL
-                    (SELECT id, row_number() OVER (ORDER BY ts_rank_cd(words, q) DESC) AS rank
-                     FROM allowed, terms WHERE words @@ q
-                     ORDER BY ts_rank_cd(words, q) DESC LIMIT %(pool)s)
+                    (SELECT kc.id, row_number() OVER (
+                            ORDER BY ts_rank_cd(f.path_words || kc.search_words, (SELECT q FROM terms)) DESC
+                        ) AS rank
+                     FROM matches m
+                     JOIN knowledge_chunks kc ON kc.id = m.id
+                     JOIN chunk_sets cs ON cs.id = kc.chunk_set_id AND cs.status = 'active'
+                     JOIN files f ON f.id = kc.file_id
+                     WHERE f.access_level = ANY(%(levels)s)
+                     ORDER BY rank LIMIT %(pool)s)
                 ), fused AS (
-                    SELECT a.id, a.file_id, a.stem, a.heading, a.content, a.source_locations,
-                        1 - (a.embedding <=> %(vector)s) AS score, r.rrf,
-                        first_value(a.file_id) OVER (PARTITION BY a.stem ORDER BY r.rrf DESC) AS best_file
+                    SELECT kc.id, kc.file_id, regexp_replace(f.path, '^.*/', '') AS title,
+                        s.stem,
+                        kc.heading, kc.content, kc.source_locations,
+                        1 - (kc.embedding <=> %(vector)s) AS score, r.rrf,
+                        first_value(kc.file_id) OVER (
+                            PARTITION BY s.stem ORDER BY r.rrf DESC
+                        ) AS best_file
                     FROM (SELECT id, sum(1.0 / (60 + rank)) AS rrf FROM ranked GROUP BY id) r
-                    JOIN allowed a ON a.id = r.id
+                    JOIN knowledge_chunks kc ON kc.id = r.id
+                    JOIN files f ON f.id = kc.file_id
+                    CROSS JOIN LATERAL (SELECT regexp_replace(f.path, '^.*/|\.[^./]*$', '', 'g') AS stem) s
                 )
-                SELECT id, file_id, stem, heading, content, source_locations, score
+                SELECT id, file_id, title, stem, heading, content, source_locations, score
                 FROM fused WHERE file_id = best_file ORDER BY rrf DESC LIMIT %(limit)s
                 """,
                 {
@@ -66,11 +79,6 @@ class SearchRepository:
                 },
             ).fetchall()
             return cast(list[dict[str, Any]], rows)
-
-    def file_title(self, file_id: UUID) -> str:
-        with get_connection() as connection:
-            row = connection.execute("SELECT path FROM files WHERE id = %s", (file_id,)).fetchone()
-            return row["path"].rsplit("/", 1)[-1] if row else "unknown"
 
     def find_source(
         self, chunk_id: UUID | None, title: str, heading: str,

@@ -85,7 +85,7 @@ def corpus(database):
     )
     for file, heading, content, vector in (
         (general, "Leave policy", "Every employee gets 20 days of leave.", unit_vector(1, 0)),
-        (secret, "Salary bands", "Senior engineers earn between 90k and 120k.", unit_vector(0, 1)),
+        (secret, "Pay bands", "Senior engineers earn between 90k and 120k.", unit_vector(0, 1)),
         # A second general chunk: staff's reranker request should hold every row they may see.
         (expenses, "Receipts", "Receipts are required above 50 dollars.", unit_vector(1, 0)),
     ):
@@ -205,8 +205,8 @@ def test_source_preview_lookup_respects_access_level(corpus):
     general_title, secret_title = f"{corpus.run}-handbook.txt", f"{corpus.run}-salaries.txt"
 
     assert search_repository.find_source(None, general_title, "Leave policy", ("general",)) is not None
-    assert search_repository.find_source(None, secret_title, "Salary bands", ("general",)) is None
-    preview = search_repository.find_source(None, secret_title, "Salary bands", ("general", "confidential"))
+    assert search_repository.find_source(None, secret_title, "Pay bands", ("general",)) is None
+    preview = search_repository.find_source(None, secret_title, "Pay bands", ("general", "confidential"))
     assert preview is not None and "Senior engineers" in preview["content"]
 
 
@@ -226,3 +226,23 @@ def test_keyword_match_finds_a_chunk_the_vector_search_misses(corpus):
     assert found(
         search_repository.search_chunks(unrelated, ("general",), top_k=10, query_text="how many days of leave?"), corpus
     ) == {"general"}
+
+
+def test_keyword_match_finds_a_chunk_by_its_file_name_and_returns_the_title(corpus):
+    unrelated = unit_vector(0, 0, 1)  # below the similarity floor, so only the keyword search can match
+
+    results = search_repository.search_chunks(unrelated, ("general",), top_k=10, query_text="handbook")
+
+    assert found(results, corpus) == {"general"}
+    assert next(row for row in results if row["file_id"] == corpus.general["id"])["title"] == corpus.general[
+        "path"
+    ].rsplit("/", 1)[-1]
+
+
+def test_file_name_match_does_not_reveal_a_confidential_file_to_general_roles(corpus):
+    unrelated = unit_vector(0, 0, 1)
+
+    assert found(search_repository.search_chunks(unrelated, ("general",), top_k=10, query_text="salaries"), corpus) == set()
+    assert found(
+        search_repository.search_chunks(unrelated, ("general", "confidential"), top_k=10, query_text="salaries"), corpus
+    ) == {"confidential"}

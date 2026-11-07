@@ -14,6 +14,7 @@ def candidates(count: int) -> list[dict]:
         {
             "id": f"00000000-0000-0000-0000-{index:012}",
             "file_id": "00000000-0000-0000-0000-000000000001",
+            "title": "handbook.pdf",
             "stem": "handbook",
             "heading": f"Section {index}",
             "content": f"passage {index}",
@@ -54,7 +55,6 @@ def search(monkeypatch):
         reranker = reranker or Reranker()
         monkeypatch.setattr(search_service, "embed_query", lambda query: [0.0])
         monkeypatch.setattr(search_service.search_repository, "search_chunks", search_chunks)
-        monkeypatch.setattr(search_service.search_repository, "file_title", lambda file_id: "handbook.pdf")
         monkeypatch.setattr(search_service.httpx, "post", reranker.post)
         monkeypatch.setattr(search_service.settings, "rerank_base_url", "http://reranker:80/")
         monkeypatch.setattr(search_service.settings, "rerank_candidates", 20)
@@ -179,9 +179,6 @@ def test_staff_cannot_see_confidential(monkeypatch) -> None:
             seen["levels"] = allowed_access_levels
             return []
 
-        def file_title(self, file_id):
-            return "doc.pdf"
-
     monkeypatch.setattr(search_service.search_repository, "search_chunks", FakeRepo().search_chunks)
     assert search_service.access_levels_for_role("staff") == ("general",)
     assert search_service.access_levels_for_role("admin") == ("general", "confidential")
@@ -202,6 +199,7 @@ def test_search_returns_results_for_authenticated_user(monkeypatch) -> None:
                 {
                     "id": "00000000-0000-0000-0000-000000000002",
                     "file_id": "00000000-0000-0000-0000-000000000001",
+                    "title": "policy.pdf",
                     "heading": "Intro",
                     "content": "x" * 400,
                     "source_locations": [{"page": 2}],
@@ -209,12 +207,8 @@ def test_search_returns_results_for_authenticated_user(monkeypatch) -> None:
                 }
             ]
 
-        def file_title(self, file_id):
-            return "policy.pdf"
-
     fake = FakeRepo()
     monkeypatch.setattr(search_service.search_repository, "search_chunks", fake.search_chunks)
-    monkeypatch.setattr(search_service.search_repository, "file_title", fake.file_title)
     from app.auth.routes import authenticated
 
     # bypass DB by overriding dependency directly
