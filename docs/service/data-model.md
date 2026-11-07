@@ -8,10 +8,10 @@ Postgres with the `vector` extension (pgvector). Schema is owned by Alembic; do 
 |-------|---------|
 | `users` | Email (unique, lowercased), `display_name`, `password_hash`, `role`, `token_version`, `is_active`, timestamps |
 | `invitations` | Pending and accepted invites: `email`, `role`, `token_hash` (SHA-256; the token itself is never stored), `invited_by`, `expires_at`, `accepted_at`. One pending invite per address |
-| `files` | Relative `path`, `content_type`, unique `sha256`, `author_id`, `access_level` (`general` \| `confidential`), generated `path_words` tsvector |
+| `files` | Relative `path`, `content_type`, unique `sha256`, `author_id`, `access_level` (`general` \| `confidential`) |
 | `okf_jobs` | PK `file_id` → files; `status` (`queued` \| `processing` \| `completed` \| `failed`); `attempts` 0–3; `last_error` |
-| `chunk_sets` | Per-file index generations: `building` \| `active` \| `superseded` |
-| `knowledge_chunks` | `heading`, `content`, `source_locations` JSONB (extractor locators, see [indexing](../architecture/okf-and-indexing.md#chunking-for-retrieval)), `embedding vector(384)`, generated `search_words` tsvector (GIN index), FKs to file + chunk_set |
+| `chunk_sets` | Per-file index generations: `building` \| `active` \| `superseded`; `centroid` (mean embedding, tells format copies from unrelated files with the same name) |
+| `knowledge_chunks` | `heading`, `content`, `source_locations` JSONB (extractor locators, see [indexing](../architecture/okf-and-indexing.md#chunking-for-retrieval)), `embedding vector(384)`, `file_path` copy, generated `search_words` tsvector (GIN index), HNSW index on `embedding`, FKs to file + chunk_set |
 | `conversations` | Owned chat threads (`owner_id`, title, timestamps) |
 | `messages` | `role` `user` \| `assistant`; content; citations JSONB |
 | `provider_settings` | Single row `id=1`, JSONB `value` for LLM/Exa overrides |
@@ -39,6 +39,9 @@ Conversation list uses index `(owner_id, updated_at DESC, id DESC)` for cursor p
 | `016_add_user_display_name` | `display_name` |
 | `017_create_invitations` | invitations |
 | `018_create_audit_events` | `audit_events` (FR10 / D-02) |
+| `019_create_google_drive` | Google Drive connections |
+| `020_allow_stopped_messages` | allow stopped assistant messages |
+| `021_add_search_indexes` | chunk `file_path` and `search_words` (GIN), HNSW on `embedding`, chunk set `centroid` |
 
 Apply:
 

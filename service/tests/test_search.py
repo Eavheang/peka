@@ -14,7 +14,7 @@ def candidates(count: int) -> list[dict]:
         {
             "id": f"00000000-0000-0000-0000-{index:012}",
             "file_id": "00000000-0000-0000-0000-000000000001",
-            "title": "handbook.pdf",
+            "file_path": "documents/handbook.pdf",
             "stem": "handbook",
             "heading": f"Section {index}",
             "content": f"passage {index}",
@@ -199,7 +199,7 @@ def test_search_returns_results_for_authenticated_user(monkeypatch) -> None:
                 {
                     "id": "00000000-0000-0000-0000-000000000002",
                     "file_id": "00000000-0000-0000-0000-000000000001",
-                    "title": "policy.pdf",
+                    "file_path": "documents/policy.pdf",
                     "heading": "Intro",
                     "content": "x" * 400,
                     "source_locations": [{"page": 2}],
