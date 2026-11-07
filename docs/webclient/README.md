@@ -103,7 +103,7 @@ Notable React Query behavior:
 
 - Current user: `["users","me"]`, 5 min staleTime
 - Conversations: infinite query with cursor, 30s staleTime
-- Files: refetch every **3s** while any OKF job is queued/processing
+- Files: refetch every **3s** while any indexing job is queued/processing
 
 ## Environment
 

@@ -11,7 +11,7 @@ Read these first if you want to know **what PEKA does** and **how it works**:
 | 1 | [What is PEKA?](what-is-peka.md) | Problem, audience, what it is / isn’t |
 | 2 | [How it works](how-it-works.md) | End-to-end: upload → index → cited answer |
 | 3 | [User guide](user-guide.md) | Screens and tasks by role |
-| 4 | [Indexing & OKF](architecture/okf-and-indexing.md) | Document pipeline deep dive |
+| 4 | [Indexing](architecture/indexing.md) | Document pipeline deep dive |
 | 5 | [Chat & RAG](architecture/chat-and-rag.md) | Question → retrieval → answer deep dive |
 
 ## Reference (build, operate, integrate)
@@ -41,7 +41,6 @@ peka/
 ├── service/      # FastAPI API + indexing background worker
 ├── webclient/    # Next.js App Router UI
 ├── docs/         # This documentation
-├── eval/         # Standalone answer-quality check (RAGAS)
 ├── .github/      # PR CI workflows
 └── .husky/       # pre-commit / pre-push gates
 ```

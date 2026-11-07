@@ -20,7 +20,7 @@ make setup
 1. Copy `config/.env.example` → `config/.env` if missing
 2. Build and start `postgres`, `pgadmin`, `embeddings`
 3. Run `alembic upgrade head` (so tables exist before the API boots)
-4. Build and start `service`, `okf-worker`
+4. Build and start `service`, `index-worker`
 5. Install webclient dependencies with Bun and start `webclient` + `proxy`
 
 Also copy and fill **service** env before first useful run:

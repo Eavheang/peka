@@ -45,8 +45,8 @@ Run the Compose commands from `config/`.
    In `service/.env`:
 
    - Replace `JWT_SECRET_KEY` with your own random secret of at least 32 characters.
-   - Set `ADMIN_EMAIL` and a new `ADMIN_PASSWORD` (12 to 1024 characters). The example values are only placeholders and must not be reused.
-   - For the local model use `LLM_BASE_URL=http://llama:8080/v1` and `LLM_MODEL=local`, with any value for `LLM_API_KEY`.
+   - Set `ADMIN_EMAIL` and `ADMIN_PASSWORD` to your own values (password of 12 to 1024 characters).
+   - The example already points at the local model, which needs no `LLM_API_KEY`.
 3. **Set up and start.**
 
    ```bash
@@ -76,7 +76,7 @@ If the machine has no 6 GB NVIDIA GPU, skip steps 1 and `make llm` and point `LL
 | Can people chat while documents are indexing? | **Yes.** All questions were answered with files indexing: 3 of 3 with 1 user, 6 of 6 with 2, and 20 of 20 with 10. |
 | How accurate is retrieval? | On 59 real questions, the right document is in the top 5 results for **98%**, over 70 files and over 270. A passage with the answer is there for **95%**. On 400 generated questions over 220 documents it is 100%, which is a ceiling because those questions name their document. |
 | How accurate are answers? | 57 of 59 answerable questions in the latest graded set were correct, 1 partly correct and 1 wrongly declined. Declining unanswerable questions worked 8 of 8. |
-| What if the documents do not have the answer? | PEKA says so. When no passage matches a question for a specific fact, the reply is labeled **Not enough evidence** and no answer is generated. |
+| What if the documents do not have the answer? | PEKA says so. When no passage matches a question for a specific fact, the reply is labeled **Need more detail**, names the closest documents, and asks what the user meant. No answer is generated. |
 | How long does indexing take? | About 50 to 55 s for all 70 evaluation files, one file at a time. |
 | Can it serve 10 people at once? | **Not in parallel.** They take turns: with 10 users asking 2 questions each, all 20 were answered and the slowest took about 80 s, with or without files indexing. |
 

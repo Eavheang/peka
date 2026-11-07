@@ -1,6 +1,6 @@
 # Service (backend)
 
-FastAPI application that powers PEKA: authentication, document ingestion, vector search, chat (sync + SSE), and admin provider settings. A sibling process (`okf-worker`) converts uploads into the Open Knowledge Format knowledge base and indexes embeddings.
+FastAPI application that powers PEKA: authentication, document ingestion, vector search, chat (sync + SSE), and admin provider settings. A sibling process (`index-worker`) converts uploads into the Open Knowledge Format knowledge base and indexes embeddings.
 
 Package entrypoint: `app.main:app`  
 Interactive OpenAPI: http://localhost:8000/docs  
@@ -33,12 +33,12 @@ service/
 │   ├── workspace_settings.py   # Admin provider settings router
 │   ├── auth/                   # login, users, JWT
 │   ├── audit/                  # FR10 audit log: routes → service → repository
-│   ├── files/                  # upload, list, download, OKF status
+│   ├── files/                  # upload, list, download, index status
 │   ├── chat/                   # chat, stream, conversations, preview
 │   └── engine/
 │       ├── ai_runtime.py       # structured generate / stream
 │       ├── source_extractor.py
-│       ├── okf/                # converter, worker, jobs, prompt.txt
+│       ├── indexing/           # indexing worker, jobs
 │       ├── chunks/             # chunker, embeddings, models
 │       ├── search/             # vector search API
 │       └── web_search/         # Exa client
@@ -66,14 +66,14 @@ cp .env.example .env   # fill required values
 uvicorn app.main:app --reload
 
 # separate terminal — indexing worker
-python -m app.engine.okf.worker
+python -m app.engine.indexing.worker
 ```
 
 Requires reachable Postgres (with `vector`), embedding server, and LLM endpoint.
 
 ## Environment variables
 
-Documented in `service/.env.example`. Field names map to `app/config.py` (case-insensitive).
+`service/.env.example` holds only what an install has to decide. Every other option below has a default in `app/config.py` and can still be set in `service/.env`. Field names map to `app/config.py` (case-insensitive).
 
 | Variable | Required | Notes |
 |----------|----------|-------|
@@ -82,17 +82,15 @@ Documented in `service/.env.example`. Field names map to `app/config.py` (case-i
 | `DATABASE_URL` | yes | Postgres URL |
 | `FILE_STORAGE_DIR` | no | Default `storage` |
 | `LLM_BASE_URL` | yes | OpenAI-compatible base |
-| `LLM_API_KEY` | yes | SecretStr |
+| `LLM_API_KEY` | no | Default `local`, which llama.cpp ignores. A hosted model needs its own key |
 | `LLM_MODEL` | yes | |
 | `LLM_MAX_TOKENS` | no | Default 2048; longest answer. An existing `.env` with 8192 keeps the old limit and can overflow a shared local context |
 | `LLM_MAX_CONCURRENT_CHATS` | no | Default 2; chats answered at once, the others wait. Raise it only with a larger context |
-| `OKF_ENRICHMENT_ENABLED` | no | Default `false`. After a file is searchable, also write an LLM OKF page to `knowledge_base/`. Competes with chat on the same model |
-| `OKF_MAX_TOKENS` | no | Default 32768; output limit for OKF enrichment only |
 | `EMBEDDING_BASE_URL` | no | Default `http://localhost:8081/v1` |
 | `EMBEDDING_MODEL` | no | `BAAI/bge-small-en-v1.5` |
 | `EMBEDDING_DIMENSIONS` | no | `384` |
 | `EMBEDDING_BATCH_SIZE` | no | `1` |
-| `SEARCH_TOP_K` | no | `8`; results from `POST /search` |
+| `SEARCH_TOP_K` | no | `10`; results from `POST /search` |
 | `RERANK_BASE_URL` | no | Default `http://localhost:8082` |
 | `RERANK_CANDIDATES` | no | `20` |
 | `RERANK_TOP_K` | no | `5`; sources sent to the chat model |
@@ -122,7 +120,7 @@ Login, refresh, logout, profile, password change, admin user CRUD/role/activatio
 
 ### Files (`app/files/`)
 
-Multipart upload, listing (ACL-filtered), download, delete, OKF status, retry, access-level patch (admin).
+Multipart upload, listing (ACL-filtered), download, delete, index status, retry, access-level patch (admin).
 
 ### Search (`app/engine/search/`)
 
@@ -132,11 +130,9 @@ Multipart upload, listing (ACL-filtered), download, delete, OKF status, retry, a
 
 Retrieval planning, KB and/or Exa grounding, structured answers with citations, conversation CRUD, source preview, SSE stream.
 
-### Engine OKF (`app/engine/okf/`)
+### Engine indexing (`app/engine/indexing/`)
 
-- `worker.py` — claim jobs with `FOR UPDATE … SKIP LOCKED`, reset stuck `processing`, index source text, queue optional enrichment
-- `converter.py` + `prompt.txt` — optional enrichment: LLM → OKF markdown
-- `file_writer.py` — knowledge_base tree + indexes
+- `worker.py` — claim jobs with `FOR UPDATE … SKIP LOCKED`, reset stuck `processing`, index source text
 - Max **3** attempts per job
 
 ### Chunks & embeddings (`app/engine/chunks/`)
@@ -149,7 +145,7 @@ Admin LLM/Exa runtime overrides in `provider_settings`.
 
 ## Dockerfile
 
-Image installs `requirements.txt`, copies `app/`, `alembic/`, `alembic.ini`, `storage/`, exposes `8000`, default CMD uvicorn. Compose overrides command for `okf-worker`.
+Image installs `requirements.txt`, copies `app/`, `alembic/`, `alembic.ini`, `storage/`, exposes `8000`, default CMD uvicorn. Compose overrides command for `index-worker`.
 
 ## Further reading
 
