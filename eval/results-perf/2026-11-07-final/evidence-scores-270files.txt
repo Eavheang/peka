@@ -1,0 +1,61 @@
+answerable_s2 n 59 min 0.291069 p10 0.773654 median 0.992124 max 0.999871
+   0.291069 s2-27 | Which product line brings in 40% of revenue, and what oven temperature | 01_Company_Profile
+   0.376288 s2-14 | How soon after an accepted delivery are farmers paid? | 06_Supply_Agreement
+   0.39392 s2-11 | What share of the estimated season value may the company advance to a  | 06_Supply_Agreement
+   0.487786 s2-28 | What did management decide about cashew purchasing, and how much had c | 09_Management_Meeting_Minutes
+   0.52458 s2-22 | What was the on-time delivery rate in the latest meeting and how full  | 09_Management_Meeting_Minutes
+   0.773654 s2-31 | What are Mekong Harvest Foods' biggest risks if a harvest fails? | 06_Supply_Agreement
+   0.777869 s2-16 | What chlorine level must the wash water have and how often is it check | 08_QC_Procedure_Dried_Mango
+   0.831369 s2-19 | How quickly must a non-conformance report be raised after a critical l | 08_QC_Procedure_Dried_Mango
+   0.853185 s2-12 | How many days does a party have to fix a serious breach of the farmer  | 06_Supply_Agreement
+   0.902172 s2-9 | What online repeat purchase rate does the marketing plan aim for, and  | 07_Marketing_Plan_FY2027
+answerable_s1 n 68 min 0.0087 p10 0.595615 median 0.99544 max 0.999867
+   0.0087 s1-57 | Who owns the mobile app accessibility audit executive summary and what | 09-api-migration-guide
+   0.012828 s1-68 | Who owns the warehouse inventory optimization report's executive summa | scale-test-171-dorquamar-warehouse-report
+   0.074347 s1-56 | In the mobile app accessibility audit, what are the baseline, target a | 03-data-retention-policy
+   0.159145 s1-18 | In the Food Safety SOP, what are the baseline and target for hand hygi | scale-test-152-pelelqua-packaging-policy
+   0.229526 s1-22 | For the Sun-Gold dried mango line, what oven temperature is required d | 08_QC_Procedure_Dried_Mango
+   0.255944 s1-31 | In the annual budget proposal, what are the baseline and target for op | 06-ai-chatbot-evaluation
+   0.595615 s1-19 | Who owns the Food Safety Standard Operating Procedure and what date do | 08_QC_Procedure_Dried_Mango
+   0.778228 s1-15 | Under the farmer supply agreement's indicative delivery calendar, how  | 06_Supply_Agreement
+   0.828191 s1-13 | Who is the owner of the data retention policy and when was it dated? | 03-data-retention-policy
+   0.89759 s1-10 | In the September 2026 Mekong Harvest Foods management meeting, what ca | 09_Management_Meeting_Minutes
+unanswerable_s2 n 8 min 0.001234 p10 0.001234 median 0.913089 max 0.994034
+   0.001234 s2-66 | How many seats will the new cafe have? | 08-cafe-expansion-plan
+   0.519541 s2-60 | How many weeks of paid maternity leave does Mekong Harvest Foods give? | 06_Supply_Agreement
+   0.520812 s2-67 | What interest rate do lenders charge Mekong Harvest Foods? | 06_Supply_Agreement
+   0.674632 s2-63 | What is the retail selling price of the 250g dried mango pouch? | 04_Inventory_Tracker
+   0.913089 s2-65 | What is the FY2027 capital expenditure budget? | 07_Marketing_Plan_FY2027
+   0.96755 s2-62 | What is the total contract value in dollars of the vendor selection RF | 20-vendor-selection-rfp
+   0.991255 s2-61 | Which vendor won the vendor selection RFP? | 20-vendor-selection-rfp
+   0.994034 s2-64 | What is the name of Mekong Harvest Foods' Chief Executive Officer? | 09_Management_Meeting_Minutes
+general n 11 min 1.3e-05 p10 1.3e-05 median 3e-05 max 0.305589
+   1.3e-05 What is the capital of France? | What is the capital of France? | scale-test-006-solnevnev-onboarding-review
+   1.3e-05 good morning, how are you? | good morning, how are you? | 08_QC_Procedure_Dried_Mango
+   1.4e-05 Explain what a neural network is. | Explain what a neural network is. | 05-employee-onboarding-guide
+   1.4e-05 write a python function that reverses a string | write a python function that reverses a string | 08_QC_Procedure_Dried_Mango
+   2.5e-05 hi there | hi there | 09_Management_Meeting_Minutes
+   3e-05 who are you? | who are you? | 01_Company_Profile
+   3.1e-05 what is 17 * 23? | what is 17 * 23? | 10-database-outage-postmortem
+   4.1e-05 thanks! | thanks! | 02_Employee_Handbook
+   4.8e-05 what is 2+2? | what is 2+2? | 09-api-migration-guide
+   0.005493 what can you do? | what can you do? | 02_Employee_Handbook
+   0.305589 hello | hello | scale-test-120-hellomor-payroll-policy
+offtopic n 6 min 2.1e-05 p10 2.1e-05 median 0.000194 max 0.012521
+   2.1e-05 Who won the 2022 FIFA World Cup? | Who won the 2022 FIFA World Cup? | 20-vendor-selection-rfp
+   6.2e-05 How many employees does Google have? | How many employees does Google have? | 01_Company_Profile
+   0.000138 What is the company's policy on bringing pets to the office? | What is the company's policy on bringing pets to the office? | 02_Employee_Handbook
+   0.000194 What is the CEO's home address? | What is the CEO's home address? | 09_Management_Meeting_Minutes
+   0.000228 What was the 2019 revenue of the Tokyo subsidiary? | What was the 2019 revenue of the Tokyo subsidiary? | 05_Company_Overview_Deck
+   0.012521 What is the Wi-Fi password for the Phnom Penh office? | What is the Wi-Fi password for the Phnom Penh office? | 07_Marketing_Plan_FY2027
+scale n 400 min 0.995185 p10 0.997864 median 0.998943 max 0.999678
+   0.995185 sc-263 | In the Calhelsol Payroll Policy, who owns Uptime and what is its targe | scale-test-132-calhelsol-payroll-policy
+   0.996126 sc-135 | In the Lommartav Analytics Review, who owns Uptime and what is its tar | scale-test-068-lommartav-analytics-review
+   0.996369 sc-329 | In the Yorgarpel Analytics Audit, who owns Uptime and what is its targ | scale-test-165-yorgarpel-analytics-audit
+   0.996489 sc-27 | In the Solpelpel Analytics Audit, who owns Audit Findings and what is  | scale-test-014-solpelpel-analytics-audit
+   0.996555 sc-325 | In the Solionor Facilities Plan, who owns Renewal Rate and what is its | scale-test-163-solionor-facilities-plan
+   0.996599 sc-123 | In the Tavquawex Logistics Report, who owns Uptime and what is its tar | scale-test-062-tavquawex-logistics-report
+   0.996664 sc-139 | In the Kelulcal Payroll Review, who owns Uptime and what is its target | scale-test-070-kelulcal-payroll-review
+   0.996888 sc-43 | In the Elsolhel Logistics Audit, who owns Uptime and what is its targe | scale-test-022-elsolhel-logistics-audit
+   0.996969 sc-373 | In the Vennevkel Compliance Review, who owns Audit Findings and what i | scale-test-187-vennevkel-compliance-review
+   0.996972 sc-357 | In the Tavfenhel Compliance Procedure, who owns Uptime and what is its | scale-test-179-tavfenhel-compliance-procedure
