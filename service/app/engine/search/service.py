@@ -31,30 +31,37 @@ def access_levels_for_role(role: str) -> tuple[str, ...]:
     return ROLE_ACCESS_LEVELS.get(role, ("general",))
 
 
+def rerank_scores(query: str, texts: list[str]) -> list[float] | None:
+    """Cross-encoder relevance of each text to the query, in the given order. None if the reranker fails."""
+    try:
+        response = httpx.post(
+            f"{settings.rerank_base_url.rstrip('/')}/rerank",
+            # The model reads 512 tokens per pair; TEI can reject longer pairs unless asked to cut.
+            json={"query": query, "texts": texts, "truncate": True},
+            timeout=10,
+        )
+        response.raise_for_status()
+        scores = [0.0] * len(texts)
+        for rank in response.json():
+            scores[rank["index"]] = float(rank["score"])
+        return scores
+    except (httpx.HTTPError, httpx.InvalidURL, IndexError, KeyError, TypeError, ValueError) as error:
+        logger.warning("Reranker failed: %r", error)
+        return None
+
+
 def rerank(query: str, rows: list[dict]) -> list[dict]:
     """Order rows by cross-encoder relevance, keeping the given order if the reranker fails."""
     # Even one row is scored: chat's evidence check reads the score.
     if not rows:
         return rows
-    try:
-        response = httpx.post(
-            f"{settings.rerank_base_url.rstrip('/')}/rerank",
-            json={
-                "query": query,
-                # Same shape the embedder sees: a query can name the document instead of the section.
-                "texts": [passage_text(row["stem"], row["heading"], row["content"]) for row in rows],
-                # The model reads 512 tokens per pair; TEI can reject longer pairs unless asked to cut.
-                "truncate": True,
-            },
-            timeout=10,
-        )
-        response.raise_for_status()
-        ranks = sorted(response.json(), key=lambda rank: rank["score"], reverse=True)
-        return [{**rows[rank["index"]], "rerank_score": rank["score"]} for rank in ranks]
-    except (httpx.HTTPError, httpx.InvalidURL, IndexError, KeyError, TypeError, ValueError) as error:
+    # Same shape the embedder sees: a query can name the document instead of the section.
+    scores = rerank_scores(query, [passage_text(row["stem"], row["heading"], row["content"]) for row in rows])
+    if scores is None:
         # Hybrid order is still a good answer: a reranker outage must not fail a chat turn.
-        logger.warning("Reranker failed, keeping hybrid search order: %r", error)
         return rows
+    ranked = sorted(range(len(rows)), key=lambda index: scores[index], reverse=True)
+    return [{**rows[index], "rerank_score": scores[index]} for index in ranked]
 
 
 def search_knowledge(query: str, user_role: str, top_k: int | None = None) -> list[dict]:

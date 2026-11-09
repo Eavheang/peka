@@ -200,6 +200,7 @@ def test_search_returns_results_for_authenticated_user(monkeypatch) -> None:
                     "id": "00000000-0000-0000-0000-000000000002",
                     "file_id": "00000000-0000-0000-0000-000000000001",
                     "file_path": "documents/policy.pdf",
+                    "stem": "policy",
                     "heading": "Intro",
                     "content": "x" * 400,
                     "source_locations": [{"page": 2}],

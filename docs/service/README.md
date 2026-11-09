@@ -95,6 +95,7 @@ Requires reachable Postgres (with `vector`), embedding server, and LLM endpoint.
 | `RERANK_CANDIDATES` | no | `20` |
 | `RERANK_TOP_K` | no | `5`; sources sent to the chat model |
 | `SEARCH_EVIDENCE_FLOOR` | no | `0.1`; below this top rerank score, chat refuses a question for a specific fact. `0` turns it off. Retune it if the rerank model changes |
+| `CITATION_MATCH_FLOOR` | no | `0.5`; when the model cites none of the sources it used, the server cites those scoring at least this against an answer block. Retune it if the rerank model changes |
 | `SEARCH_SIMILARITY_FLOOR` | no | `0.3` |
 | `EXA_API_KEY` | no | Empty disables web search |
 | `EXA_BASE_URL` | no | Default Exa API |
