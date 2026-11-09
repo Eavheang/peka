@@ -31,6 +31,9 @@ export default function AuditEventsTable({ events }: { events: AuditEvent[] }) {
           <TableCell className="px-5 py-4 text-foreground">{event.actor_id ?? "—"}</TableCell>
           <TableCell className="px-5 py-4 whitespace-normal text-foreground">
             {event.summary}
+            {typeof event.metadata.reason === "string" && (
+              <span className="block text-xs text-muted">Reason: {event.metadata.reason}</span>
+            )}
           </TableCell>
         </TableRow>
       ))}

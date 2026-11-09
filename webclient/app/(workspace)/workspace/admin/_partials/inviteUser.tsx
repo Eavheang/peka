@@ -28,7 +28,13 @@ type InviteUserProps = {
 
 export default function InviteUser({ open, onOpenChange, onInvited }: InviteUserProps) {
   const inviteUser = useInviteUser();
-  const { control, register, handleSubmit, reset } = useForm<InviteUserValues>({
+  const {
+    control,
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<InviteUserValues>({
     defaultValues: { email: "", role: "staff" },
   });
 
@@ -73,8 +79,15 @@ export default function InviteUser({ open, onOpenChange, onInvited }: InviteUser
             aria-label="Email"
             placeholder="Email"
             autoComplete="off"
-            {...register("email", { required: true })}
+            aria-invalid={errors.email ? true : undefined}
+            aria-describedby={errors.email ? "invite-email-error" : undefined}
+            {...register("email", { required: "Email is required." })}
           />
+          {errors.email && (
+            <p id="invite-email-error" role="alert" className="text-sm text-panel-danger">
+              {errors.email.message}
+            </p>
+          )}
           <Controller
             control={control}
             name="role"
