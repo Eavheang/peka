@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import axios from "axios";
 import Image from "next/image";
 import { ArrowLeft, ArrowRight, Eye, EyeOff } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -12,6 +13,12 @@ import { toast } from "@/components/ui/toast";
 import type { LoginFormValues } from "@/interface/auth";
 import { useLogin } from "@/services/auth";
 import { storeAuthTokens } from "@/utils/auth-storage";
+
+// A 5xx or no response (502 while the service restarts) is not bad credentials.
+const loginErrorMessage = (error: unknown) =>
+  axios.isAxiosError(error) && (error.response?.status ?? 500) < 500
+    ? "Invalid email or password."
+    : "Can't reach the server. Try again shortly.";
 
 type SignInFormValues = LoginFormValues & {
   rememberMe: boolean;
@@ -46,7 +53,7 @@ export default function SignInPage() {
           next.origin === window.location.origin ? next.pathname + next.search : "/workspace",
         );
       },
-      onError: () => toast.add({ title: "Invalid email or password.", type: "error" }),
+      onError: (error) => toast.add({ title: loginErrorMessage(error), type: "error" }),
     });
   }
 
@@ -131,7 +138,7 @@ export default function SignInPage() {
             />
             Remember me
           </label>
-          {login.isError && <p className="mt-1 text-xs text-danger">Invalid email or password.</p>}
+          {login.isError && <p className="mt-1 text-xs text-danger">{loginErrorMessage(login.error)}</p>}
           <Button className="mt-5 w-full" type="submit" disabled={login.isPending} size="lg">
             {login.isPending ? (
               "Signing in..."
