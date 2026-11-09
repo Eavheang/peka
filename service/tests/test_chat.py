@@ -33,6 +33,8 @@ def _empty_knowledge_base(monkeypatch) -> None:
     monkeypatch.setattr(chat_service, "search_knowledge", lambda query, role: [])
     # With no evidence the question counts as general unless a test says otherwise.
     monkeypatch.setattr(chat_service, "_needs_documents", lambda *args: False)
+    # No reranker in tests: uncited answers stay uncited unless a test scores them.
+    monkeypatch.setattr(chat_service, "rerank_scores", lambda query, texts: None)
 
 
 def _override_admin() -> None:
@@ -355,95 +357,106 @@ def test_grounded_answer_carries_citations(monkeypatch) -> None:
     assert response.citations[0].file_id == file_id
 
 
-def test_invalid_source_is_dropped_without_retry(monkeypatch):
-    results = [
-        {
-            "title": "school-policy.pdf",
-            "heading": "Student conduct",
-            "snippet": "Fighting is prohibited.",
-            "source_locations": [],
-        }
-    ]
-    answer_calls = 0
+_FIGHTING_RESULTS = [
+    {
+        "title": "school-policy.pdf",
+        "heading": "Student conduct",
+        "content": "Fighting is prohibited.",
+        "snippet": "Fighting is prohibited.",
+        "source_locations": [],
+    }
+]
+_UNCITED = {"blocks": [
+    {"kind": "general", "text": "Fighting is prohibited.", "source_ids": ["source-2"]},
+    {"kind": "general", "text": "Talk to a teacher.", "source_ids": []},
+]}
 
-    def generate(_messages, output_type):
-        nonlocal answer_calls
+
+def _scores_fighting(query, texts):
+    return [0.9 if "prohibited" in query else 0.01 for _ in texts]
+
+
+def _answer_uncited(monkeypatch) -> list:
+    """Fake a model that cites nothing on both chat paths; returns the answer calls it got."""
+    calls = []
+
+    def generate(messages, output_type):
         if output_type is chat_service.SearchPlan:
-            return _search_plan("search_knowledge_base", "school policy fighting")
-        answer_calls += 1
-        return chat_service.ModelAnswer(
-            blocks=[
-                {
-                    "kind": "grounded",
-                    "text": "Fighting is prohibited.",
-                    "source_ids": ["source-2"],
-                }
-            ]
-        )
-
-    monkeypatch.setattr(chat_service, "generate_structured", generate)
-    monkeypatch.setattr(chat_service, "search_knowledge", lambda *args: results)
-
-    response = chat_service.answer_from_knowledge(
-        "Is fighting against school policy?", "staff", web_search=True
-    )
-
-    assert response.answer == "Fighting is prohibited."
-    assert response.citations == []
-    assert answer_calls == 1
-
-
-def test_stream_invalid_source_is_dropped_without_retry(monkeypatch):
-    results = [
-        {
-            "title": "school-policy.pdf",
-            "heading": "Student conduct",
-            "snippet": "Fighting is prohibited.",
-            "source_locations": [],
-        }
-    ]
-    stream_calls = []
-
-    monkeypatch.setattr(
-        chat_service,
-        "generate_structured",
-        lambda messages, output_type: _search_plan("search_knowledge_base", "school policy fighting")
-        if output_type is chat_service.SearchPlan
-        else pytest.fail("Answer generation should use the streaming path"),
-    )
-    monkeypatch.setattr(chat_service, "search_knowledge", lambda *args: results)
+            return _search_plan("web_search", "school fighting rules")
+        calls.append(messages[-1].text)
+        return chat_service.ModelAnswer.model_validate(_UNCITED)
 
     async def stream_text(messages, output_type):
-        stream_calls.append(messages)
-        yield json.dumps(
-            {
-                "blocks": [
-                    {
-                        "kind": "grounded",
-                        "text": "Original answer.",
-                        "source_ids": ["source-2"],
-                    }
-                ]
-            }
-        )
+        calls.append(messages[-1].text)
+        yield json.dumps(_UNCITED)
 
+    monkeypatch.setattr(chat_service, "generate_structured", generate)
     monkeypatch.setattr(chat_service, "stream_structured_text", stream_text)
+    return calls
 
-    async def collect():
-        return [
-            event
-            async for event in chat_service.stream_answer_from_knowledge(
-                "Is fighting against school policy?", "staff", web_search=True
-            )
-        ]
 
-    events = asyncio.run(collect())
-    completed = next(
-        event for event in events if isinstance(event, chat_service.ChatStreamCompleted)
-    )
-    assert completed.response.answer == "Original answer."
-    assert completed.response.citations == []
-    assert len(stream_calls) == 1
+@both_chat_paths
+@pytest.mark.parametrize("web_search", [False, True], ids=["documents", "web"])
+def test_uncited_answer_gets_citations_without_another_model_call(monkeypatch, path, web_search):
+    calls = _answer_uncited(monkeypatch)
+    monkeypatch.setattr(chat_service, "search_knowledge", lambda *args: _FIGHTING_RESULTS)
+    monkeypatch.setattr(chat_service, "perform_web_search", lambda query: _FIGHTING_RESULTS)
+    monkeypatch.setattr(chat_service, "rerank_scores", _scores_fighting)
+
+    response = _ask(path, "Is fighting against school policy?", web_search=web_search)
+
+    assert response.answer == "Fighting is prohibited. [1]\n\nTalk to a teacher."
+    assert [citation.title for citation in response.citations] == ["school-policy.pdf"]
+    assert len(calls) == 1, "the answer is generated once"
+
+
+@both_chat_paths
+@pytest.mark.parametrize("score", [0.01, None], ids=["weak evidence", "reranker down"])
+def test_uncited_answer_is_not_matched_without_usable_scores(monkeypatch, path, score):
+    _answer_uncited(monkeypatch)
+    monkeypatch.setattr(chat_service, "search_knowledge", lambda *args: [{**_FIGHTING_RESULTS[0], "rerank_score": score}])
+    monkeypatch.setattr(chat_service, "rerank_scores", lambda *args: pytest.fail("must not call the reranker"))
+
+    assert _ask(path, "Is fighting against school policy?").citations == []
+
+
+@pytest.mark.parametrize("text, scores", [
+    ("Fighting is prohibited.", [0.4]),  # below the match floor
+    ("Fighting costs 3 days of suspension.", [0.9]),  # the source does not hold the number
+    ("Fighting costs 3 days of suspension.", None),  # reranker failed on this call
+])
+def test_attach_citations_cites_only_matching_sources(text, scores, monkeypatch):
+    monkeypatch.setattr(chat_service, "rerank_scores", lambda query, texts: scores)
+    answer = chat_service.ModelAnswer(blocks=[{"kind": "general", "text": text, "source_ids": []}])
+
+    attached = chat_service._attach_citations(answer, {"source-1": _FIGHTING_RESULTS[0]}, "web_search")
+
+    assert attached.blocks[0].source_ids == []
+
+
+def test_attach_citations_picks_the_sources_holding_the_numbers(monkeypatch):
+    sources = {
+        "source-1": {"title": "a.pdf", "heading": "", "content": "Stipends moved by 32 percent."},
+        "source-2": {"title": "b.pdf", "heading": "", "content": "Stipends moved by 34 percent."},
+    }
+    monkeypatch.setattr(chat_service, "rerank_scores", lambda query, texts: [0.99, 0.8])
+
+    def cited(text):
+        answer = chat_service.ModelAnswer(blocks=[{"kind": "general", "text": text, "source_ids": []}])
+        return chat_service._attach_citations(answer, sources, "web_search").blocks[0].source_ids
+
+    assert cited("Stipends moved 34 percent.") == ["source-2"]
+    assert cited("It moved 32 and 34 percent.") == ["source-1", "source-2"]
+
+
+def test_answer_that_cites_anything_is_left_alone(monkeypatch):
+    monkeypatch.setattr(chat_service, "rerank_scores", lambda *args: pytest.fail("must not score"))
+    cited = chat_service.ModelAnswer(blocks=[
+        {"kind": "grounded", "text": "Fighting is prohibited.", "source_ids": ["source-1"]},
+        {"kind": "general", "text": "Talk to a teacher.", "source_ids": []},
+    ])
+
+    assert chat_service._attach_citations(cited, {"source-1": _FIGHTING_RESULTS[0]}, "web_search") is cited
 
 
 def test_empty_search_falls_back_without_citations(monkeypatch):
@@ -588,8 +601,8 @@ def test_model_receives_bounded_conversation_context(monkeypatch):
 
     monkeypatch.setattr(chat_service, "generate_structured", generate)
     chat_service.answer_from_knowledge("What about the second option?", "staff", history)
-    # 20 history messages + system + question + retrieval context
-    assert len(seen) == 23
+    # Short messages all fit the character budget: 26 history messages + system + question + retrieval context
+    assert len(seen) == 29
     assert seen[-3].role == "assistant"
     assert seen[-3].text == "Option two is distribution."
     assert seen[-2].text == "What about the second option?"
@@ -1384,7 +1397,8 @@ def test_history_and_question_share_one_character_budget() -> None:
 
     messages = chat_service._conversation_messages(query, history, "system")
 
-    assert sum(len(message.text) for message in messages[1:]) == chat_service._HISTORY_MAX_CHARS
+    overhead = chat_service._MESSAGE_OVERHEAD_CHARS * (len(messages) - 2)
+    assert sum(len(message.text) for message in messages[1:]) + overhead == chat_service._HISTORY_MAX_CHARS
     assert messages[-1].text == query
 
 
@@ -1397,7 +1411,27 @@ def test_message_that_overflows_the_budget_is_cut_not_dropped() -> None:
     messages = chat_service._conversation_messages("Shorten it.", history, "system")
 
     assert [message.text[0] for message in messages[1:]] == ["r", "S"]
-    assert len(messages[1].text) == chat_service._HISTORY_MAX_CHARS - len("Shorten it.")
+    assert len(messages[1].text) == (
+        chat_service._HISTORY_MAX_CHARS - len("Shorten it.") - chat_service._MESSAGE_OVERHEAD_CHARS
+    )
+
+
+def test_many_short_turns_cannot_overflow_the_context() -> None:
+    # Each message costs chat-template tokens however short it is.
+    messages = chat_service._conversation_messages("q", [{"role": "user", "content": "ok"}] * 1000, "system")
+
+    assert len(messages) - 2 == (chat_service._HISTORY_MAX_CHARS - 1) // (2 + chat_service._MESSAGE_OVERHEAD_CHARS)
+
+
+@both_chat_paths
+@pytest.mark.parametrize("score, told", [(0.01, True), (0.9, False), (None, False)])
+def test_unrelated_results_tell_the_model_to_answer_generally(monkeypatch, path, score, told) -> None:
+    prompts = _answer_uncited(monkeypatch)
+    monkeypatch.setattr(chat_service, "search_knowledge", lambda *args: [{**_POLICY_SOURCE, "rerank_score": score}])
+
+    _ask(path, "What is 17 times 23?")
+
+    assert (chat_service._UNRELATED_RESULTS_NOTE in prompts[0]) is told
 
 
 def test_a_long_question_is_not_sent_again_whole_as_the_search_query() -> None:
@@ -1527,7 +1561,7 @@ def test_web_search_results_are_not_gated(monkeypatch) -> None:
     assert chat_service.answer_from_knowledge("Any news?", "staff", web_search=True).refused is False
 
 
-def test_needs_documents_reads_the_classifier_with_recent_history(monkeypatch) -> None:
+def test_needs_documents_reads_the_classifier_with_the_whole_conversation(monkeypatch) -> None:
     seen = []
 
     def generate(messages, output_type):
@@ -1538,7 +1572,8 @@ def test_needs_documents_reads_the_classifier_with_recent_history(monkeypatch) -
     history = [{"role": "user", "content": str(index)} for index in range(10)]
 
     assert _real_needs_documents("And its risks?", history, None) is True
-    assert [message.text for message in seen[0][1:]] == ["6", "7", "8", "9", "And its risks?"]
+    # The user may have stated the answer at the start, so not only the last exchanges.
+    assert [message.text for message in seen[0][1:]] == [*map(str, range(10)), "And its risks?"]
 
 
 def test_needs_documents_answers_normally_when_the_classifier_fails(monkeypatch) -> None:

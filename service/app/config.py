@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     rerank_top_k: int = 5
     # Below this top rerank score the documents do not cover the question. Depends on the rerank model; 0 turns it off.
     search_evidence_floor: float = 0.1
+    # From this rerank score an answer block counts as drawn from a source, when the model cited none.
+    # Measured with bge-reranker here: restating blocks scored 0.91 or more, general text 0.34 or less.
+    citation_match_floor: float = Field(default=0.5, ge=0, le=1)
     exa_api_key: SecretStr | None = None
     exa_base_url: str = "https://api.exa.ai"
     web_search_top_k: int = 5
