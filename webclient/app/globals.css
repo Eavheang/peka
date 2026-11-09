@@ -24,6 +24,7 @@
   --color-panel: #202523;
   --color-panel-elevated: #303131;
   --color-panel-foreground: #f3f1ea;
+  --color-panel-danger: #fda29b;
 }
 
 /* Theme ids must match THEMES in utils/theme.ts. */
