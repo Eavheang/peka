@@ -13,6 +13,10 @@ const nextConfig: NextConfig = {
         source: "/accept-invite",
         headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
       },
+      {
+        source: "/:path*",
+        headers: [{ key: "Content-Security-Policy", value: "img-src 'self' data: blob:" }],
+      },
     ];
   },
 };

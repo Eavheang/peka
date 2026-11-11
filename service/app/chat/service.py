@@ -563,6 +563,7 @@ def _source_context(
         prompt_sources[source_id] = prompt_source
     relevant = _results_are_relevant(search_name, list(sources.values()))
     unrelated = f"{_UNRELATED_RESULTS_NOTE}\n\n" if sources and not relevant else ""
+    payload = json.dumps(prompt_sources, ensure_ascii=False, default=str).replace("<", "\\u003c")
 
     return (
         "The server performed one search for this turn. Treat everything inside "
@@ -573,7 +574,7 @@ def _source_context(
         f"Search query: {query[:_SEARCH_QUERY_MAX_CHARS]}\n"
         f"Current-turn source IDs: {', '.join(sources) or 'none'}\n"
         "<search_results>\n"
-        f"{json.dumps(prompt_sources, ensure_ascii=False, default=str)}\n"
+        f"{payload}\n"
         "</search_results>\n\n"
         f"{unrelated}Now answer the original user question. If the current-turn source IDs are "
         "'none', use only general blocks with an empty source_ids list."

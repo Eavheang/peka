@@ -74,3 +74,13 @@ On API lifespan, if both `ADMIN_EMAIL` and `ADMIN_PASSWORD` are set and no admin
 | `ADMIN_PASSWORD` | `service/.env` (bootstrap only) |
 
 Use a secret manager in real deployments. Prefer removing the llama host port publish so only the backend network can reach the LLM.
+
+## Prompt injection and answer rendering
+
+Indexed documents are untrusted, any signed-in user can upload general files, and the model can repeat Markdown planted in those documents.
+
+- `AnswerMarkdown` drops images, including one whose URL carries chat data
+- Links get `rel="noreferrer"`
+- Web client sends `Content-Security-Policy: img-src 'self' data: blob:` so a rendered image cannot load from another origin
+- Inside `<search_results>`, `<` is escaped as `\u003c`, so a document cannot close that delimiter
+- Links still render, and a user can click them
