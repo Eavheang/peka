@@ -404,6 +404,21 @@ def test_a_kept_chunk_is_deleted_with_the_last_message_citing_it(cited_then_rein
     assert exists(current)  # active chunks are never released
 
 
+
+@pytest.mark.parametrize("citations", ['{"chunk_id": "x"}', '"text"', '[{"chunk_id": "not-a-uuid"}, "text", 7, {"chunk_id": 5}]'])
+def test_deleting_a_message_with_malformed_citations_still_works(cited_then_reindexed, citations):
+    case = cited_then_reindexed
+    execute(
+        "INSERT INTO messages (conversation_id, sequence, role, content, citations) "
+        "VALUES (%s, 2, 'assistant', 'old', %s::jsonb)",
+        case.conversation, citations,
+    )
+
+    execute("DELETE FROM messages WHERE conversation_id = %s", case.conversation)
+
+    assert execute("SELECT 1 FROM messages WHERE conversation_id = %s", case.conversation) is None
+    assert not exists(case.cited)  # the well-formed citation in the same delete is still released
+
 def test_a_failed_swap_keeps_the_active_set_and_every_chunk(cited_then_reindexed, monkeypatch):
     case = cited_then_reindexed
     before = execute("SELECT id FROM chunk_sets WHERE file_id = %s AND status = 'active'", case.file["id"])[0]

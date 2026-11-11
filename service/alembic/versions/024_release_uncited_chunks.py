@@ -24,9 +24,12 @@ def upgrade() -> None:
         BEGIN
             DELETE FROM knowledge_chunks kc USING chunk_sets cs
             WHERE kc.id IN (
-                SELECT (citation->>'chunk_id')::uuid
-                FROM removed, jsonb_array_elements(removed.citations) citation
-                WHERE citation->>'chunk_id' IS NOT NULL
+                -- Guarded so one malformed old row can't make every message delete fail.
+                SELECT CASE WHEN citation->>'chunk_id' ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+                            THEN (citation->>'chunk_id')::uuid END
+                FROM removed, jsonb_array_elements(
+                    CASE WHEN jsonb_typeof(removed.citations) = 'array' THEN removed.citations ELSE '[]'::jsonb END
+                ) citation
             )
             AND cs.id = kc.chunk_set_id AND cs.status = 'superseded'
             AND NOT EXISTS (
