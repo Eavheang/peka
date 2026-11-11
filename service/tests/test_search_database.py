@@ -19,14 +19,20 @@ from uuid import uuid4
 import httpx
 import psycopg
 import pytest
+from fastapi.testclient import TestClient
+from pgvector.psycopg import register_vector
+from psycopg.types.json import Jsonb
 
+from app.auth.routes import authenticated
 from app.config import settings
 from app.engine.chunks.chunker import CHUNKER_VERSION, Chunk
+from app.engine.chunks import repository as chunks_repository
 from app.engine.chunks.repository import knowledge_chunks_repository
 from app.engine.indexing.job_repository import index_jobs_repository
 from app.engine.search import service as search_service
 from app.engine.search.repository import search_repository
 from app.files.repository import files_repository
+from app.main import app
 
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
 pytestmark = pytest.mark.skipif(
@@ -312,48 +318,138 @@ def test_format_copies_do_not_crowd_another_document_out_of_the_pool(owner):
     assert "Other" in {row["heading"] for row in results}
 
 
-def test_a_cited_chunk_still_opens_after_its_file_is_re_indexed(owner):
+
+def cite(owner_id, *chunks):
+    """Save an answer citing these (chunk_id, path, heading) passages; returns its conversation."""
+    conversation = execute("INSERT INTO conversations (owner_id, title) VALUES (%s, 't') RETURNING id", owner_id)[0]
+    citations = [{"chunk_id": str(chunk_id), "title": path, "heading": heading} for chunk_id, path, heading in chunks]
+    execute(
+        "INSERT INTO messages (conversation_id, sequence, role, content, citations) "
+        "VALUES (%s, 1, 'assistant', 'answer', %s)",
+        conversation, Jsonb(citations),
+    )
+    return conversation
+
+
+def chunk_id(file, heading):
+    """The file's active chunk under this heading."""
+    return execute(
+        "SELECT kc.id FROM knowledge_chunks kc JOIN chunk_sets cs ON cs.id = kc.chunk_set_id AND cs.status = 'active' "
+        "WHERE kc.file_id = %s AND kc.heading = %s",
+        file["id"], heading,
+    )[0]
+
+
+def exists(chunk):
+    return execute("SELECT 1 FROM knowledge_chunks WHERE id = %s", chunk) is not None
+
+
+@pytest.fixture
+def cited_then_reindexed(owner):
+    """A file whose "Leave" chunk a saved answer cites, then re-indexed with new text."""
     path = f"citations/{uuid4().hex[:8]}-policy.txt"
     file = index_file(path, "general", owner.id, [("Leave", unit_vector(1, 0)), ("Pay", unit_vector(0, 1))])
     owner.files.append(file)
-    cited, uncited = (
-        execute("SELECT id FROM knowledge_chunks WHERE file_id = %s AND heading = %s", file["id"], heading)[0]
-        for heading in ("Leave", "Pay")
-    )
-    conversation = execute(
-        "INSERT INTO conversations (owner_id, title) VALUES (%s, 'leave') RETURNING id", owner.id
-    )[0]
-    execute(
-        "INSERT INTO messages (conversation_id, sequence, role, content, citations) "
-        "VALUES (%s, 1, 'assistant', 'answer', %s::jsonb)",
-        conversation, f'[{{"chunk_id": "{cited}", "title": "{path}", "heading": "Leave"}}]',
-    )
-    title = path.rsplit("/", 1)[-1]
-
+    cited, uncited = chunk_id(file, "Leave"), chunk_id(file, "Pay")
+    conversation = cite(owner.id, (cited, path, "Leave"))
     new = Chunk(title=path, heading="Leave", content="Leave was rewritten.", source_locations=())
     knowledge_chunks_repository.swap_active_set(file["id"], [new], [unit_vector(1, 0)])
+    return SimpleNamespace(
+        file=file, path=path, title=path.rsplit("/", 1)[-1], cited=cited, uncited=uncited,
+        conversation=conversation, owner_id=owner.id,
+    )
 
-    preview = search_repository.find_source(cited, title, "Leave", ("general",))
-    assert preview is not None and preview["content"] == "Leave text."
-    assert execute("SELECT 1 FROM knowledge_chunks WHERE id = %s", uncited) is None
+
+def preview(role, chunk, title, heading):
+    app.dependency_overrides[authenticated] = lambda: {"id": "u1", "role": role}
+    try:
+        return TestClient(app).post(
+            "/chat/source-preview", json={"chunk_id": str(chunk) if chunk else None, "title": title, "heading": heading}
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_a_cited_chunk_still_opens_after_its_file_is_re_indexed(cited_then_reindexed):
+    case = cited_then_reindexed
+
+    response = preview("staff", case.cited, case.title, "Leave")
+    assert response.status_code == 200 and response.json()["content"] == "Leave text."
+    assert not exists(case.uncited)
     results = search_repository.search_chunks(unit_vector(1, 0), ("general",), top_k=10)
-    assert [row["content"] for row in results if row["file_id"] == file["id"]] == ["Leave was rewritten."]
+    assert [row["content"] for row in results if row["file_id"] == case.file["id"]] == ["Leave was rewritten."]
     # Without a chunk ID, the preview reads the current passage, never the kept one.
-    assert search_repository.find_source(None, title, "Leave", ("general",))["content"] == "Leave was rewritten."
-    assert search_repository.find_source(cited, title, "Leave", ()) is None
+    assert preview("staff", None, case.title, "Leave").json()["content"] == "Leave was rewritten."
 
 
-def test_files_indexed_by_an_older_chunker_are_queued_again(owner):
+def test_a_kept_chunk_follows_the_files_current_access_level(cited_then_reindexed):
+    case = cited_then_reindexed
+    files_repository.update_access_level(case.file["id"], "confidential")
+
+    assert preview("staff", case.cited, case.title, "Leave").status_code == 404
+    assert preview("admin", case.cited, case.title, "Leave").json()["content"] == "Leave text."
+
+
+def test_a_kept_chunk_is_deleted_with_the_last_message_citing_it(cited_then_reindexed):
+    case = cited_then_reindexed
+    other = cite(case.owner_id, (case.cited, case.path, "Leave"))
+    current = chunk_id(case.file, "Leave")
+    citing_current = cite(case.owner_id, (current, case.path, "Leave"))
+
+    execute("DELETE FROM messages WHERE conversation_id = %s", case.conversation)
+    assert exists(case.cited)  # another answer still cites it
+    execute("DELETE FROM conversations WHERE id = %s", other)  # cascades to its messages
+    assert not exists(case.cited)
+    execute("DELETE FROM conversations WHERE id = %s", citing_current)
+    assert exists(current)  # active chunks are never released
+
+
+def test_a_failed_swap_keeps_the_active_set_and_every_chunk(cited_then_reindexed, monkeypatch):
+    case = cited_then_reindexed
+    before = execute("SELECT id FROM chunk_sets WHERE file_id = %s AND status = 'active'", case.file["id"])[0]
+    real_connect = chunks_repository.get_connection
+
+    class FailsOnActivate:
+        def __init__(self):
+            self.connection = real_connect()
+
+        def __enter__(self):
+            self.connection.__enter__()
+            return self
+
+        def __exit__(self, *error):
+            return self.connection.__exit__(*error)
+
+        def execute(self, sql, params=None):
+            if sql.startswith("UPDATE chunk_sets SET status = 'active'"):
+                raise RuntimeError("activation failed")
+            return self.connection.execute(sql, params)
+
+    monkeypatch.setattr(chunks_repository, "get_connection", FailsOnActivate)
+    monkeypatch.setattr(chunks_repository, "register_vector", lambda proxy: register_vector(proxy.connection))
+    newer = Chunk(title=case.path, heading="Leave", content="Newer text.", source_locations=())
+    with pytest.raises(RuntimeError, match="activation failed"):
+        knowledge_chunks_repository.swap_active_set(case.file["id"], [newer], [unit_vector(1, 0)])
+
+    assert execute("SELECT id FROM chunk_sets WHERE file_id = %s AND status = 'active'", case.file["id"])[0] == before
+    assert exists(case.cited) and exists(chunk_id(case.file, "Leave"))
+    assert execute("SELECT 1 FROM knowledge_chunks WHERE content = 'Newer text.'") is None
+
+@pytest.mark.parametrize("status", ["completed", "failed", "queued"])
+def test_files_indexed_by_an_older_chunker_are_queued_again(owner, status):
     old, current = (
         index_file(f"versions/{uuid4().hex[:8]}-{name}.txt", "general", owner.id, [("Text", unit_vector(1, 0))])
         for name in ("old", "current")
     )
     owner.files.extend([old, current])
-    execute("UPDATE index_jobs SET status = 'completed', attempts = 2 WHERE file_id = ANY(%s)", [old["id"], current["id"]])
+    execute(
+        "UPDATE index_jobs SET status = %s, attempts = 3, last_error = 'x' WHERE file_id = ANY(%s)",
+        status, [old["id"], current["id"]],
+    )
     execute("UPDATE chunk_sets SET chunker_version = %s WHERE file_id = %s", CHUNKER_VERSION - 1, old["id"])
 
     index_jobs_repository.queue_outdated(CHUNKER_VERSION)
 
-    status = lambda file: execute("SELECT status, attempts FROM index_jobs WHERE file_id = %s", file["id"])
-    assert status(old) == ("queued", 0)
-    assert status(current) == ("completed", 2)
+    state = lambda file: execute("SELECT status, attempts, last_error FROM index_jobs WHERE file_id = %s", file["id"])
+    assert state(old) == ("queued", 0, None)
+    assert state(current) == (status, 3, "x")

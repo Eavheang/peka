@@ -16,9 +16,10 @@ class IndexJobsRepository:
         """Re-index files whose active chunks an older chunker built."""
         with get_connection() as connection:
             connection.execute(
-                "UPDATE index_jobs jobs SET status = 'queued', attempts = 0, updated_at = CURRENT_TIMESTAMP "
+                "UPDATE index_jobs jobs SET status = 'queued', attempts = 0, last_error = NULL, "
+                "updated_at = CURRENT_TIMESTAMP "
                 "FROM chunk_sets sets WHERE sets.file_id = jobs.file_id AND sets.status = 'active' "
-                "AND sets.chunker_version < %s AND jobs.status = 'completed'",
+                "AND sets.chunker_version < %s AND jobs.status IN ('queued', 'completed', 'failed')",
                 (chunker_version,),
             )
 
