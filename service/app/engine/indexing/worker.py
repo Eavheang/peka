@@ -6,7 +6,7 @@ import time
 from app.audit.service import record_audit_event
 from app.config import settings
 from app.engine.source_extractor import source_id_for
-from app.engine.chunks.chunker import chunk_extraction
+from app.engine.chunks.chunker import CHUNKER_VERSION, chunk_extraction
 from app.engine.chunks.embeddings import embed_chunks
 from app.engine.chunks.repository import knowledge_chunks_repository
 from app.engine.indexing.job_repository import index_jobs_repository
@@ -44,6 +44,7 @@ def process_next_job() -> bool:
 def run_worker(stop: threading.Event | None = None) -> None:
     # ponytail: one worker serializes shared indexes; add per-organization locks before scaling.
     index_jobs_repository.reset_processing()
+    index_jobs_repository.queue_outdated(CHUNKER_VERSION)
     while stop is None or not stop.is_set():
         if not process_next_job():
             if stop is None:

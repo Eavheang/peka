@@ -116,6 +116,7 @@ def test_chunk_set_model_describes_versioned_sets() -> None:
         "id",
         "file_id",
         "status",
+        "chunker_version",
         "created_at",
     }
     assert str(next(constraint for constraint in table.constraints

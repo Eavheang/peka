@@ -89,6 +89,8 @@ The TEI image in Compose truncates longer input instead of rejecting it (`auto_t
 
 Each re-index creates a new `chunk_sets` row (`building`), inserts chunks, then swaps so only one set per file is `active`. Search never mixes superseded vectors.
 
+The swap deletes the superseded set's chunks except those a saved answer cites, so older citations still open their source preview. A trigger on `messages` deletes a kept chunk once the last message citing it is deleted.
+
 ## Worker reliability
 
 - Single serial worker (no Redis); claim via `SKIP LOCKED`
@@ -102,7 +104,13 @@ Scaling note: code comments warn that org-level locking would be needed before r
 
 ## Re-indexing existing files
 
-Files indexed before this format keep their old model-rewritten chunks until they are re-indexed. Nothing re-queues them automatically, because regenerating rewritten chunks later is expensive, so this is the owner's choice. Re-indexing deletes the old chunks, so previews of citations saved in older conversations stop working. To re-index every file from its original text:
+Each chunk set records the `chunker_version` that built it (`CHUNKER_VERSION` in `chunker.py`). When the index worker starts, it re-queues every file whose active set an older chunker built, whatever the state of its job. Bump `CHUNKER_VERSION` whenever chunk output changes.
+
+Migration `023` gives every existing chunk set version 0, so **the first deploy with it re-indexes every file once**. That is intended: it moves files still on model-rewritten chunks onto the original text.
+
+Re-indexing keeps the chunks that saved answers cite, so citations in older conversations still open their source preview. Kept chunks stay in their superseded set, which search never reads, and the preview still checks the file's current access level. Citations already broken by a re-index before this change stay broken.
+
+To re-index every file now, without changing the version:
 
 ```sql
 UPDATE index_jobs SET status = 'queued', attempts = 0, last_error = NULL, updated_at = CURRENT_TIMESTAMP
