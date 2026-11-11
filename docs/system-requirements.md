@@ -25,11 +25,12 @@ Software:
 | Docker and Docker Compose | Docker 28.5, Compose 2.40 | Runs every service |
 | NVIDIA driver and NVIDIA Container Toolkit | driver 595 | Lets the llama.cpp container use the GPU |
 | `make` | any | Wraps the Compose commands in `config/Makefile` |
+| `openssl` | any | `make setup` uses it to generate database and pgAdmin passwords |
 | Bun | 1.4 | Only for working on the web client outside Docker |
 | Python 3.12 | | Only for working on the service outside Docker (the container image provides it) |
 | A GGUF model file | `gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf` (4.2 GB) | The local language model, placed in `config/model/` |
 
-Ports used on the host: `3000` (web app), `8000` (API), `8080` (llama.cpp), `5432` (Postgres), `5050` (pgAdmin). Free them first or change the mappings in `config/compose.yaml`.
+`compose.yaml` publishes only port `3000` (the web app). The dev stack binds `8000` (API) and `5432` (Postgres) to `127.0.0.1`, and `5050` (pgAdmin) and `8080` (llama.cpp) when those are started.
 
 ## Start PEKA
 

@@ -15,7 +15,7 @@ Useful URLs:
 - API: http://localhost:8000
 - API docs: http://localhost:8000/docs
 - Health check: http://localhost:8000/health
-- pgAdmin: http://localhost:5050
+- pgAdmin (optional, `--profile pgadmin` in `config/`): http://127.0.0.1:5050
 
 ## Database migrations
 

@@ -57,10 +57,10 @@ make up      # start the dev stack
 | Service | URL |
 |---------|-----|
 | Web UI (via nginx) | http://localhost:3000 |
-| API | http://localhost:8000 |
-| OpenAPI docs | http://localhost:8000/docs |
-| Health | http://localhost:8000/health |
-| pgAdmin | http://localhost:5050 |
-| llama.cpp (optional profile) | http://localhost:8080 |
+| API (dev stack) | http://127.0.0.1:8000 |
+| OpenAPI docs | http://127.0.0.1:8000/docs |
+| Health | http://127.0.0.1:8000/health |
+| pgAdmin (optional `--profile pgadmin`) | http://127.0.0.1:5050 |
+| llama.cpp (optional profile) | http://127.0.0.1:8080 |
 
 See [Getting started](getting-started.md) for env files, admin bootstrap, and optional local LLM.

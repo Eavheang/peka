@@ -19,12 +19,12 @@ It can run entirely on your own machine, including the language model.
 | Item | Minimum |
 |------|---------|
 | OS | Linux. Windows and macOS have not been tested |
-| Software | Docker with Compose, `make` |
+| Software | Docker with Compose, `make`, `openssl` |
 | RAM | 16 GB |
 | Disk | About 20 GB free |
 | GPU | NVIDIA with 6 GB VRAM, plus the NVIDIA Container Toolkit. Not needed with a hosted model |
 
-The app uses host ports `3000`, `8000`, `8080`, `5432` and `5050`.
+Only port `3000` is published. The dev stack also binds `8000` and `5432` to `127.0.0.1`, and `5050` (pgAdmin) and `8080` (llama) when those are started.
 
 ## Quick start
 
@@ -109,9 +109,8 @@ These figures come from one test corpus and were graded by a single person. See 
 
 The default setup is for local use. Before exposing PEKA to a network:
 
-- Change the Postgres and pgAdmin passwords in `config/.env`, which `make setup` creates from `config/.env.example`.
 - Set your own secrets, and never commit `.env` files.
-- Restrict the published ports. The local model on `8080` has no authentication, and Postgres on `5432` and pgAdmin on `5050` are also published.
+- See [Security](docs/security.md) before publishing any port beyond the web app.
 - Serve the app over HTTPS.
 
 See [Security](docs/security.md) for details.

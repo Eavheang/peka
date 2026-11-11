@@ -114,7 +114,7 @@ These commands need the local `eval/` folder, which is not in this repository. T
 cd eval
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 
-export PEKA_URL=http://localhost:8000          # default
+export PEKA_URL=http://localhost:8000          # needs the dev stack (`make up` in `config/`)
 export PEKA_EMAIL=... PEKA_PASSWORD=...        # an account that can see the documents
 export JUDGE_BASE_URL=https://openrouter.ai/api/v1 JUDGE_API_KEY=... JUDGE_MODEL=minimax/minimax-m3.1-flash:free
 

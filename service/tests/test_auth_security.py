@@ -64,3 +64,11 @@ def test_settings_validate_auth_configuration() -> None:
         Settings(jwt_secret_key=secret, jwt_access_token_expire_minutes=61)
     with pytest.raises(ValidationError):
         Settings(jwt_secret_key=SecretStr("replace-with-at-least-32-random-characters"))
+
+
+def test_settings_reject_old_default_database_password() -> None:
+    with pytest.raises(ValidationError):
+        Settings(
+            jwt_secret_key=SecretStr("test-only-secret-that-is-at-least-32-chars"),
+            database_url="postgresql://peka:peka_dev_password@localhost:5432/peka",
+        )

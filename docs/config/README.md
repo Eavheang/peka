@@ -32,15 +32,15 @@ make prod-down # tear down the prod-style stack
 
 | Service | Image / build | Host ports | Role |
 |---------|---------------|------------|------|
-| `postgres` | `pgvector/pgvector:pg16` | 5432 | Primary DB + vectors |
-| `pgadmin` | `dpage/pgadmin4` | 5050 | DB UI |
+| `postgres` | `pgvector/pgvector:pg16` | `127.0.0.1:5432` in dev; unpublished in prod | Primary DB + vectors |
+| `pgadmin` | `dpage/pgadmin4` | `127.0.0.1:5050`, `--profile pgadmin` in `compose.dev.yaml` | Optional DB UI |
 | `webclient` | `../webclient` Dockerfile | via proxy | Next.js UI |
-| `service` | `../service` Dockerfile | 8000 | FastAPI |
+| `service` | `../service` Dockerfile | `127.0.0.1:8000` in dev; unpublished in prod | FastAPI |
 | `index-worker` | same service image | — | `python -m app.engine.indexing.worker` |
 | `embeddings` | TEI `cpu-1.9` | (internal 80) | BGE-small embeddings |
 | `reranker` | TEI `cpu-1.9` | (internal 80) | Cross-encoder that reranks search hits, on CPU |
-| `proxy` | `nginx:alpine` | `${WEBCLIENT_PORT:-3000}` | Public entry |
-| `llama` | llama.cpp CUDA (profile `llama`) | 8080 | Optional local LLM |
+| `proxy` | `nginx:alpine` | `${WEBCLIENT_PORT:-3000}` (only prod publish) | Public entry |
+| `llama` | llama.cpp CUDA (profile `llama`) | `127.0.0.1:8080` | Optional local LLM |
 
 Shared volume `file_storage` is mounted at `/app/storage` for `service` and `index-worker`.
 
@@ -53,10 +53,12 @@ From `config/.env.example`:
 ```env
 POSTGRES_DB=peka
 POSTGRES_USER=peka
-POSTGRES_PASSWORD=peka_dev_password
+POSTGRES_PASSWORD=
 PGADMIN_DEFAULT_EMAIL=admin@example.com
-PGADMIN_DEFAULT_PASSWORD=peka_admin_password
+PGADMIN_DEFAULT_PASSWORD=
 ```
+
+`make setup` fills the two blank passwords when it creates `config/.env`.
 
 Optional, with defaults in `compose.yaml`: `WEBCLIENT_PORT`, `EMBEDDING_MODEL`, `EMBEDDING_DIMENSIONS`, `EMBEDDING_BATCH_SIZE`, `RERANK_MODEL`. `JWT_SECRET_KEY` is read from `service/.env` only.
 
