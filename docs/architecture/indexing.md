@@ -49,9 +49,12 @@ PDF tables are not detected: they stay in the page text. PDF headings are not de
 | Source | Chunk heading | `source_locations` |
 |--------|---------------|--------------------|
 | PDF page | `Page 3` | `[{"page": 3}]` |
-| PPTX slide | `Slide 3` | `[{"slide": 3}]` |
+| PPTX slide, including text inside grouped shapes | `Slide 3` | `[{"slide": 3}]` |
+| PPTX speaker notes | `Slide 3 notes` | `[{"slide": 3, "part": "notes"}]` |
 | XLSX sheet | `Sheet: Q1` | `[{"sheet": 1, "name": "Q1"}]` |
 | DOCX heading | The heading text | `[{"section": 2}]` |
+| DOCX footnotes | `Footnotes` | `[{"part": "footnotes"}]` |
+| DOCX headers and footers, each distinct one once | `Headers and footers` | `[{"part": "headers and footers"}]` |
 | Markdown `#` to `######` | The heading text | `[]` |
 | Text before the first heading, and `.txt` | `Text` | `[{"section": 0}]` for DOCX, otherwise `[]` |
 
@@ -61,6 +64,8 @@ Rules:
 2. **Everything else splits at the coarsest boundary that fits:** paragraph, line, sentence, word, then inside an unbroken run such as a long ID.
 3. **Nothing is dropped.** That includes text before the first heading and plain text with no headings. A heading with no body of its own moves into the next section's text.
 4. **A heading can repeat.** All parts of a long page keep the name `Page 3`. Citations and previews find a chunk by its ID, so this hides nothing. Search keeps only the best-ranked format of a file name, so `.pdf` and `.docx` copies of one report never compete for result slots.
+
+Not extracted: DOCX endnotes, text boxes and comments; PPTX charts, SmartArt and alt text; text in images (there is no OCR). Footnotes and headers or footers are cited by part only, without a page or footnote number.
 
 Embedding input string:
 

@@ -5,6 +5,9 @@ from uuid import uuid4
 
 import pymupdf
 from docx import Document
+from docx.opc.constants import CONTENT_TYPE as CT, RELATIONSHIP_TYPE as RT
+from docx.opc.packuri import PackURI
+from docx.opc.part import Part
 from openpyxl import Workbook
 from pptx import Presentation
 from pptx.util import Inches
@@ -99,6 +102,32 @@ def test_docx_chunks_follow_unnumbered_headings_and_tables(tmp_path):
     ]
 
 
+def test_docx_headers_footers_and_footnotes_become_their_own_chunks(tmp_path):
+    path = tmp_path / "report.docx"
+    document = Document()
+    document.add_paragraph("Body text.")
+    document.sections[0].header.paragraphs[0].text = "Internal use only"
+    document.sections[0].footer.paragraphs[0].text = "Finance team"
+    document.add_section()  # Its header links to the first one, so it must not repeat.
+    footnotes = (
+        '<w:footnotes xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+        '<w:footnote w:type="separator" w:id="-1"><w:p><w:r><w:separator/></w:r></w:p></w:footnote>'
+        '<w:footnote w:id="1"><w:p><w:r><w:t>Source:</w:t><w:tab/><w:t>2025</w:t></w:r><w:r><w:br/><w:t>audit.</w:t></w:r></w:p></w:footnote>'
+        "</w:footnotes>"
+    )
+    part = Part(PackURI("/word/footnotes.xml"), CT.WML_FOOTNOTES, footnotes.encode(), document.part.package)
+    document.part.relate_to(part, RT.FOOTNOTES)
+    document.save(path)
+
+    chunks = chunk_extraction(extract_file(path))
+
+    assert [(chunk.heading, chunk.content, chunk.source_locations) for chunk in chunks] == [
+        ("Text", "Body text.", ({"section": 0},)),
+        ("Footnotes", "Source: 2025 audit.", ({"part": "footnotes"},)),
+        ("Headers and footers", "Internal use only\nFinance team", ({"part": "headers and footers"},)),
+    ]
+
+
 def test_pdf_table_becomes_pipe_rows_apart_from_the_prose(tmp_path) -> None:
     path = tmp_path / "ruled.pdf"
     with pymupdf.open() as pdf:
@@ -154,6 +183,23 @@ def test_pptx_table_text_is_extracted_as_its_own_chunk(tmp_path):
     assert [(chunk.heading, chunk.content, chunk.source_locations) for chunk in chunks] == [
         ("Slide 1", "Roadmap", ({"slide": 1},)),
         ("Slide 1", "| Phase: Beta | Date: March |", ({"slide": 1},)),
+    ]
+
+
+def test_pptx_grouped_shapes_and_speaker_notes_are_extracted(tmp_path):
+    path = tmp_path / "deck.pptx"
+    presentation = Presentation()
+    slide = presentation.slides.add_slide(presentation.slide_layouts[6])
+    group = slide.shapes.add_group_shape()
+    group.shapes.add_textbox(Inches(1), Inches(1), Inches(4), Inches(1)).text = "Grouped label"
+    slide.notes_slide.notes_text_frame.text = "Mention the budget."
+    presentation.save(path)
+
+    chunks = chunk_extraction(extract_file(path))
+
+    assert [(chunk.heading, chunk.content, chunk.source_locations) for chunk in chunks] == [
+        ("Slide 1", "Grouped label", ({"slide": 1},)),
+        ("Slide 1 notes", "Mention the budget.", ({"slide": 1, "part": "notes"},)),
     ]
 
 

@@ -10,10 +10,14 @@ from pathlib import Path
 
 import pymupdf
 from docx import Document
+from docx.opc.constants import RELATIONSHIP_TYPE as RT
+from docx.oxml import parse_xml
+from docx.oxml.ns import qn
 from docx.table import Table
 from docx.text.paragraph import Paragraph
 from openpyxl import load_workbook
 from pptx import Presentation
+from pptx.shapes.group import GroupShape
 
 
 SECTION_HEADING_RE = re.compile(r"^(?P<number>\d+)[.)]\s+(?P<title>[A-Z][^\n]*)$")
@@ -21,6 +25,9 @@ SECTION_HEADING_RE = re.compile(r"^(?P<number>\d+)[.)]\s+(?P<title>[A-Z][^\n]*)$
 _TEXT_RULER_RE = re.compile(r"\s*-{2,}(?:\s+-{2,})+\s*")
 
 SUPPORTED = {".pdf", ".docx", ".xlsx", ".pptx", ".txt", ".md"}
+# Bump when extracted text changes, together with CHUNKER_VERSION so stored files are queued again.
+# The index worker re-extracts the original file when its saved extraction is older.
+EXTRACTOR_VERSION = 2
 
 
 def clean_text(text: str) -> str:
@@ -122,10 +129,48 @@ def extract_docx(path: Path) -> list[dict[str, object]]:
         if text:
             section_blocks.setdefault(current_section, []).append(text)
 
-    return [
+    sections = [
         {"section": number, "text": clean_text("\n".join(blocks))}
         for number, blocks in section_blocks.items()
         if clean_text("\n".join(blocks))
+    ]
+    for part, blocks in (("footnotes", _docx_footnotes(document)), ("headers and footers", _docx_headers(document))):
+        if text := clean_text("\n".join(blocks)):
+            sections.append({"part": part, "text": text})
+    return sections
+
+
+def _docx_headers(document) -> list[str]:
+    blocks = []
+    for section in document.sections:
+        for part in (
+            section.header, section.first_page_header, section.even_page_header,
+            section.footer, section.first_page_footer, section.even_page_footer,
+        ):
+            if part.is_linked_to_previous:  # No content of its own: it repeats an earlier one.
+                continue
+            for item in part.iter_inner_content():
+                blocks.append(
+                    _table_text([cell.text for cell in row.cells] for row in item.rows)
+                    if isinstance(item, Table)
+                    else item.text
+                )
+    return list(dict.fromkeys(blocks))  # Each section usually repeats the same header.
+
+
+_FOOTNOTE_TEXT_TAGS = (qn("w:t"), qn("w:tab"), qn("w:br"))  # Tabs and breaks become spaces.
+
+
+def _docx_footnotes(document) -> list[str]:
+    # python-docx has no footnote API, so read the footnotes part's XML.
+    rel = next((rel for rel in document.part.rels.values() if rel.reltype == RT.FOOTNOTES), None)
+    if rel is None:
+        return []
+    return [
+        "".join(node.text or "" if node.tag == qn("w:t") else " " for node in paragraph.iter(*_FOOTNOTE_TEXT_TAGS))
+        for footnote in parse_xml(rel.target_part.blob).iterchildren(qn("w:footnote"))
+        if footnote.get(qn("w:type")) is None  # Skip the separator lines Word stores as footnotes.
+        for paragraph in footnote.iter(qn("w:p"))
     ]
 
 
@@ -133,16 +178,25 @@ def extract_pptx(path: Path) -> list[dict[str, object]]:
     presentation = Presentation(path)
     sections = []
     for number, slide in enumerate(presentation.slides, start=1):
-        blocks = []
-        for shape in slide.shapes:
-            if getattr(shape, "has_table", False):
-                blocks.append(_table_text([cell.text for cell in row.cells] for row in shape.table.rows))
-            elif getattr(shape, "has_text_frame", False) and shape.text.strip():
-                blocks.append(shape.text)
-        text = clean_text("\n".join(blocks))
+        text = clean_text("\n".join(_shape_blocks(slide.shapes)))
         if text:
             sections.append({"slide": number, "text": text})
+        notes = slide.notes_slide.notes_text_frame if slide.has_notes_slide else None
+        if notes is not None and (text := clean_text(notes.text)):
+            sections.append({"slide": number, "part": "notes", "text": text})
     return sections
+
+
+def _shape_blocks(shapes) -> list[str]:
+    blocks = []
+    for shape in shapes:
+        if isinstance(shape, GroupShape):
+            blocks.extend(_shape_blocks(shape.shapes))
+        elif getattr(shape, "has_table", False):
+            blocks.append(_table_text([cell.text for cell in row.cells] for row in shape.table.rows))
+        elif getattr(shape, "has_text_frame", False) and shape.text.strip():
+            blocks.append(shape.text)
+    return blocks
 
 
 def extract_xlsx(path: Path) -> list[dict[str, object]]:
@@ -187,6 +241,7 @@ def extract_file(
         "source_path": str(resolved_path),
         "source_extension": suffix,
         "extracted_at": datetime.now(UTC).isoformat(),
+        "extractor_version": EXTRACTOR_VERSION,
         "sections": sections,
     }
 

@@ -82,7 +82,7 @@ def test_sync_complete_and_terminal_fail_write_rows(database, monkeypatch, tmp_p
     source.write_text("source", encoding="utf-8")
     extraction = tmp_path / "extracted" / f"{extractor.source_id_for(source)}.json"
     extraction.parent.mkdir()
-    extraction.write_text(json.dumps({"source_id": "source-1", "sections": []}), encoding="utf-8")
+    extraction.write_text(json.dumps({"source_id": "source-1", "extractor_version": extractor.EXTRACTOR_VERSION, "sections": []}), encoding="utf-8")
     file_id = execute(
         "INSERT INTO files (path, content_type, sha256, author_id) "
         "VALUES (%s, 'text/plain', %s, %s) RETURNING id",

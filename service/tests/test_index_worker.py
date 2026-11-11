@@ -1,5 +1,8 @@
 import json
 
+from pptx import Presentation
+from pptx.util import Inches
+
 from app.engine import source_extractor as extractor
 from app.engine.indexing import worker
 
@@ -28,7 +31,7 @@ class FakeJobsRepository:
         return self.status
 
 
-def _write_extraction(storage, relative_source, sections=None):
+def _write_extraction(storage, relative_source, sections=None, extractor_version=extractor.EXTRACTOR_VERSION):
     source = storage / relative_source
     source.parent.mkdir(parents=True)
     source.write_text("source", encoding="utf-8")
@@ -40,6 +43,7 @@ def _write_extraction(storage, relative_source, sections=None):
                 "source_id": "source-1",
                 "source_filename": "policy.pdf",
                 "source_extension": ".pdf",
+                "extractor_version": extractor_version,
                 "sections": [{"page": 7, "text": "Employees must sign in."}] if sections is None else sections,
             }
         ),
@@ -47,9 +51,8 @@ def _write_extraction(storage, relative_source, sections=None):
     )
 
 
-def _prepare(monkeypatch, tmp_path, *, sections=None):
-    relative_source = "pdf/policy.pdf"
-    _write_extraction(tmp_path, relative_source, sections)
+def _prepare(monkeypatch, tmp_path, *, sections=None, relative_source="pdf/policy.pdf", **extraction):
+    _write_extraction(tmp_path, relative_source, sections, **extraction)
     repository = FakeJobsRepository(relative_source)
     stored = []
     monkeypatch.setattr(worker, "index_jobs_repository", repository)
@@ -103,3 +106,27 @@ def test_embed_failure_leaves_old_chunks_intact(monkeypatch, tmp_path):
     assert repository.attempts == 1
     assert repository.error == "embedding endpoint down"
     assert stored == []
+
+
+def test_extraction_from_an_older_extractor_is_redone_from_the_original_file(monkeypatch, tmp_path):
+    repository, stored = _prepare(
+        monkeypatch, tmp_path, relative_source="pptx/deck.pptx",
+        sections=[{"slide": 1, "text": "Roadmap"}], extractor_version=None,
+    )
+    presentation = Presentation()
+    slide = presentation.slides.add_slide(presentation.slide_layouts[6])
+    slide.shapes.add_textbox(Inches(1), Inches(1), Inches(4), Inches(1)).text = "Roadmap"
+    slide.notes_slide.notes_text_frame.text = "Mention the budget."
+    source = tmp_path / "pptx/deck.pptx"
+    presentation.save(source)
+
+    assert worker.process_next_job()
+
+    assert repository.status == "completed"
+    assert [(chunk.heading, chunk.content) for chunk in stored[0][1]] == [
+        ("Slide 1", "Roadmap"),
+        ("Slide 1 notes", "Mention the budget."),
+    ]
+    saved = json.loads((tmp_path / "extracted" / f"{extractor.source_id_for(source)}.json").read_text())
+    assert saved["extractor_version"] == extractor.EXTRACTOR_VERSION
+    assert saved["source_id"] == "source-1"
