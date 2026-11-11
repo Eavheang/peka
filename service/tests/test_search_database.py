@@ -5,7 +5,7 @@ real SQL. These use the real repositories and a dedicated database, and are skip
 TEST_DATABASE_URL points at one (its name must contain "test"). Locally:
 
     docker compose exec postgres psql -U peka -d postgres -c "CREATE DATABASE peka_test"
-    TEST_DATABASE_URL=postgresql://peka:peka_dev_password@postgres:5432/peka_test python -m pytest
+    TEST_DATABASE_URL=postgresql://peka:$POSTGRES_PASSWORD@postgres:5432/peka_test python -m pytest
 """
 import math
 import os

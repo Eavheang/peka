@@ -7,7 +7,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     app_name: str = "PEKA Service"
     debug: bool = False
-    database_url: str = "postgresql://peka:peka_dev_password@localhost:5432/peka"
+    database_url: str = "postgresql://peka@localhost:5432/peka"
     file_storage_dir: Path = Path("storage")
     max_upload_bytes: int = 25 * 1024 * 1024
     llm_base_url: str
@@ -76,6 +76,15 @@ class Settings(BaseSettings):
     def reject_placeholder_secret(cls, value: SecretStr) -> SecretStr:
         if value.get_secret_value().startswith(("CHANGE-ME", "replace-with-at-least-32-random-characters")):
             raise ValueError("JWT_SECRET_KEY must be replaced with a random secret")
+        return value
+
+    @field_validator("database_url")
+    @classmethod
+    def reject_default_database_password(cls, value: str) -> str:
+        if "peka_dev_password" in value:
+            raise ValueError(
+                "DATABASE_URL uses the old default Postgres password; set POSTGRES_PASSWORD in config/.env"
+            )
         return value
 
     @field_validator("admin_email")

@@ -3,7 +3,7 @@
 Skipped unless TEST_DATABASE_URL points at a database whose name contains "test".
 CI sets that variable. Locally:
 
-    TEST_DATABASE_URL=postgresql://peka:peka_dev_password@localhost:5432/peka_test python -m pytest tests/test_audit_writers_database.py
+    TEST_DATABASE_URL=postgresql://peka:$POSTGRES_PASSWORD@localhost:5432/peka_test python -m pytest tests/test_audit_writers_database.py
 """
 import json
 import os
