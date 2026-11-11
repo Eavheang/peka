@@ -21,8 +21,9 @@ import psycopg
 import pytest
 
 from app.config import settings
-from app.engine.chunks.chunker import Chunk
+from app.engine.chunks.chunker import CHUNKER_VERSION, Chunk
 from app.engine.chunks.repository import knowledge_chunks_repository
+from app.engine.indexing.job_repository import index_jobs_repository
 from app.engine.search import service as search_service
 from app.engine.search.repository import search_repository
 from app.files.repository import files_repository
@@ -309,3 +310,50 @@ def test_format_copies_do_not_crowd_another_document_out_of_the_pool(owner):
     results = search_repository.search_chunks(QUERY, ("general",), top_k=14)
 
     assert "Other" in {row["heading"] for row in results}
+
+
+def test_a_cited_chunk_still_opens_after_its_file_is_re_indexed(owner):
+    path = f"citations/{uuid4().hex[:8]}-policy.txt"
+    file = index_file(path, "general", owner.id, [("Leave", unit_vector(1, 0)), ("Pay", unit_vector(0, 1))])
+    owner.files.append(file)
+    cited, uncited = (
+        execute("SELECT id FROM knowledge_chunks WHERE file_id = %s AND heading = %s", file["id"], heading)[0]
+        for heading in ("Leave", "Pay")
+    )
+    conversation = execute(
+        "INSERT INTO conversations (owner_id, title) VALUES (%s, 'leave') RETURNING id", owner.id
+    )[0]
+    execute(
+        "INSERT INTO messages (conversation_id, sequence, role, content, citations) "
+        "VALUES (%s, 1, 'assistant', 'answer', %s::jsonb)",
+        conversation, f'[{{"chunk_id": "{cited}", "title": "{path}", "heading": "Leave"}}]',
+    )
+    title = path.rsplit("/", 1)[-1]
+
+    new = Chunk(title=path, heading="Leave", content="Leave was rewritten.", source_locations=())
+    knowledge_chunks_repository.swap_active_set(file["id"], [new], [unit_vector(1, 0)])
+
+    preview = search_repository.find_source(cited, title, "Leave", ("general",))
+    assert preview is not None and preview["content"] == "Leave text."
+    assert execute("SELECT 1 FROM knowledge_chunks WHERE id = %s", uncited) is None
+    results = search_repository.search_chunks(unit_vector(1, 0), ("general",), top_k=10)
+    assert [row["content"] for row in results if row["file_id"] == file["id"]] == ["Leave was rewritten."]
+    # Without a chunk ID, the preview reads the current passage, never the kept one.
+    assert search_repository.find_source(None, title, "Leave", ("general",))["content"] == "Leave was rewritten."
+    assert search_repository.find_source(cited, title, "Leave", ()) is None
+
+
+def test_files_indexed_by_an_older_chunker_are_queued_again(owner):
+    old, current = (
+        index_file(f"versions/{uuid4().hex[:8]}-{name}.txt", "general", owner.id, [("Text", unit_vector(1, 0))])
+        for name in ("old", "current")
+    )
+    owner.files.extend([old, current])
+    execute("UPDATE index_jobs SET status = 'completed', attempts = 2 WHERE file_id = ANY(%s)", [old["id"], current["id"]])
+    execute("UPDATE chunk_sets SET chunker_version = %s WHERE file_id = %s", CHUNKER_VERSION - 1, old["id"])
+
+    index_jobs_repository.queue_outdated(CHUNKER_VERSION)
+
+    status = lambda file: execute("SELECT status, attempts FROM index_jobs WHERE file_id = %s", file["id"])
+    assert status(old) == ("queued", 0)
+    assert status(current) == ("completed", 2)

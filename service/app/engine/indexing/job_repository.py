@@ -12,6 +12,16 @@ class IndexJobsRepository:
                 "WHERE status = 'processing'"
             )
 
+    def queue_outdated(self, chunker_version: int) -> None:
+        """Re-index files whose active chunks an older chunker built."""
+        with get_connection() as connection:
+            connection.execute(
+                "UPDATE index_jobs jobs SET status = 'queued', attempts = 0, updated_at = CURRENT_TIMESTAMP "
+                "FROM chunk_sets sets WHERE sets.file_id = jobs.file_id AND sets.status = 'active' "
+                "AND sets.chunker_version < %s AND jobs.status = 'completed'",
+                (chunker_version,),
+            )
+
     def claim_next(self) -> dict | None:
         with get_connection() as connection:
             row = connection.execute(

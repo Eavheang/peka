@@ -8,6 +8,8 @@ import re
 # TEI truncates those rather than failing, and keyword search still reads the whole chunk. Call TEI /tokenize
 # instead if that ever matters.
 MAX_CHUNK_TOKENS = 400
+# Bump when chunk output changes: the index worker re-indexes sets built by an older version on start.
+CHUNKER_VERSION = 1
 _TOKEN_RE = re.compile(r"[A-Za-z]{1,12}|\d{1,2}|\S")
 
 _HEADED_FORMATS = {".md", ".docx"}

@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Text, text
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, Text, text
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -22,4 +22,5 @@ class ChunkSet(Base):
         index=True,
     )
     status: Mapped[str] = mapped_column(Text, nullable=False, server_default="building")
+    chunker_version: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=text("CURRENT_TIMESTAMP"))
