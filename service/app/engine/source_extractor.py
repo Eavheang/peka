@@ -25,6 +25,9 @@ SECTION_HEADING_RE = re.compile(r"^(?P<number>\d+)[.)]\s+(?P<title>[A-Z][^\n]*)$
 _TEXT_RULER_RE = re.compile(r"\s*-{2,}(?:\s+-{2,})+\s*")
 
 SUPPORTED = {".pdf", ".docx", ".xlsx", ".pptx", ".txt", ".md"}
+# Bump when extracted text changes, together with CHUNKER_VERSION so stored files are queued again.
+# The index worker re-extracts the original file when its saved extraction is older.
+EXTRACTOR_VERSION = 2
 
 
 def clean_text(text: str) -> str:
@@ -155,13 +158,16 @@ def _docx_headers(document) -> list[str]:
     return list(dict.fromkeys(blocks))  # Each section usually repeats the same header.
 
 
+_FOOTNOTE_TEXT_TAGS = (qn("w:t"), qn("w:tab"), qn("w:br"))  # Tabs and breaks become spaces.
+
+
 def _docx_footnotes(document) -> list[str]:
     # python-docx has no footnote API, so read the footnotes part's XML.
     rel = next((rel for rel in document.part.rels.values() if rel.reltype == RT.FOOTNOTES), None)
     if rel is None:
         return []
     return [
-        "".join(node.text or "" for node in paragraph.iter(qn("w:t")))
+        "".join(node.text or "" if node.tag == qn("w:t") else " " for node in paragraph.iter(*_FOOTNOTE_TEXT_TAGS))
         for footnote in parse_xml(rel.target_part.blob).iterchildren(qn("w:footnote"))
         if footnote.get(qn("w:type")) is None  # Skip the separator lines Word stores as footnotes.
         for paragraph in footnote.iter(qn("w:p"))
@@ -235,6 +241,7 @@ def extract_file(
         "source_path": str(resolved_path),
         "source_extension": suffix,
         "extracted_at": datetime.now(UTC).isoformat(),
+        "extractor_version": EXTRACTOR_VERSION,
         "sections": sections,
     }
 

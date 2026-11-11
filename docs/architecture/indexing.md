@@ -65,6 +65,8 @@ Rules:
 3. **Nothing is dropped.** That includes text before the first heading and plain text with no headings. A heading with no body of its own moves into the next section's text.
 4. **A heading can repeat.** All parts of a long page keep the name `Page 3`. Citations and previews find a chunk by its ID, so this hides nothing. Search keeps only the best-ranked format of a file name, so `.pdf` and `.docx` copies of one report never compete for result slots.
 
+Not extracted: DOCX endnotes, text boxes and comments; PPTX charts, SmartArt and alt text; text in images (there is no OCR). Footnotes and headers or footers are cited by part only, without a page or footnote number.
+
 Embedding input string:
 
 ```text

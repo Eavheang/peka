@@ -112,7 +112,7 @@ def test_docx_headers_footers_and_footnotes_become_their_own_chunks(tmp_path):
     footnotes = (
         '<w:footnotes xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
         '<w:footnote w:type="separator" w:id="-1"><w:p><w:r><w:separator/></w:r></w:p></w:footnote>'
-        '<w:footnote w:id="1"><w:p><w:r><w:t>Source: 2025 </w:t></w:r><w:r><w:t>audit.</w:t></w:r></w:p></w:footnote>'
+        '<w:footnote w:id="1"><w:p><w:r><w:t>Source:</w:t><w:tab/><w:t>2025</w:t></w:r><w:r><w:br/><w:t>audit.</w:t></w:r></w:p></w:footnote>'
         "</w:footnotes>"
     )
     part = Part(PackURI("/word/footnotes.xml"), CT.WML_FOOTNOTES, footnotes.encode(), document.part.package)
