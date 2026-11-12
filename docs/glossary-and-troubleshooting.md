@@ -9,7 +9,7 @@
 | **Retrieval router** | LLM call before the answer, only on a follow-up or with web search on; rewrites the search query and can choose web search |
 | **Grounded block** | Answer segment that cites current-turn source IDs |
 | **General block** | Answer segment from model knowledge with no citations |
-| **Refusal** | Templated "need more detail" reply (`refused: true`) that names the closest documents and asks what the user meant, when no passage matches a question for a specific organization fact; no answer is generated |
+| **Refusal** | Templated "need more detail" reply (`refused: true`) that names the closest documents and asks what the user meant, when no passage matches a question for a specific organization fact, or the model cites none of the weak matches |
 | **RAG** | Retrieval-augmented generation — chat grounded on search results |
 | **TEI** | Hugging Face Text Embeddings Inference server |
 | **ACL / access_level** | `general` vs `confidential` document visibility by role |

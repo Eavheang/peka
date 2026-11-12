@@ -11,7 +11,7 @@ from pptx.util import Inches
 from fastapi import UploadFile
 
 from app.engine.chunks.chunker import chunk_extraction
-from app.engine.source_extractor import extract_file
+from app.engine.source_extractor import _numbered_headings, extract_file
 from app.files import service
 
 
@@ -119,6 +119,41 @@ def test_pdf_table_becomes_pipe_rows_apart_from_the_prose(tmp_path) -> None:
     assert all(chunk.source_locations == ({"page": 1},) for chunk in chunks)
 
 
+def test_adjacent_pdf_tables_keep_their_own_columns_and_follow_their_headings(tmp_path) -> None:
+    path = tmp_path / "two-tables.pdf"
+    with pymupdf.open() as pdf:
+        page = pdf.new_page()
+        page.insert_text((72, 72), "1. Approval", fontname="hebo")  # Helvetica Bold
+        page.insert_text((72, 230), "2. Vendors", fontname="hebo")
+        for top, table in ((90, [("Value", "Approver"), ("Small", "Manager")]),
+                           (250, [("Category", "Vendor"), ("Video", "Northbank")])):
+            for row, cells in enumerate(table):
+                for column, text in enumerate(cells):
+                    cell = pymupdf.Rect(72 + 150 * column, top + 30 * row, 222 + 150 * column, top + 30 + 30 * row)
+                    page.draw_rect(cell)
+                    page.insert_text((cell.x0 + 5, cell.y0 + 20), text)
+        pdf.save(path)
+
+    chunks = [(chunk.heading, chunk.content) for chunk in chunk_extraction(extract_file(path))]
+
+    # Bold numbered lines become section headings.
+    assert chunks == [("1. Approval", "| Value: Small | Approver: Manager |"),
+                      ("2. Vendors", "| Category: Video | Vendor: Northbank |")]
+
+
+def test_only_bold_numbered_pdf_lines_become_headings_and_continue_on_the_next_page() -> None:
+    bold = {"1. Scope", "2. Steps", "3. Payment"}
+    # A contents line and a numbered list share the numbering but are not bold.
+    page_1, heading = _numbered_headings(
+        "1. Scope 2\n1. Scope\nCovers vendors.\n2. Steps\n1. Call legal\n2. Wait", "", bold
+    )
+    page_2, heading = _numbered_headings("3. Wait more\nManagers approve.\n3. Payment", heading, bold)
+
+    assert page_1 == "1. Scope 2\n# 1. Scope\nCovers vendors.\n# 2. Steps\n1. Call legal\n2. Wait"
+    assert page_2 == "# 2. Steps\n3. Wait more\nManagers approve.\n# 3. Payment"
+    assert heading == "3. Payment"
+
+
 def test_plain_text_columns_under_a_ruler_become_their_own_table_chunk(tmp_path) -> None:
     path = tmp_path / "plan.txt"
     path.write_text(
@@ -138,7 +173,7 @@ def test_plain_text_columns_under_a_ruler_become_their_own_table_chunk(tmp_path)
     ]
 
 
-def test_pptx_table_text_is_extracted_as_its_own_chunk(tmp_path):
+def test_pptx_table_keeps_the_title_above_it_as_its_caption(tmp_path):
     path = tmp_path / "deck.pptx"
     presentation = Presentation()
     slide = presentation.slides.add_slide(presentation.slide_layouts[6])
@@ -152,8 +187,7 @@ def test_pptx_table_text_is_extracted_as_its_own_chunk(tmp_path):
     chunks = chunk_extraction(extract_file(path))
 
     assert [(chunk.heading, chunk.content, chunk.source_locations) for chunk in chunks] == [
-        ("Slide 1", "Roadmap", ({"slide": 1},)),
-        ("Slide 1", "| Phase: Beta | Date: March |", ({"slide": 1},)),
+        ("Slide 1", "| Roadmap |\n| Phase: Beta | Date: March |", ({"slide": 1},)),
     ]
 
 

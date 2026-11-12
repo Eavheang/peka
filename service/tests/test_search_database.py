@@ -309,3 +309,27 @@ def test_format_copies_do_not_crowd_another_document_out_of_the_pool(owner):
     results = search_repository.search_chunks(QUERY, ("general",), top_k=14)
 
     assert "Other" in {row["heading"] for row in results}
+
+
+
+def test_a_rare_query_word_outranks_a_name_found_everywhere(owner):
+    run = uuid4().hex[:8]
+    for name, content in (
+        ("decoy1", "Zorblax Zorblax serves many industries."),
+        ("decoy2", "Zorblax works across industries, Zorblax says."),
+        ("decoy3", "Zorblax industries overview."),
+        ("rules", "Zorblax refuses tobacco work."),
+    ):
+        path = f"keyword/{run}-{name}.txt"
+        file = files_repository.create_many([(path, "text/plain", f"sha-{path}", "general")], owner.id)[0]
+        owner.files.append(file)
+        chunk = Chunk(title=path, heading="Section", content=content, source_locations=())
+        # Orthogonal to the query vector, so only keyword search can find these.
+        knowledge_chunks_repository.swap_active_set(file["id"], [chunk], [unit_vector(0, 0, 1)])
+
+    results = search_repository.search_chunks(
+        unit_vector(1, 0), ("general",), top_k=10, query_text="Which industries does Zorblax refuse?"
+    )
+    ours = {str(file["id"]): file["path"].rsplit("-", 1)[-1] for file in owner.files}
+
+    assert [ours[str(r["file_id"])] for r in results if str(r["file_id"]) in ours][0] == "rules.txt"

@@ -1,6 +1,6 @@
 # PEKA final report
 
-Final evaluation of PEKA against its project objectives on the project's minimum hardware (6 GB VRAM, 16 GB RAM) with the **local** language model. PEKA answered through `llama.cpp` (`gemma-4-E4B-it-qat-UD-Q4_K_XL`), and no cloud model or web search was called. The evaluation first ran on 2026-10-30. It was repeated in full on 2026-11-07 on the code with issues #95, #96, #97, #98, #99 and #101, and the numbers below come from that repeat unless they say otherwise.
+Final evaluation of PEKA against its project objectives on the project's minimum hardware (6 GB VRAM, 16 GB RAM) with the **local** language model. PEKA answered through `llama.cpp` (`gemma-4-E4B-it-qat-UD-Q4_K_XL`), and no cloud model or web search was called. The evaluation first ran on 2026-10-30. It was repeated in full on 2026-11-07 on the code with issues #95, #96, #97, #98, #99 and #101, and the numbers below come from that repeat unless they say otherwise. On 2026-11-12 PEKA was tested again on [50 distinct documents](#evaluation-on-50-distinct-documents-2026-11-12), and the search and chunking fixes from that run are described there.
 
 To run PEKA yourself, start with [System requirements and running PEKA locally](system-requirements.md). Earlier answer-quality runs are in [evaluation.md](evaluation.md).
 
@@ -12,12 +12,13 @@ To run PEKA yourself, start with [System requirements and running PEKA locally](
 | **Objective 5 / NFR02**: response latency and time to first token | One user: first token **4.9 s median, 7.5 s p95**; full answer **5.6 s median, 8.3 s p95** | **Measured.** The repo states no target, so there is no pass or fail |
 | **NFR04**: 10 concurrent users while indexing runs | **20 of 20** requests answered with 10 users while 8 files indexed; the slowest took 80 s | **Met** in that every request was answered. The repo states no limit on the wait, and this was one run |
 | Answer quality (supporting result) | 57 of 59 answerable questions correct, 1 partly correct, 1 wrongly declined; 8 of 8 unanswerable declined, hand-graded | Good on the test set |
+| Answer quality on 50 distinct documents (2026-11-12) | **145 of 151** correct on the main set and **57 of 60** on a held-out set; Recall@5 **100%** on both; 14 of 14 unanswerable declined | Good; the misses need a stronger model or a second search |
 
-In short: PEKA finds the right documents reliably and answers correctly. On the minimum hardware it answers two questions at a time and queues the rest, so 10 people can use it together but may wait over a minute. Indexing no longer competes for the model. The result on 200+ documents comes from generated documents, so a proper test on real documents is still open (issue #104).
+In short: PEKA finds the right documents reliably and answers correctly. On the minimum hardware it answers two questions at a time and queues the rest, so 10 people can use it together but may wait over a minute. Indexing no longer competes for the model. The result on 200+ documents comes from generated documents. A test on 50 distinct, varied documents with reworded questions (2026-11-12) found the right document every time, but a test on 200+ such documents is still open (issue #104).
 
 ## What was built and tested
 
-PEKA is an organization-private RAG assistant. Users upload documents, and a background worker extracts their original text, splits it into chunks, embeds the chunks and stores them in Postgres with pgvector, without using the language model. In chat, the service runs a hybrid keyword and vector search filtered by the user's role, reranks the hits with a local cross-encoder, refuses a question for a specific fact when no passage matches it, and otherwise has the model write an answer with citations. A follow-up question first makes one short model call to rewrite its search. See [How it works](how-it-works.md) and the [architecture](architecture/overview.md).
+PEKA is an organization-private RAG assistant. Users upload documents, and a background worker extracts their original text, splits it into chunks, embeds the chunks and stores them in Postgres with pgvector, without using the language model. In chat, the service runs a hybrid keyword and vector search filtered by the user's role, reranks the hits with a local cross-encoder, refuses a question for a specific fact when no passage matches it and the model cites none of the weak matches, and otherwise has the model write an answer with citations. A follow-up question first makes one short model call to rewrite its search. See [How it works](how-it-works.md) and the [architecture](architecture/overview.md).
 
 | Component | What runs it |
 |-----------|--------------|
@@ -159,6 +160,8 @@ The score separates "no passage matches" from "a passage matches", but it cannot
 
 An answer block that claims a source ID from outside the current turn already loses it and becomes a general block, so no change was needed for that part of #101.
 
+**Changed on 2026-11-12.** On the 50-document run, the floor refused 3 questions whose answer was in the top result, scored 0.008 to 0.036. Unanswerable questions there scored from 0.0008 up to 0.9997, so no floor value separates the two. The server now refuses at once only when search returns nothing. With weak results it lets the model read them, with a note to answer only from a result that states the answer, and keeps that answer only if it cites a source. That answer is not streamed. This cost no refusals of unanswerable questions on that run.
+
 ## Answer quality
 
 67 questions from set 2 over the 70-file corpus, each in a new conversation, graded by reading each answer against its reference.
@@ -173,6 +176,56 @@ An answer block that claims a source ID from outside the current turn already lo
 Smaller problems: questions 2 and 14 are correct but cite nothing, question 14 also lists other suppliers' payment terms, and question 41 opens with an unsupported hedge before the correct owner and target.
 
 The earlier run on the same search got question 29 fully right, cited question 2, and gave a clean answer to question 41, so some of this is variation between runs. Each question was asked once. Set 2 was graded in one pass by one grader, and its questions follow the source wording.
+
+## Evaluation on 50 distinct documents (2026-11-12)
+
+The earlier real corpus held 20 documents, each in several formats. This run used 50 documents that are all different, from one fictional marketing agency: 14 Markdown, 12 Word, 10 PDF, 8 Excel and 6 PowerPoint files. They include policies, proposals, contracts, financial reports, spreadsheets of campaigns, pipeline and budgets, and slide decks. The files were uploaded through the API to a fresh database, and the stack ran the local model on the minimum hardware.
+
+| Question set | Answerable | Kinds | Unanswerable |
+|--------------|------------|-------|--------------|
+| Main | 151 | 50 name their document, 89 are reworded and name no document, 6 need a table lookup or say what is missing, 6 need two documents | 9 |
+| Held out | 60 | 48 reworded, 9 table lookups, 3 need two documents | 5 |
+
+The held-out set was written after the fixes below and was not used to make them. An answer counts as correct when it contains every expected fact. Every answer that missed a fact was read by hand.
+
+### Results
+
+| | Before the fixes | After, main set | After, held-out set |
+|---|---|---|---|
+| Document Recall@1 | 94.7% | 95.4% | 95.0% |
+| **Document Recall@5** | 99.3% | **100%** (151 of 151) | **100%** (60 of 60) |
+| **Correct answers** | 141 of 151 | **145 of 151** | **57 of 60** |
+| Partly correct | 1 | 3 | 1 |
+| Declined although the documents hold the answer | 7, of which 3 refused by the server | 2, none refused by the server | 0 |
+| Wrong answer | 2 | 1 | 2 |
+| Unanswerable, declined | 9 of 9 | 9 of 9 | 5 of 5 |
+| First token, median / p95 | 3.9 s / 8.0 s | 4.0 s / 8.2 s | 3.9 s / 7.1 s |
+| Full answer, median / p95 | 4.7 s / 8.9 s | 4.9 s / 9.0 s | 4.5 s / 7.5 s |
+
+### What was wrong and what changed
+
+| Problem in the first run | Questions | Change |
+|--------------------------|-----------|--------|
+| The evidence floor refused answers that were in the top result | 3 | Weak results go to the model, and an answer is kept only if it cites one (see [No-evidence refusal](#no-evidence-refusal-101)) |
+| Keyword search ranked a word found everywhere as high as a rare one. "RevoluMark" is in a quarter of all chunks, so generic "About RevoluMark" sections pushed out the one rule with "refuse" and "advertising" | 1 | Rare query words count more (inverse document frequency). The keyword and vector lists take turns filling the 20 rerank candidates, so a passage only keywords find is not pushed out by passages that are middling in both |
+| PDF tables were appended after the page text with no break, so two tables on one page read as one and the second took the first one's column names | 2 | Each table sits under the text above it, with blank lines around it |
+| Every PDF chunk was named `Page N`, so a short section such as "6. Spokespeople" was buried in a long chunk that the reranker scored low | 1 | Numbered PDF sections get their own heading, as Word documents already did |
+| Later parts of a split table lost its title rows, such as "Q4 is a forecast" or "Total budget $900,000", and a caption above a table became a chunk of its own | 3 | Every part repeats the title rows, and a short line just above a table becomes its title |
+
+Search time did not change (about 0.4 s mean, 0.6 s p95). Two other ideas were tried and dropped. A larger reranker, `BAAI/bge-reranker-base`, took 2.5 s per search instead of 0.5 s and ranked no better. Sending the model the rest of a matching table or page added a database query and a prompt budget, and it was not needed once tables kept their titles.
+
+### What still fails
+
+| Cause | Questions | What would fix it |
+|-------|-----------|-------------------|
+| Questions that need two documents: PEKA searches once and finds one half | 4 of 9 such questions | A second search for questions that join two facts |
+| The reranker ranks the right passage, which reaches the 20 candidates, out of the top 5 | 3 | A stronger reranker that stays fast on the CPU |
+| The model misread the passage ranked first | 1 | A stronger model |
+| A question that compares every row of a large spreadsheet ("highest CPA") | 1 | Computing over the sheet instead of reading 5 chunks |
+
+These misses are mostly declines or half answers. Three answers were wrong. One gave the hourly rate of a role the answer had guessed, one picked the wrong campaign as the most expensive, and one gave the 90 brands RevoluMark serves as the number of DataHive's clients (18). Each question was asked once, and answers change between runs: the run before the last review fixes, on the same search, scored 146 of 151 and 58 of 60, with different questions missed. For example, "Who won Rookie of the Year?" failed in one run and passed in the next. A goal such as 99.99% cannot be measured on 211 questions, where one miss is already 0.5%.
+
+**Caveats.** The documents come from one fictional company and the questions were written by the evaluator after reading them, so they follow the documents' wording more than real users would. Rewording 137 of the 211 answerable questions and holding out 60 reduces that. Files uploaded before this change keep their old PDF extraction until they are uploaded again (see [Indexing](architecture/indexing.md)).
 
 ## How many users does this system serve?
 
@@ -191,12 +244,13 @@ People who ask a question only now and then rarely overlap, so a team of occasio
 
 In order of value:
 
-1. **Test recall on real documents (#104).** A real set of 200+ independent reports with independently written questions is the proper proof of Objective 3.
-2. **Set a response-time target for NFR02 and NFR04.** Without one these results cannot pass or fail on speed.
-3. **Mark near misses as refused.** Letting the model flag "the sources do not contain this" as its own answer type would set `refused` on the 7 of 8 near misses that the score cannot catch. Not tried.
-4. **Keep the model out of indexing.** OKF enrichment sent each whole document to the model that serves chat, outside the chat queue, and the last run with the model in indexing answered 4 of 20. Enrichment was off for this evaluation and has since been removed.
-5. **Make the queue first come, first served** if the longest waits matter more than the median.
-6. **Cap llama.cpp's prompt cache on a 16 GB machine** (`--cache-ram`) if memory gets tight, as described below. Not tried.
+1. **Test recall on real documents (#104).** A real set of 200+ independent reports with independently written questions is the proper proof of Objective 3. The 50-document run is a step toward it.
+2. **Search twice for questions that join two facts.** This was the largest group of misses on the 50-document run. Not tried.
+3. **Set a response-time target for NFR02 and NFR04.** Without one these results cannot pass or fail on speed.
+4. **Mark near misses as refused.** Letting the model flag "the sources do not contain this" as its own answer type would set `refused` on the 7 of 8 near misses that the score cannot catch. Not tried.
+5. **Keep the model out of indexing.** OKF enrichment sent each whole document to the model that serves chat, outside the chat queue, and the last run with the model in indexing answered 4 of 20. Enrichment was off for this evaluation and has since been removed.
+6. **Make the queue first come, first served** if the longest waits matter more than the median.
+7. **Cap llama.cpp's prompt cache on a 16 GB machine** (`--cache-ram`) if memory gets tight, as described below. Not tried.
 
 ## Limitations
 

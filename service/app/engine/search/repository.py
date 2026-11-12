@@ -25,10 +25,10 @@ class SearchRepository:
     ) -> list[dict[str, Any]]:
         """Hybrid search over active chunk sets, permission-filtered in SQL.
 
-        Vector and keyword (full-text, any query term) rankings are merged with reciprocal rank
-        fusion: embeddings alone miss exact lookups such as one metric row in a table. Only the
-        best-ranked format of a document is kept, so the .pdf/.docx/.md copies of one document
-        can't fill every slot or mix their conflicting figures.
+        Vector and keyword (full-text, any query term, rare terms weighted higher) rankings take turns,
+        ties broken by reciprocal rank fusion: embeddings alone miss exact lookups such as one metric
+        row in a table. Only the best-ranked format of a document is kept, so the .pdf/.docx/.md copies
+        of one document can't fill every slot or mix their conflicting figures.
         """
         with get_connection() as connection:
             register_vector(connection)
@@ -37,24 +37,33 @@ class SearchRepository:
             connection.execute("SELECT set_config('hnsw.ef_search', '1000', true)")
             rows = connection.execute(
                 r"""
-                WITH terms AS (
-                    SELECT replace(plainto_tsquery('english', coalesce(%(text)s, ''))::text, '&', '|')::tsquery AS q
-                ), permitted AS NOT MATERIALIZED (
+                WITH permitted AS NOT MATERIALIZED (
                     SELECT kc.id, kc.embedding, kc.search_words
                     FROM knowledge_chunks kc
                     JOIN chunk_sets cs ON cs.id = kc.chunk_set_id AND cs.status = 'active'
                     JOIN files f ON f.id = kc.file_id
                     WHERE f.access_level = ANY(%(levels)s)
+                ), lexemes AS (
+                    SELECT DISTINCT plainto_tsquery('simple', lexeme) AS q  -- lexemes are already stemmed
+                    FROM unnest(tsvector_to_array(to_tsvector('english', coalesce(%(text)s, '')))) lexeme
+                ), terms AS (  -- rare words count more: a name found in every document must not outrank them
+                    -- ponytail: counts each query word's chunks on every search, a GIN lookup per word. Cache
+                    -- document frequencies if search over a large corpus gets slow.
+                    SELECT l.q, ln((n.total + 1.0) / (count(p.id) + 0.5)) AS idf
+                    FROM lexemes l
+                    CROSS JOIN (SELECT count(*) AS total FROM permitted) n
+                    LEFT JOIN permitted p ON p.search_words @@ l.q
+                    GROUP BY l.q, n.total
+                ), keyword AS (
+                    SELECT p.id, sum(t.idf) AS weight
+                    FROM permitted p JOIN terms t ON p.search_words @@ t.q GROUP BY p.id
                 ), candidates AS (
                     (SELECT 'vector' AS branch, id, row_number() OVER (ORDER BY embedding <=> %(vector)s) AS rank
                      FROM permitted WHERE 1 - (embedding <=> %(vector)s) >= %(floor)s
                      ORDER BY embedding <=> %(vector)s LIMIT %(candidates)s)
                     UNION ALL
-                    (SELECT 'keyword', id, row_number() OVER (
-                            ORDER BY ts_rank_cd(search_words, (SELECT q FROM terms)) DESC
-                        )
-                     FROM permitted WHERE search_words @@ (SELECT q FROM terms)
-                     ORDER BY 3 LIMIT %(candidates)s)
+                    (SELECT 'keyword', id, row_number() OVER (ORDER BY weight DESC)
+                     FROM keyword ORDER BY 3 LIMIT %(candidates)s)
                 ), documents AS (
                     SELECT r.id, kc.file_id, s.stem, cs.centroid,
                         first_value(kc.file_id) OVER best AS best_file,
@@ -73,10 +82,15 @@ class SearchRepository:
                 )
                 SELECT kc.id, kc.file_id, kc.file_path, d.stem,
                     kc.heading, kc.content, kc.source_locations, 1 - (kc.embedding <=> %(vector)s) AS score
-                FROM (SELECT id, sum(1.0 / (60 + rank)) AS rrf FROM ranked WHERE rank <= %(pool)s GROUP BY id) r
+                FROM (
+                    SELECT id, min(rank) AS best, sum(1.0 / (60 + rank)) AS rrf
+                    FROM ranked WHERE rank <= %(pool)s GROUP BY id
+                ) r
                 JOIN knowledge_chunks kc ON kc.id = r.id
                 JOIN documents d ON d.id = r.id
-                ORDER BY r.rrf DESC LIMIT %(limit)s
+                -- Each branch's best rows first, taking turns: by fused score alone, rows that are middling in
+                -- both lists push out one that only keywords find, such as the one passage with a rare word.
+                ORDER BY r.best, r.rrf DESC LIMIT %(limit)s
                 """,
                 {
                     "levels": list(allowed_access_levels),

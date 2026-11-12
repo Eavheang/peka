@@ -1471,9 +1471,7 @@ def test_evidence_floor_of_zero_turns_the_check_off(monkeypatch, results) -> Non
 
 
 @pytest.mark.parametrize("path", ["plain", "stream"])
-@pytest.mark.parametrize("results", [[], _WEAK_EVIDENCE], ids=["empty", "weak"])
-def test_document_question_without_evidence_is_refused_without_an_answer_call(monkeypatch, path, results) -> None:
-    monkeypatch.setattr(chat_service, "search_knowledge", lambda *args: results)
+def test_document_question_without_results_is_refused_without_an_answer_call(monkeypatch, path) -> None:
     monkeypatch.setattr(chat_service, "_needs_documents", lambda *args: True)
     monkeypatch.setattr(chat_service, "generate_structured", _no_generation)
     monkeypatch.setattr(chat_service, "stream_structured_text", _no_generation)
@@ -1481,8 +1479,49 @@ def test_document_question_without_evidence_is_refused_without_an_answer_call(mo
     response = _ask(path, "What is the CEO's home address?")
 
     assert response.refused is True
-    assert response.answer == chat_service._clarifying_answer(results)
+    assert response.answer == chat_service._clarifying_answer([])
     assert response.citations == []
+
+
+def _weak_answer(source_ids):
+    def generate(messages, output_type):
+        if output_type is chat_service.ModelAnswer:
+            assert "only weak matches" in messages[-1].text
+            return chat_service.ModelAnswer(
+                blocks=[{"kind": "grounded" if source_ids else "general", "text": "Pay is set yearly.",
+                         "source_ids": source_ids}]
+            )
+        pytest.fail(f"Unexpected model call for {output_type}")
+    return generate
+
+
+@pytest.mark.parametrize("path", ["plain", "stream"])
+def test_weak_evidence_answer_that_cites_nothing_becomes_the_clarifying_question(monkeypatch, path) -> None:
+    monkeypatch.setattr(chat_service, "search_knowledge", lambda *args: _WEAK_EVIDENCE)
+    monkeypatch.setattr(chat_service, "_needs_documents", lambda *args: True)
+    monkeypatch.setattr(chat_service, "generate_structured", _weak_answer([]))
+    monkeypatch.setattr(chat_service, "stream_structured_text", _no_generation)
+
+    response = _ask(path, "What is the CEO's home address?")
+
+    assert response.refused is True
+    assert response.answer == chat_service._clarifying_answer(_WEAK_EVIDENCE)
+    assert response.citations == []
+
+
+@pytest.mark.parametrize("path", ["plain", "stream"])
+def test_weak_evidence_answer_that_cites_a_source_is_kept(monkeypatch, path) -> None:
+    # The reranker scores some real matches low, such as a reworded question.
+    monkeypatch.setattr(chat_service, "search_knowledge", lambda *args: _WEAK_EVIDENCE)
+    monkeypatch.setattr(chat_service, "_needs_documents", lambda *args: True)
+    monkeypatch.setattr(chat_service, "generate_structured", _weak_answer(["source-1"]))
+    monkeypatch.setattr(chat_service, "stream_structured_text", _no_generation)
+
+    response = _ask(path, "How is pay reviewed?")
+
+    assert response.refused is False
+    assert response.answer == "Pay is set yearly. [1]"
+    assert [citation.title for citation in response.citations] == ["secret.pdf"]
 
 
 def test_clarifying_answer_names_the_closest_documents_once() -> None:
@@ -1504,8 +1543,13 @@ def test_clarifying_answer_still_asks_back_without_results() -> None:
 def test_stream_shows_the_clarifying_answer(monkeypatch) -> None:
     monkeypatch.setattr(chat_service, "search_knowledge", lambda *args: _WEAK_EVIDENCE)
     monkeypatch.setattr(chat_service, "_needs_documents", lambda *args: True)
+    monkeypatch.setattr(chat_service, "generate_structured", _weak_answer([]))
+    monkeypatch.setattr(chat_service, "stream_structured_text", _no_generation)
 
-    events = _stream_events(monkeypatch, [])
+    async def collect():
+        return [event async for event in chat_service.stream_answer_from_knowledge("hello", "staff")]
+
+    events = asyncio.run(collect())
 
     assert _visible_text(events) == chat_service._clarifying_answer(_WEAK_EVIDENCE)
     assert "secret.pdf" in _visible_text(events)

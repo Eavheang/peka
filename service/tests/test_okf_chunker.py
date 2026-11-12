@@ -148,6 +148,19 @@ def test_title_rows_above_a_sheet_header_stay_and_the_widest_row_labels_the_rest
     assert chunks[0].content == "| Stock levels |\n| SKU: A1 | Owner: Dana |"
 
 
+def test_every_part_of_a_split_sheet_repeats_its_title_rows():
+    rows = [f"| Q{number} | {number} |" for number in range(200)]
+    text = "\n".join(["| Revenue (USD millions), Q4 is a forecast |", "| Quarter | Revenue |", *rows])
+
+    chunks = chunk_extraction(extraction({"sheet": 1, "name": "S", "text": text}, extension=".xlsx"))
+
+    assert len(chunks) > 1
+    assert all(chunk.content.startswith("| Revenue (USD millions), Q4 is a forecast |\n") for chunk in chunks)
+    labelled = [line for chunk in chunks for line in chunk.content.splitlines()[1:]]
+    assert labelled == [f"| Quarter: Q{number} | Revenue: {number} |" for number in range(200)]
+    assert_fits(chunks)
+
+
 def test_short_rows_and_empty_cells_lose_nothing():
     table = "| A | B | C |\n| 1 |  | 3 |\n| 4 |"
 

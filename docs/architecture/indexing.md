@@ -35,12 +35,13 @@ Extractors produce ordered **sections** with text and optional locators (`page`,
 
 Two conventions in the section text let the chunker see the structure:
 
-- Tables in DOCX, PPTX, and XLSX are pipe-delimited rows (`| Region | Sales |`), which keeps cell boundaries.
+- Tables in DOCX, PPTX, XLSX, and PDF are pipe-delimited rows (`| Region | Sales |`), which keeps cell boundaries.
 - DOCX headings are written as `# Heading`. A paragraph counts as a heading when it has a Heading style, or when it is the next number in a `1. Title` sequence.
+- PDF headings are written the same way when a whole line is bold and has the `1. Title` form. Bold keeps out numbered list items and table-of-contents lines, which are usually set in body text. Lines over 100 characters do not count. A section that runs onto the next page keeps its heading there.
 
 A DOCX `section` locator is the position of its heading in the document, starting at 1. Text before the first heading is section 0.
 
-PDF tables are not detected: they stay in the page text. PDF headings are not detected either, so PDF chunks are named after their page.
+PDF tables are found with PyMuPDF's `find_tables`. Each table is placed under the text above it, top to bottom, with blank lines around it, so two tables on one page keep their own column names. Two-column pages read top to bottom, so their paragraphs interleave. A PDF without numbered sections keeps chunks named after their page.
 
 ## Chunking for retrieval
 
@@ -48,7 +49,8 @@ PDF tables are not detected: they stay in the page text. PDF headings are not de
 
 | Source | Chunk heading | `source_locations` |
 |--------|---------------|--------------------|
-| PDF page | `Page 3` | `[{"page": 3}]` |
+| PDF numbered section | The heading text, such as `6. Spokespeople` | `[{"page": 3}]` |
+| PDF page without one | `Page 3` | `[{"page": 3}]` |
 | PPTX slide | `Slide 3` | `[{"slide": 3}]` |
 | XLSX sheet | `Sheet: Q1` | `[{"sheet": 1, "name": "Q1"}]` |
 | DOCX heading | The heading text | `[{"section": 2}]` |
@@ -57,7 +59,7 @@ PDF tables are not detected: they stay in the page text. PDF headings are not de
 
 Rules:
 
-1. **Tables and sheets are their own chunks.** Every cell is named after its column (`| Metric: Uptime | Owner: Dana |`), so a row says what its numbers mean in any chunk; the values stay exactly as in the source. They split between rows. The widest row of a table or sheet is taken as its header, and any one-cell title rows above it stay as they are. Plain-text columns aligned under a dashed ruler count as tables. PDF tables are found with PyMuPDF's `find_tables`, which needs ruled lines; a table drawn without lines stays in the page text.
+1. **Tables and sheets are their own chunks.** Every cell is named after its column (`| Metric: Uptime | Owner: Dana |`), so a row says what its numbers mean in any chunk; the values stay exactly as in the source. They split between rows. The widest row of a table or sheet is taken as its header. One-cell title rows above it (units, "Q4 is a forecast", a total budget) are repeated at the top of every part, unless they take more than half the part's room. A short line just above a table, such as `Revenue by Quarter (FY2025)`, becomes its first title row. Plain-text columns aligned under a dashed ruler count as tables. PDF tables are found with PyMuPDF's `find_tables`, which needs ruled lines; a table drawn without lines stays in the page text.
 2. **Everything else splits at the coarsest boundary that fits:** paragraph, line, sentence, word, then inside an unbroken run such as a long ID.
 3. **Nothing is dropped.** That includes text before the first heading and plain text with no headings. A heading with no body of its own moves into the next section's text.
 4. **A heading can repeat.** All parts of a long page keep the name `Page 3`. Citations and previews find a chunk by its ID, so this hides nothing. Search keeps only the best-ranked format of a file name, so `.pdf` and `.docx` copies of one report never compete for result slots.
@@ -113,7 +115,7 @@ WHERE status IN ('completed', 'failed');
 docker compose -f config/compose.yaml exec postgres psql -U peka -d peka -c "<the statement above>"
 ```
 
-The old chunks stay searchable until each file's new set is active, and a job that fails keeps them. The worker reads the stored extraction JSON, so files extracted earlier keep that extraction: XLSX cell boundaries are gone, PDF, DOCX and plain-text tables stay in the surrounding text, and PPTX tables stay missing. Getting table chunks with labelled cells and unnumbered DOCX headings needs a fresh upload.
+The old chunks stay searchable until each file's new set is active, and a job that fails keeps them. The worker reads the stored extraction JSON, so files extracted earlier keep that extraction: XLSX cell boundaries are gone, PDF, DOCX and plain-text tables stay in the surrounding text, and PPTX tables stay missing. Getting table chunks with labelled cells and unnumbered DOCX headings needs a fresh upload, and so do PDF tables placed under their sections and numbered PDF headings (files uploaded before 2026-11-12).
 
 ## History: OKF pages
 
