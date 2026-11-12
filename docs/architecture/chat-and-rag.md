@@ -21,7 +21,7 @@ User query (+ history)
           ▼
 ┌───────────────────┐
 │ Evidence check    │  no or weak hits: one short call asks whether this needs a
-│ (only if weak)    │  specific organization fact; if so, refuse without answering
+│ (only if weak)    │  specific organization fact; if so, answer only with a citation
 └─────────┬─────────┘
           │
           ▼
@@ -69,11 +69,12 @@ Output shape:
 `search_knowledge` / `SearchRepository.search_chunks`:
 
 1. Embed query via TEI  
-2. Rank by cosine similarity on **active** chunk embeddings  
-3. Filter `access_level` by role  
-4. Apply `SEARCH_SIMILARITY_FLOOR` (default `0.3`)  
-5. Rerank the top `RERANK_CANDIDATES` (default `20`) with the local cross-encoder; if it fails, log a warning and keep the hybrid order  
-6. Limit to `RERANK_TOP_K` (default `5`) for chat, or `SEARCH_TOP_K` for `POST /search`
+2. Rank by cosine similarity on **active** chunk embeddings, above `SEARCH_SIMILARITY_FLOOR` (default `0.3`)  
+3. Rank by keyword match separately, any query word counting, rare words weighted higher (a word found in every document, such as the company name, counts little)  
+4. Filter `access_level` by role; keep only the best-ranked format of each file name  
+5. Let the two lists take turns filling the candidates, ties broken by reciprocal rank fusion, so a passage only keywords find still reaches the reranker  
+6. Rerank the top `RERANK_CANDIDATES` (default `20`) with the local cross-encoder; if it fails, log a warning and keep the hybrid order  
+7. Limit to `RERANK_TOP_K` (default `5`) for chat, or `SEARCH_TOP_K` for `POST /search`
 
 Returned fields become chat sources: title, heading, snippet/content, locations, scores, file ids.
 
@@ -109,7 +110,7 @@ An answer block that claims a source ID from outside this turn loses it and beco
 
 After a knowledge-base search, the evidence is weak when there are no results or the top rerank score is below `SEARCH_EVIDENCE_FLOOR` (default `0.1`). One short model call then classifies the question:
 
-- **A specific fact only the organization's records could hold** (a name, number, date, rule): the server returns a templated reply with `refused: true` and no citations, and the answer model is not called. The reply names up to three of the closest documents and asks the user which one they meant or for more detail. Search is access-filtered, so it never names a document the user may not read. The UI labels it "Need more detail".
+- **A specific fact only the organization's records could hold** (a name, number, date, rule): with no results, the server returns a templated reply with `refused: true` and no citations, and the answer model is not called. With weak results, the answer model reads them with a note to answer only from a result that states the answer. The small reranker scores some real matches low, such as a reworded question or a table row. That answer is not streamed: it is kept only if it cites a source, and otherwise replaced by the templated reply. The reply names up to three of the closest documents and asks the user which one they meant or for more detail. Search is access-filtered, so it never names a document the user may not read. The UI labels it "Need more detail".
 - **Anything else** (greetings, arithmetic, public knowledge, broad "summarize the documents" requests): the turn goes on to the answer model as usual.
 
 Web search, and a search with no rerank score because the reranker is down, skip this check. If the classifier call fails, the turn is answered normally.
@@ -158,7 +159,7 @@ The web client (`services/chat.ts`) parses `data:` lines and updates the UI; on 
 | `SEARCH_TOP_K` / `SEARCH_SIMILARITY_FLOOR` | Recall vs precision |
 | Extraction / `MAX_CHUNK_TOKENS` | Structure and size of indexed source chunks |
 | `RERANK_CANDIDATES` / `RERANK_TOP_K` | Reranker CPU time; sources sent to the chat model |
-| `SEARCH_EVIDENCE_FLOOR` | Top rerank score below which a question for a specific fact is refused; `0` turns it off. Calibrated for the default rerank model |
+| `SEARCH_EVIDENCE_FLOOR` | Top rerank score below which a question for a specific fact is answered only with a citation, and otherwise refused; `0` turns it off. Calibrated for the default rerank model |
 | `LLM_MAX_TOKENS` / model context | Longest answer; see [Prompt size](#prompt-size) |
 | Exa key + UI toggle | Whether public web grounding is possible |
 | File ACL | Hard filter on what can ever be retrieved |
@@ -167,7 +168,7 @@ The web client (`services/chat.ts`) parses `data:` lines and updates the UI; on 
 
 - Invalid retrieval plan → search with the question as written  
 - Embed failure on `/search` → HTTP 503  
-- Empty or weak search results → [refuse a question for a specific fact](#no-evidence-refusal); answer anything else with general blocks  
+- Empty or weak search results → [refuse a question for a specific fact](#no-evidence-refusal) unless the model cites a weak result; answer anything else with general blocks  
 - Invalid answer JSON → no second generation, so a busy model is not held longer:  
   1. Repair it in place (markdown fence, surrounding text, unescaped quotes or line breaks)  
   2. `/chat/stream` only: if the model wrote plain prose, show that without citations  

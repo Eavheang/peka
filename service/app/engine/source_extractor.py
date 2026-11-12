@@ -27,7 +27,7 @@ _TEXT_RULER_RE = re.compile(r"\s*-{2,}(?:\s+-{2,})+\s*")
 SUPPORTED = {".pdf", ".docx", ".xlsx", ".pptx", ".txt", ".md"}
 # Bump when extracted text changes, together with CHUNKER_VERSION so stored files are queued again.
 # The index worker re-extracts the original file when its saved extraction is older.
-EXTRACTOR_VERSION = 2
+EXTRACTOR_VERSION = 3
 
 
 def clean_text(text: str) -> str:
@@ -49,14 +49,31 @@ def source_id_for(path: Path) -> str:
     return hashlib.sha256(identity.encode("utf-8")).hexdigest()[:16]
 
 
+def _numbered_headings(text: str, heading: str, bold: set[str]) -> tuple[str, str]:
+    """Mark bold "3. Crisis Team" lines as Markdown headings, so each section gets its own heading instead
+    of the page's. Bold keeps out numbered list items and contents lines, which share the numbering. `heading`
+    is the last one on earlier pages: text before this page's first heading continues it."""
+    continued = heading
+    lines = text.splitlines()
+    for index, line in enumerate(lines):
+        line = line.strip()
+        # The chunker reads headings up to 100 characters.
+        if line in bold and len(line) <= 100 and SECTION_HEADING_RE.fullmatch(line):
+            heading, lines[index] = line, f"# {line}"
+    if continued and not next((line for line in lines if line.strip()), "").startswith("# "):
+        lines.insert(0, f"# {continued}")
+    return "\n".join(lines), heading
+
+
 def extract_pdf(path: Path) -> list[dict[str, object]]:
     sections = []
+    heading = ""
     with pymupdf.open(path) as document:
         for number, page in enumerate(document, start=1):
             tables = page.find_tables().tables
             # Tables become pipe rows, which the chunker keeps apart from the prose around them.
-            blocks = [
-                block[4]
+            parts = [
+                (block[1], block[0], block[4])
                 for block in page.get_text("blocks")
                 # By the block's centre: a table's box can be slightly smaller than the text in it.
                 if not any(
@@ -64,8 +81,21 @@ def extract_pdf(path: Path) -> list[dict[str, object]]:
                     for table in tables
                 )
             ]
-            rows = [_table_text(_pdf_cells(page, table)) for table in tables]
-            text = clean_text("\n".join([*blocks, *rows]))
+            # Each table under the text above it, set apart by blank lines: adjacent tables would otherwise
+            # read as one and take the first one's column names. The page's own block order can't place
+            # them: generators often draw headers and footers first.
+            # ponytail: top-to-bottom order interleaves the paragraphs of two-column pages.
+            parts += [
+                (table.bbox[1], table.bbox[0], f"\n\n{_table_text(_pdf_cells(page, table))}\n\n") for table in tables
+            ]
+            text = clean_text("\n".join(text for *_, text in sorted(parts, key=lambda part: part[:2])))
+            bold = {
+                "".join(span["text"] for span in line["spans"]).strip()
+                for block in page.get_text("dict")["blocks"]
+                for line in block.get("lines", [])
+                if all(span["flags"] & pymupdf.TEXT_FONT_BOLD for span in line["spans"])
+            }
+            text, heading = _numbered_headings(text, heading, bold)
             if text:
                 sections.append({"page": number, "text": text})
     return sections

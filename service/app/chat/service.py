@@ -94,6 +94,13 @@ _UNRELATED_RESULTS_NOTE = (
     "the conversation in general blocks, without mentioning the documents. Never invent company facts."
 )
 
+# A document question whose best match scored low. The reranker misjudges some real matches (a reworded
+# question, a table row), so the model reads them, but must not fill the gap from general knowledge.
+_WEAK_RESULTS_NOTE = (
+    "The search found only weak matches for this question. Answer only from a result that states the "
+    "answer, and cite it. If no result states it, say the documents do not say, in one general block."
+)
+
 _QUESTION_SCOPE_PROMPT = (
     "You are Peka's question classifier. A search of the organization's documents found no passage "
     "that clearly matches the user's current question. Decide what kind of question it is. "
@@ -549,6 +556,7 @@ def _source_context(
     search_name: str,
     query: str,
     sources: dict[str, dict],
+    weak: bool = False,
 ) -> str:
     # Keep retrieved source data within the local model's context window. The
     # full results remain available for citations; only the prompt copy is
@@ -562,7 +570,11 @@ def _source_context(
                 prompt_source[field] = value[:limit]
         prompt_sources[source_id] = prompt_source
     relevant = _results_are_relevant(search_name, list(sources.values()))
-    unrelated = f"{_UNRELATED_RESULTS_NOTE}\n\n" if sources and not relevant else ""
+    note = ""
+    if weak:  # a question for an organization fact, with only weak matches
+        note = f"{_WEAK_RESULTS_NOTE}\n\n"
+    elif sources and not relevant:
+        note = f"{_UNRELATED_RESULTS_NOTE}\n\n"
     payload = json.dumps(prompt_sources, ensure_ascii=False, default=str).replace("<", "\\u003c")
 
     return (
@@ -576,7 +588,7 @@ def _source_context(
         "<search_results>\n"
         f"{payload}\n"
         "</search_results>\n\n"
-        f"{unrelated}Now answer the original user question. If the current-turn source IDs are "
+        f"{note}Now answer the original user question. If the current-turn source IDs are "
         "'none', use only general blocks with an empty source_ids list."
     )
 
@@ -642,6 +654,13 @@ def _attach_citations(answer: ModelAnswer, sources: dict[str, dict], tool: str) 
     return ModelAnswer(blocks=blocks)
 
 
+def _cited_or_clarifying(answer: ModelAnswer, sources: dict[str, dict]) -> ChatResponse:
+    """Keep a weak-evidence answer only if it cites a source; otherwise ask what the user meant."""
+    if any(block.source_ids for block in answer.blocks):
+        return _response_from_model_answer(answer, sources)
+    return ChatResponse(answer=_clarifying_answer(list(sources.values())), refused=True, citations=[])
+
+
 def _response_from_model_answer(
     answer: ModelAnswer, sources: dict[str, dict]
 ) -> ChatResponse:
@@ -683,19 +702,22 @@ def answer_from_knowledge(
                 if search_plan.tool == "web_search"
                 else search_knowledge(search_plan.query, user_role)
             )
-            if (
+            weak = (
                 search_plan.tool == "search_knowledge_base"
                 and _weak_evidence(results)
                 and _needs_documents(query, history, timezone)
-            ):
+            )
+            if weak and not results:
                 return ChatResponse(answer=_clarifying_answer(results), refused=True, citations=[])
             sources = {
                 f"source-{index}": result
                 for index, result in enumerate(results, 1)
             }
             messages.append(
-                ai.user_message(_source_context(search_plan.tool, search_plan.query, sources))
+                ai.user_message(_source_context(search_plan.tool, search_plan.query, sources, weak))
             )
+            if weak:
+                return _cited_or_clarifying(_generate_valid_answer(messages, sources), sources)
 
         answer = _attach_citations(_generate_valid_answer(messages, sources), sources, search_plan.tool)
 
@@ -737,6 +759,7 @@ async def _stream_answer(
         _search_plan, query, history, web_search, timezone
     )
     sources: dict[str, dict] = {}
+    weak = False
     messages = _conversation_messages(query, history, _SYSTEM_PROMPT, timezone)
 
     if search_plan.tool != "none":
@@ -752,7 +775,8 @@ async def _stream_answer(
             results = await asyncio.to_thread(perform_web_search, search_plan.query)
         else:
             results = await asyncio.to_thread(search_knowledge, search_plan.query, user_role)
-            if _weak_evidence(results) and await asyncio.to_thread(_needs_documents, query, history, timezone):
+            weak = _weak_evidence(results) and await asyncio.to_thread(_needs_documents, query, history, timezone)
+            if weak and not results:
                 answer = _clarifying_answer(results)
                 yield ChatStreamText(answer)
                 yield ChatStreamCompleted(ChatResponse(answer=answer, refused=True, citations=[]))
@@ -762,8 +786,17 @@ async def _stream_answer(
             for index, result in enumerate(results, 1)
         }
         messages.append(
-            ai.user_message(_source_context(search_plan.tool, search_plan.query, sources))
+            ai.user_message(_source_context(search_plan.tool, search_plan.query, sources, weak))
         )
+        if weak:
+            # Not streamed: an answer that cites nothing is replaced by the clarifying question.
+            yield ChatStreamStatus("Checking the documents...")
+            response = _cited_or_clarifying(
+                await asyncio.to_thread(_generate_valid_answer, messages, sources), sources
+            )
+            yield ChatStreamText(response.answer)
+            yield ChatStreamCompleted(response)
+            return
 
     yield ChatStreamStatus("Writing response...")
     raw_output: list[str] = []

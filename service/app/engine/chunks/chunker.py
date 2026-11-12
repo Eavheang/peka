@@ -9,14 +9,17 @@ import re
 # instead if that ever matters.
 MAX_CHUNK_TOKENS = 400
 # Bump when chunk output changes: the index worker re-indexes sets built by an older version on start.
-CHUNKER_VERSION = 2
+CHUNKER_VERSION = 3
 _TOKEN_RE = re.compile(r"[A-Za-z]{1,12}|\d{1,2}|\S")
 
-_HEADED_FORMATS = {".md", ".docx"}
+# The extractor writes `#` headings for Word headings and numbered PDF sections.
+_HEADED_FORMATS = {".md", ".docx", ".pdf"}
 _LOCATOR_KEYS = ("page", "slide", "sheet", "name", "section", "part")
 _HEADING_RE = re.compile(r"^#{1,6}\s+(.{1,100}?)(?:\s+#+)?\s*$")
 _TABLE_RE = re.compile(r"((?:^[ \t]*\|.*\|[ \t]*(?:\n|$)){2,})", re.MULTILINE)
 _TABLE_DELIMITER_RE = re.compile(r"[\s|:-]+")
+# One short line without a closing stop or list marker: a caption, not a sentence or a bullet.
+_CAPTION_RE = re.compile(r"[A-Za-z][^|\n]{0,78}[^.:;,!?|\s]")
 # Coarsest first: paragraphs, lines, sentences, words. Each cut keeps the text around it.
 _BOUNDARIES = tuple(re.compile(pattern) for pattern in (r"(?<=\n\n)", r"(?<=\n)", r"(?<=[.!?]\s)", r"(?<=\s)"))
 
@@ -101,9 +104,15 @@ def _markdown_sections(text: str, default_heading: str) -> list[tuple[str, str]]
 
 
 def _split_blocks(text: str, budget: int) -> list[str]:
-    """Give each table its own chunks. The capture group puts tables at the odd indexes."""
+    """Give each table, with its caption, its own chunks. The capture group puts tables at the odd indexes."""
+    blocks = _TABLE_RE.split(text)
+    for index in range(1, len(blocks), 2):
+        # A short line just above a table ("Revenue by Quarter (FY2025)") is its caption: it goes with the table.
+        before, _, last = blocks[index - 1].rstrip().rpartition("\n")
+        if _CAPTION_RE.fullmatch(last.strip()):
+            blocks[index - 1], blocks[index] = before, f"| {last.strip()} |\n{blocks[index]}"
     pieces: list[str] = []
-    for index, block in enumerate(_TABLE_RE.split(text)):
+    for index, block in enumerate(blocks):
         pieces.extend(_split_table(block, budget) if index % 2 else _pieces(block, budget))
     return pieces
 
@@ -124,7 +133,13 @@ def _split_table(table: str, budget: int) -> list[str]:
         for row in rows
         if not _TABLE_DELIMITER_RE.fullmatch(row)
     ]
-    return _pieces("\n".join([*lines[:start], *labelled]) if labelled and len(names) > 1 else table, budget)
+    if not labelled or len(names) < 2:
+        return _pieces(table, budget)
+    # Title rows (units, "forecast", the total budget) say what every row means, so each part repeats them.
+    cost = estimate_tokens("\n".join(lines[:start]))
+    if cost > budget // 2:  # Repeating a long title would leave each part little room for rows.
+        return _pieces("\n".join([*lines[:start], *labelled]), budget)
+    return ["\n".join([*lines[:start], piece]) for piece in _pieces("\n".join(labelled), budget - cost)]
 
 
 def _pieces(text: str, budget: int) -> list[str]:
