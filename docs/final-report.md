@@ -225,7 +225,7 @@ Search time did not change (about 0.4 s mean, 0.6 s p95). Two other ideas were t
 
 These misses are mostly declines or half answers. Three answers were wrong. One gave the hourly rate of a role the answer had guessed, one picked the wrong campaign as the most expensive, and one gave the 90 brands RevoluMark serves as the number of DataHive's clients (18). Each question was asked once, and answers change between runs: the run before the last review fixes, on the same search, scored 146 of 151 and 58 of 60, with different questions missed. For example, "Who won Rookie of the Year?" failed in one run and passed in the next. A goal such as 99.99% cannot be measured on 211 questions, where one miss is already 0.5%.
 
-**Caveats.** The documents come from one fictional company and the questions were written by the evaluator after reading them, so they follow the documents' wording more than real users would. Rewording 137 of the 211 answerable questions and holding out 60 reduces that. Files uploaded before this change keep their old PDF extraction until they are uploaded again (see [Indexing](architecture/indexing.md)).
+**Caveats.** The documents come from one fictional company and the questions were written by the evaluator after reading them, so they follow the documents' wording more than real users would. Rewording 137 of the 211 answerable questions and holding out 60 reduces that. The change bumps the extractor and chunker versions, so the index worker re-extracts and re-indexes files already uploaded when it starts (see [Indexing](architecture/indexing.md#re-indexing-existing-files)).
 
 ## How many users does this system serve?
 

@@ -51,9 +51,12 @@ PDF tables are found with PyMuPDF's `find_tables`. Each table is placed under th
 |--------|---------------|--------------------|
 | PDF numbered section | The heading text, such as `6. Spokespeople` | `[{"page": 3}]` |
 | PDF page without one | `Page 3` | `[{"page": 3}]` |
-| PPTX slide | `Slide 3` | `[{"slide": 3}]` |
+| PPTX slide, including text inside grouped shapes | `Slide 3` | `[{"slide": 3}]` |
+| PPTX speaker notes | `Slide 3 notes` | `[{"slide": 3, "part": "notes"}]` |
 | XLSX sheet | `Sheet: Q1` | `[{"sheet": 1, "name": "Q1"}]` |
 | DOCX heading | The heading text | `[{"section": 2}]` |
+| DOCX footnotes | `Footnotes` | `[{"part": "footnotes"}]` |
+| DOCX headers and footers, each distinct one once | `Headers and footers` | `[{"part": "headers and footers"}]` |
 | Markdown `#` to `######` | The heading text | `[]` |
 | Text before the first heading, and `.txt` | `Text` | `[{"section": 0}]` for DOCX, otherwise `[]` |
 
@@ -63,6 +66,8 @@ Rules:
 2. **Everything else splits at the coarsest boundary that fits:** paragraph, line, sentence, word, then inside an unbroken run such as a long ID.
 3. **Nothing is dropped.** That includes text before the first heading and plain text with no headings. A heading with no body of its own moves into the next section's text.
 4. **A heading can repeat.** All parts of a long page keep the name `Page 3`. Citations and previews find a chunk by its ID, so this hides nothing. Search keeps only the best-ranked format of a file name, so `.pdf` and `.docx` copies of one report never compete for result slots.
+
+Not extracted: DOCX endnotes, text boxes and comments; PPTX charts, SmartArt and alt text; text in images (there is no OCR). Footnotes and headers or footers are cited by part only, without a page or footnote number.
 
 Embedding input string:
 
@@ -91,6 +96,8 @@ The TEI image in Compose truncates longer input instead of rejecting it (`auto_t
 
 Each re-index creates a new `chunk_sets` row (`building`), inserts chunks, then swaps so only one set per file is `active`. Search never mixes superseded vectors.
 
+The swap deletes the superseded set's chunks except those a saved answer cites, so older citations still open their source preview. A trigger on `messages` deletes a kept chunk once the last message citing it is deleted.
+
 ## Worker reliability
 
 - Single serial worker (no Redis); claim via `SKIP LOCKED`
@@ -104,7 +111,13 @@ Scaling note: code comments warn that org-level locking would be needed before r
 
 ## Re-indexing existing files
 
-Files indexed before this format keep their old model-rewritten chunks until they are re-indexed. Nothing re-queues them automatically, because regenerating rewritten chunks later is expensive, so this is the owner's choice. Re-indexing deletes the old chunks, so previews of citations saved in older conversations stop working. To re-index every file from its original text:
+Each chunk set records the `chunker_version` that built it (`CHUNKER_VERSION` in `chunker.py`). When the index worker starts, it re-queues every file whose active set an older chunker built, whatever the state of its job. Bump `CHUNKER_VERSION` whenever chunk output changes.
+
+Migration `023` gives every existing chunk set version 0, so **the first deploy with it re-indexes every file once**. That is intended: it moves files still on model-rewritten chunks onto the original text.
+
+Re-indexing keeps the chunks that saved answers cite, so citations in older conversations still open their source preview. Kept chunks stay in their superseded set, which search never reads, and the preview still checks the file's current access level. Citations already broken by a re-index before this change stay broken.
+
+To re-index every file now, without changing the version:
 
 ```sql
 UPDATE index_jobs SET status = 'queued', attempts = 0, last_error = NULL, updated_at = CURRENT_TIMESTAMP
@@ -115,7 +128,7 @@ WHERE status IN ('completed', 'failed');
 docker compose -f config/compose.yaml exec postgres psql -U peka -d peka -c "<the statement above>"
 ```
 
-The old chunks stay searchable until each file's new set is active, and a job that fails keeps them. The worker reads the stored extraction JSON, so files extracted earlier keep that extraction: XLSX cell boundaries are gone, PDF, DOCX and plain-text tables stay in the surrounding text, and PPTX tables stay missing. Getting table chunks with labelled cells and unnumbered DOCX headings needs a fresh upload, and so do PDF tables placed under their sections and numbered PDF headings (files uploaded before 2026-11-12).
+The old chunks stay searchable until each file's new set is active, and a job that fails keeps them. The worker reads the stored extraction JSON, and reads the original file again when an older extractor wrote it (`EXTRACTOR_VERSION` in `source_extractor.py`). Bump it together with `CHUNKER_VERSION` when extracted text changes, so stored files are re-extracted as well as re-chunked. Version 3 (2026-11-12) did this for PDF tables placed under their sections, bold numbered PDF headings, and table title rows repeated in every part.
 
 ## History: OKF pages
 

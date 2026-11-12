@@ -92,7 +92,7 @@ def _write_extraction(storage, relative_source):
     source.write_text("source", encoding="utf-8")
     extraction_path = storage / "extracted" / f"{extractor.source_id_for(source)}.json"
     extraction_path.parent.mkdir(exist_ok=True)
-    extraction_path.write_text(json.dumps({"source_id": "source-1", "sections": []}), encoding="utf-8")
+    extraction_path.write_text(json.dumps({"source_id": "source-1", "extractor_version": extractor.EXTRACTOR_VERSION, "sections": []}), encoding="utf-8")
 
 
 def _prepare_worker(monkeypatch, tmp_path, jobs, chunk):

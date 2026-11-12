@@ -17,11 +17,14 @@ def test_run_worker_stops_on_event(monkeypatch) -> None:
         def reset_processing(self):
             processed.append("reset")
 
+        def queue_outdated(self, chunker_version):
+            processed.append(f"outdated<{chunker_version}")
+
     monkeypatch.setattr(worker, "index_jobs_repository", FakeJobsRepository())
     stop = threading.Event()
     stop.set()
     worker.run_worker(stop)
-    assert processed == ["reset"]
+    assert processed == ["reset", f"outdated<{worker.CHUNKER_VERSION}"]
 
 
 def test_index_status_reports_all_fields(monkeypatch) -> None:

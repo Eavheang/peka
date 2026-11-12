@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "oxlint",
     "lint-fix": "oxlint --fix",
+    "test": "bun test",
     "format": "oxfmt",
     "format-check": "oxfmt --check",
     "tsc": "tsc --noEmit"

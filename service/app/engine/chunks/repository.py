@@ -5,7 +5,7 @@ from pgvector.psycopg import register_vector
 from psycopg.types.json import Jsonb
 
 from app.database import get_connection
-from app.engine.chunks.chunker import Chunk
+from app.engine.chunks.chunker import CHUNKER_VERSION, Chunk
 
 
 class KnowledgeChunksRepository:
@@ -23,8 +23,8 @@ class KnowledgeChunksRepository:
         with get_connection() as connection:
             register_vector(connection)
             set_id = connection.execute(
-                "INSERT INTO chunk_sets (file_id, status) VALUES (%s, 'building') RETURNING id",
-                (file_id,),
+                "INSERT INTO chunk_sets (file_id, status, chunker_version) VALUES (%s, 'building', %s) RETURNING id",
+                (file_id, CHUNKER_VERSION),
             ).fetchone()["id"]
             for chunk, vector in zip(chunks, vectors, strict=True):
                 connection.execute(
@@ -55,8 +55,10 @@ class KnowledgeChunksRepository:
                 ).fetchall()
             ]
             if superseded:
+                # Keep the chunks saved answers cite, so their source previews still open; search reads active sets only.
                 connection.execute(
-                    "DELETE FROM knowledge_chunks WHERE chunk_set_id = ANY(%s)",
+                    "DELETE FROM knowledge_chunks kc WHERE chunk_set_id = ANY(%s) AND NOT EXISTS ("
+                    "SELECT 1 FROM messages WHERE citations @> jsonb_build_array(jsonb_build_object('chunk_id', kc.id::text)))",
                     (superseded,),
                 )
             connection.execute(

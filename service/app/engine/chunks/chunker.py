@@ -8,11 +8,13 @@ import re
 # TEI truncates those rather than failing, and keyword search still reads the whole chunk. Call TEI /tokenize
 # instead if that ever matters.
 MAX_CHUNK_TOKENS = 400
+# Bump when chunk output changes: the index worker re-indexes sets built by an older version on start.
+CHUNKER_VERSION = 3
 _TOKEN_RE = re.compile(r"[A-Za-z]{1,12}|\d{1,2}|\S")
 
 # The extractor writes `#` headings for Word headings and numbered PDF sections.
 _HEADED_FORMATS = {".md", ".docx", ".pdf"}
-_LOCATOR_KEYS = ("page", "slide", "sheet", "name", "section")
+_LOCATOR_KEYS = ("page", "slide", "sheet", "name", "section", "part")
 _HEADING_RE = re.compile(r"^#{1,6}\s+(.{1,100}?)(?:\s+#+)?\s*$")
 _TABLE_RE = re.compile(r"((?:^[ \t]*\|.*\|[ \t]*(?:\n|$)){2,})", re.MULTILINE)
 _TABLE_DELIMITER_RE = re.compile(r"[\s|:-]+")
@@ -67,9 +69,11 @@ def _label(section: dict) -> str:
     if "page" in section:
         return f"Page {section['page']}"
     if "slide" in section:
-        return f"Slide {section['slide']}"
+        return f"Slide {section['slide']} {section['part']}" if "part" in section else f"Slide {section['slide']}"
     if "sheet" in section:
         return f"Sheet: {section.get('name') or section['sheet']}"
+    if "part" in section:
+        return section["part"].capitalize()
     return f"Section {section['section']}" if section.get("section") else "Text"
 
 

@@ -15,14 +15,13 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import Markdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ChatMessage, ChatResult } from "@/interface/chat";
 import { getConversation, sendChatMessageStream, useGetConversation } from "@/services/chat";
 import { getApiErrorMessage } from "@/utils/api-error";
+import { AnswerMarkdown } from "./answerMarkdown";
 
 const MAX_QUERY_LENGTH = 4000;
 const WEB_SEARCH_STORAGE_KEY = "peka_web_search_enabled";
@@ -581,9 +580,7 @@ function ChatMessageBubble({
             </p>
           ) : (
             <div className="break-words text-sm leading-7 [&_h1]:my-4 [&_h1]:text-xl [&_h2]:my-4 [&_h2]:text-lg [&_h3]:my-3 [&_h3]:text-base [&_p]:my-3 [&_ul]:my-3 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:my-3 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-1 [&_pre]:my-3 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-secondary [&_pre]:p-3 [&_code]:text-xs">
-              <Markdown remarkPlugins={[remarkGfm]} skipHtml>
-                {message.text}
-              </Markdown>
+              <AnswerMarkdown>{message.text}</AnswerMarkdown>
             </div>
           ))}
         {!isUser && streamingStatus && (

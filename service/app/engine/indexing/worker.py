@@ -5,8 +5,8 @@ import time
 
 from app.audit.service import record_audit_event
 from app.config import settings
-from app.engine.source_extractor import source_id_for
-from app.engine.chunks.chunker import chunk_extraction
+from app.engine.source_extractor import EXTRACTOR_VERSION, extract_file, source_id_for
+from app.engine.chunks.chunker import CHUNKER_VERSION, chunk_extraction
 from app.engine.chunks.embeddings import embed_chunks
 from app.engine.chunks.repository import knowledge_chunks_repository
 from app.engine.indexing.job_repository import index_jobs_repository
@@ -27,6 +27,12 @@ def process_next_job() -> bool:
             raise ValueError("Unsafe source path")
         extracted = storage_root / "extracted" / f"{source_id_for(source)}.json"
         extraction = json.loads(extracted.read_text(encoding="utf-8"))
+        if extraction.get("extractor_version") != EXTRACTOR_VERSION:
+            # Saved by an older extractor: read the original file again so the new text is indexed.
+            extraction = extract_file(
+                source, source_id=extraction.get("source_id"), content_hash=extraction.get("source_sha256")
+            )
+            extracted.write_text(json.dumps(extraction, indent=2) + "\n", encoding="utf-8")
         chunks = chunk_extraction(extraction)
         vectors = embed_chunks(chunks)
         knowledge_chunks_repository.swap_active_set(job["file_id"], chunks, vectors)
@@ -44,6 +50,7 @@ def process_next_job() -> bool:
 def run_worker(stop: threading.Event | None = None) -> None:
     # ponytail: one worker serializes shared indexes; add per-organization locks before scaling.
     index_jobs_repository.reset_processing()
+    index_jobs_repository.queue_outdated(CHUNKER_VERSION)
     while stop is None or not stop.is_set():
         if not process_next_job():
             if stop is None:

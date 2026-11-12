@@ -111,15 +111,17 @@ class SearchRepository:
     ) -> dict[str, Any] | None:
         query = (
             "SELECT kc.content, kc.file_id FROM knowledge_chunks kc "
-            "JOIN chunk_sets cs ON cs.id = kc.chunk_set_id AND cs.status = 'active' "
+            "JOIN chunk_sets cs ON cs.id = kc.chunk_set_id "
             "JOIN files f ON f.id = kc.file_id "
             "WHERE f.access_level = ANY(%s) "
             "AND regexp_replace(f.path, '^.*/', '') = %s AND kc.heading = %s"
         )
         parameters: list[Any] = [list(allowed_access_levels), title, heading]
-        if chunk_id is not None:
+        if chunk_id is not None:  # A cited chunk outlives re-indexing in its superseded set.
             query += " AND kc.id = %s"
             parameters.append(chunk_id)
+        else:
+            query += " AND cs.status = 'active'"
         with get_connection() as connection:
             rows = connection.execute(query + " LIMIT 2", parameters).fetchall()
         # Older citations lack chunk IDs; never guess between multiple matching passages.

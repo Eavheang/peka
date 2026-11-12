@@ -71,6 +71,21 @@ On API lifespan, if both `ADMIN_EMAIL` and `ADMIN_PASSWORD` are set and no admin
 | `LLM_API_KEY` | `service/.env` (+ optional DB override) |
 | `EXA_API_KEY` | `service/.env` (+ optional DB override) |
 | `POSTGRES_PASSWORD` | `config/.env` |
+| `PGADMIN_DEFAULT_PASSWORD` | `config/.env` |
 | `ADMIN_PASSWORD` | `service/.env` (bootstrap only) |
 
-Use a secret manager in real deployments. Prefer removing the llama host port publish so only the backend network can reach the LLM.
+`make setup` generates `POSTGRES_PASSWORD` and `PGADMIN_DEFAULT_PASSWORD` when it creates `config/.env`. The old defaults `peka_dev_password` and `peka_admin_password` are refused.
+
+Use a secret manager in real deployments.
+
+`compose.yaml` publishes only the nginx proxy (`WEBCLIENT_PORT`, default 3000). Dev publishes Postgres on `127.0.0.1:5432` and the API on `127.0.0.1:8000`. pgAdmin is opt-in on `127.0.0.1:5050`. The llama profile publishes `127.0.0.1:8080`. To open a dev port on the LAN, edit the bind address in `config/compose.dev.yaml` (for example `"127.0.0.1:5432:5432"` to `"5432:5432"`). Postgres is protected only by its password, and llama has no authentication.
+
+## Prompt injection and answer rendering
+
+Indexed documents are untrusted, any signed-in user can upload general files, and the model can repeat Markdown planted in those documents.
+
+- `AnswerMarkdown` drops images, including one whose URL carries chat data
+- Links get `rel="noreferrer"`
+- Web client sends `Content-Security-Policy: img-src 'self' data: blob:` so a rendered image cannot load from another origin
+- Inside `<search_results>`, `<` is escaped as `\u003c`, so a document cannot close that delimiter
+- Links still render, and a user can click them
