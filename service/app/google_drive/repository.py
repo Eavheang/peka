@@ -76,7 +76,7 @@ class GoogleDriveRepository:
                 )
                 return
             # A new folder starts over. The cascade forgets the old folder's files, which stay in PEKA as
-            # ordinary files, and the first run lists the folder so files already in it count as existing.
+            # ordinary files, and the first run imports every file already in the new folder.
             connection.execute("DELETE FROM google_drive_sync")
             connection.execute(
                 "INSERT INTO google_drive_sync (user_id, folder_id, folder_name, access_level, timezone, "
@@ -106,7 +106,7 @@ class GoogleDriveRepository:
                 f"WITH due AS ({_DUE} FOR UPDATE OF s) UPDATE google_drive_sync s"
                 " SET last_run_on = CASE WHEN due.scheduled THEN due.local_date ELSE s.last_run_on END"
                 " FROM due WHERE s.id = due.id AND (due.run_requested OR due.scheduled)"
-                " RETURNING s.user_id, s.folder_id, s.access_level, s.needs_baseline,"
+                " RETURNING s.user_id, s.folder_id, s.access_level,"
                 " EXISTS (SELECT 1 FROM users u WHERE u.id = s.user_id AND u.role = 'admin' AND u.is_active)"
                 " AS owner_is_admin"
             ).fetchone()
@@ -119,19 +119,6 @@ class GoogleDriveRepository:
                 "UPDATE google_drive_sync SET last_result = %s, last_synced_at = CURRENT_TIMESTAMP, "
                 "run_requested = false WHERE folder_id = %s",
                 (result, folder_id),
-            )
-
-    def save_baseline(self, folder_id: str, files: dict[str, str]) -> None:
-        """Record every file already in the folder as seen and not imported, unless the folder changed meanwhile."""
-        with get_connection() as connection:
-            if not connection.execute(
-                "UPDATE google_drive_sync SET needs_baseline = false WHERE folder_id = %s", (folder_id,)
-            ).rowcount:
-                return
-            connection.execute("DELETE FROM google_drive_synced_files")
-            connection.cursor().executemany(
-                "INSERT INTO google_drive_synced_files (drive_file_id, modified_time) VALUES (%s, %s)",
-                list(files.items()),
             )
 
     def synced_files(self) -> dict[str, dict]:

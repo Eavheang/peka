@@ -17,8 +17,8 @@ Postgres with the `vector` extension (pgvector). Schema is owned by Alembic; do 
 | `provider_settings` | Single row `id=1`, JSONB `value` for LLM/Exa overrides |
 | `audit_events` | Admin audit log: `type` (`sync` \| `query` \| `system`), nullable `actor_id`, `summary`, `metadata` JSONB, `created_at`. Indexes `(type, created_at DESC)` and `(created_at DESC)`. List order is `created_at DESC, id DESC` |
 | `google_drive_connections` | PK `user_id` → users (cascade); Google OAuth `refresh_token` (Fernet-encrypted with a key derived from `JWT_SECRET_KEY`), timestamps. One row per user who connected Drive |
-| `google_drive_sync` | Single row `id=1`: the admin folder sync. `user_id` → users (cascade), the admin whose Drive is read; `folder_id`, `folder_name`, `access_level`, `timezone`, `sync_time`, `last_run_on` (local date of the last scheduled run), `run_requested` (Sync now), `needs_baseline` (folder not listed yet), `last_synced_at`, `last_result` |
-| `google_drive_synced_files` | PK `drive_file_id`; `sync_id` → `google_drive_sync` (cascade); `file_id` → files (set null), NULL when the file was in the folder when picked, was skipped, or was deleted in PEKA; `modified_time` from Drive, compared on each run |
+| `google_drive_sync` | Single row `id=1`: the admin folder sync. `user_id` → users (cascade), the admin whose Drive is read; `folder_id`, `folder_name`, `access_level`, `timezone`, `sync_time`, `last_run_on` (local date of the last scheduled run), `run_requested` (Sync now), `last_synced_at`, `last_result` |
+| `google_drive_synced_files` | PK `drive_file_id`; `sync_id` → `google_drive_sync` (cascade); `file_id` → files (set null), NULL when the file was skipped or deleted in PEKA; `modified_time` from Drive, compared on each run |
 
 Conversation list uses index `(owner_id, updated_at DESC, id DESC)` for cursor pagination.
 
@@ -49,6 +49,7 @@ Conversation list uses index `(owner_id, updated_at DESC, id DESC)` for cursor p
 | `023_add_chunker_version` | `chunk_sets.chunker_version`; GIN index on `messages.citations` |
 | `024_release_uncited_chunks` | Trigger: a superseded chunk kept for an old citation is deleted with the last message that cites it |
 | `025_create_google_drive_sync` | `google_drive_sync`, `google_drive_synced_files`; clears plaintext Drive tokens so users reconnect once |
+| `026_drop_drive_sync_baseline` | Drops `google_drive_sync.needs_baseline`: the first run imports files already in the folder. Forgets synced files with no PEKA file and queues a run, so they are imported |
 
 Apply:
 

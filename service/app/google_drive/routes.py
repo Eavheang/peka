@@ -120,7 +120,7 @@ def get_sync(_: dict = Depends(admin_only)) -> dict | None:
 
 @router.put("/sync", response_model=DriveSyncSettings)
 def put_sync(payload: DriveSyncUpdate, user: dict = Depends(admin_only)) -> dict:
-    """Makes this admin the owner. A different folder starts over: files already in it count as existing."""
+    """Makes this admin the owner. A different folder starts over: its first run imports every file in it."""
     return save_sync_settings(user["id"], payload.folder_id, payload.folder_name, payload.access_level,
                               payload.timezone, payload.sync_time)
 

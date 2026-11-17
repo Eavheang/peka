@@ -64,8 +64,8 @@ def test_runs_once_a_day_at_local_time_and_on_request(database):
     repository.save_sync(admin, "folder-a", "A", "general", zone, time(23, 0))
 
     assert repository.is_due()
-    job = repository.claim_due()  # a new folder is listed right away
-    assert job["folder_id"] == "folder-a" and job["needs_baseline"]
+    job = repository.claim_due()  # a new folder is synced right away
+    assert job["folder_id"] == "folder-a"
     assert repository.find_sync()["run_requested"]  # until the run finishes, so the page keeps checking
     repository.finish_run("folder-a", "listed")
     assert not repository.is_due() and repository.claim_due() is None  # 23:00 local has not come yet
@@ -88,14 +88,11 @@ def test_runs_once_a_day_at_local_time_and_on_request(database):
     assert repository.claim_due()["owner_is_admin"] is False  # the run fails visibly instead of hanging
 
 
-def test_changing_folder_forgets_synced_files_and_lists_again(database):
+def test_changing_folder_forgets_synced_files_and_syncs_again(database):
     admin = create_user("admin")
     repository.save_sync(admin, "folder-a", "A", "general", "UTC", time(0, 0))
-    repository.save_baseline("folder-old", {"stale": "t0"})  # a run for a folder no longer synced
-    assert repository.synced_files() == {}
-    repository.save_baseline("folder-a", {"d1": "t1"})
+    repository.record_synced("d1", None, "t1")
     repository.record_synced("d2", None, "t2")
-    assert execute("SELECT needs_baseline FROM google_drive_sync")[0] is False
 
     repository.save_sync(admin, "folder-a", "A", "confidential", "UTC", time(22, 0))
     assert set(repository.synced_files()) == {"d1", "d2"}
@@ -103,8 +100,7 @@ def test_changing_folder_forgets_synced_files_and_lists_again(database):
     other_admin = create_user("admin")
     repository.save_sync(other_admin, "folder-b", "B", "general", "UTC", time(22, 0))
     assert repository.synced_files() == {}
-    assert execute("SELECT user_id, needs_baseline, run_requested FROM google_drive_sync") == (
-        other_admin, True, True)
+    assert execute("SELECT user_id, run_requested FROM google_drive_sync") == (other_admin, True)
 
     repository.delete_sync()
     assert repository.find_sync() is None

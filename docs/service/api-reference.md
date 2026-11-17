@@ -120,7 +120,7 @@ One workspace-wide folder. Once a day at `sync_time` in `timezone`, or within a 
 - deletes the PEKA copy of files removed from the tree (deleted, trashed or moved out). Nothing is deleted unless every folder in the tree listed without error;
 - skips unsupported, too large and duplicate files.
 
-Files already in the folder when it is picked are recorded and skipped until they are edited. Stopping the sync or picking another folder keeps the files already synced. Each run writes a `sync` audit event.
+Picking a folder starts a run within a minute that imports every file already in it. Stopping the sync or picking another folder keeps the files already synced. Each run writes a `sync` audit event.
 
 | Method | Path | Auth | Body / notes | Response |
 |--------|------|------|--------------|----------|
