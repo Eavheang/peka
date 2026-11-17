@@ -169,7 +169,7 @@ def fake_drive(monkeypatch, tree, fail_folder=None):
 
 def fake_sync(monkeypatch, job, known):
     """In-memory sync tables; `known` is the synced-files table and changes in place."""
-    runs, baseline, events, stored, deleted = [], {}, [], [], []
+    runs, events, stored, deleted = [], [], [], []
     repository = service.google_drive_repository
     monkeypatch.setattr(repository, "is_due", lambda: True)
     monkeypatch.setattr(repository, "claim_due", lambda: job)
@@ -177,7 +177,6 @@ def fake_sync(monkeypatch, job, known):
     monkeypatch.setattr(repository, "record_synced", lambda drive_id, file_id, modified: known.__setitem__(
         drive_id, {"file_id": file_id, "modified_time": modified}))
     monkeypatch.setattr(repository, "forget_synced", known.pop)
-    monkeypatch.setattr(repository, "save_baseline", lambda folder_id, files: baseline.update(files))
     monkeypatch.setattr(repository, "finish_run", lambda folder_id, result: runs.append(result))
     monkeypatch.setattr(service, "access_token", lambda user_id, scope=None: "fresh")
     monkeypatch.setattr(service, "record_audit_event", lambda event, **kwargs: events.append(event))
@@ -191,18 +190,18 @@ def fake_sync(monkeypatch, job, known):
 
     monkeypatch.setattr(service, "store_files", store_files)
     monkeypatch.setattr(service, "delete_file", lambda file_id, user_id, is_admin: deleted.append(file_id))
-    return runs, baseline, events, stored, deleted
+    return runs, events, stored, deleted
 
 
 SYNC_TREE = {
     "root": [
         ("same", "same.pdf", "application/pdf", "1"),
-        ("picked", "picked.pdf", "application/pdf", "1"),
+        ("unimported", "unimported.pdf", "application/pdf", "1"),
         ("edited", "edited.pdf", "application/pdf", "2"),
         ("sub", "Sub", service.FOLDER_MIME_TYPE, "1"),
     ],
     "sub": [
-        ("picked-then-edited", "old.docx", DOCX, "2"),
+        ("unimported-then-edited", "old.docx", DOCX, "2"),
         ("new", "new.pdf", "application/pdf", "1"),
         ("video", "clip.mp4", "video/mp4", "1"),
         ("shortcut", "report.pdf", "application/vnd.google-apps.shortcut", "1"),
@@ -216,26 +215,26 @@ def test_sync_imports_new_and_edited_files_and_removes_deleted_ones(monkeypatch)
     fake_drive(monkeypatch, SYNC_TREE)
     known = {
         "same": {"file_id": "f-same", "modified_time": "1"},
-        "picked": {"file_id": None, "modified_time": "1"},
+        "unimported": {"file_id": None, "modified_time": "1"},
         "edited": {"file_id": "f-edited", "modified_time": "1"},
-        "picked-then-edited": {"file_id": None, "modified_time": "1"},
+        "unimported-then-edited": {"file_id": None, "modified_time": "1"},
         "gone": {"file_id": "f-gone", "modified_time": "1"},
         "gone-unimported": {"file_id": None, "modified_time": "1"},
     }
-    job = {"user_id": uuid4(), "folder_id": "root", "access_level": "confidential", "needs_baseline": False,
+    job = {"user_id": uuid4(), "folder_id": "root", "access_level": "confidential",
            "owner_is_admin": True}
-    runs, _, events, stored, deleted = fake_sync(monkeypatch, job, known)
+    runs, events, stored, deleted = fake_sync(monkeypatch, job, known)
 
     service.sync_folder()
 
     assert sorted(stored) == [("edited.pdf", b"edited", "confidential"), ("new.pdf", b"new", "confidential"),
-                              ("old.docx", b"picked-then-edited", "confidential")]
+                              ("old.docx", b"unimported-then-edited", "confidential")]
     assert sorted(deleted) == ["f-edited", "f-gone"]
     assert known == {
         "same": {"file_id": "f-same", "modified_time": "1"},
-        "picked": {"file_id": None, "modified_time": "1"},  # in the folder when picked, never edited
+        "unimported": {"file_id": None, "modified_time": "1"},  # skipped before and unchanged since
         "edited": {"file_id": "file-edited.pdf", "modified_time": "2"},
-        "picked-then-edited": {"file_id": "file-old.docx", "modified_time": "2"},
+        "unimported-then-edited": {"file_id": "file-old.docx", "modified_time": "2"},
         "new": {"file_id": "file-new.pdf", "modified_time": "1"},
         "video": {"file_id": None, "modified_time": "1"},
         "shortcut": {"file_id": None, "modified_time": "1"},
@@ -249,9 +248,9 @@ def test_sync_deletes_nothing_when_any_folder_fails_to_list(monkeypatch):
     configure(monkeypatch)
     fake_drive(monkeypatch, SYNC_TREE, fail_folder="sub")
     known = {"gone": {"file_id": "f-gone", "modified_time": "1"}}
-    job = {"user_id": uuid4(), "folder_id": "root", "access_level": "general", "needs_baseline": False,
+    job = {"user_id": uuid4(), "folder_id": "root", "access_level": "general",
            "owner_is_admin": True}
-    runs, _, events, stored, deleted = fake_sync(monkeypatch, job, known)
+    runs, events, stored, deleted = fake_sync(monkeypatch, job, known)
 
     service.sync_folder()
 
@@ -261,27 +260,25 @@ def test_sync_deletes_nothing_when_any_folder_fails_to_list(monkeypatch):
     assert events == ["drive_sync_failed"]
 
 
-def test_first_sync_records_existing_files_without_importing(monkeypatch):
+def test_first_sync_imports_files_already_in_the_folder(monkeypatch):
     configure(monkeypatch)
     fake_drive(monkeypatch, SYNC_TREE)
-    job = {"user_id": uuid4(), "folder_id": "root", "access_level": "general", "needs_baseline": True,
-           "owner_is_admin": True}
-    runs, baseline, _, stored, deleted = fake_sync(monkeypatch, job, {})
+    job = {"user_id": uuid4(), "folder_id": "root", "access_level": "general", "owner_is_admin": True}
+    runs, _, stored, deleted = fake_sync(monkeypatch, job, {})
 
     service.sync_folder()
 
-    assert stored == [] and deleted == []
-    assert baseline == {"same": "1", "picked": "1", "edited": "2", "picked-then-edited": "2", "new": "1",
-                        "video": "1", "shortcut": "1", "dup": "1"}
-    assert runs[0].startswith("Folder picked with 8 existing files")
+    assert sorted(name for name, _, _ in stored) == ["edited.pdf", "new.pdf", "old.docx", "same.pdf", "unimported.pdf"]
+    assert deleted == []
+    assert runs == ["5 added, 0 updated, 0 removed, 3 skipped (unsupported, too large, or duplicate)."]
 
 
 def test_sync_stops_when_the_owner_is_no_longer_an_admin(monkeypatch):
     configure(monkeypatch)
     fake_drive(monkeypatch, SYNC_TREE)
-    job = {"user_id": uuid4(), "folder_id": "root", "access_level": "general", "needs_baseline": False,
+    job = {"user_id": uuid4(), "folder_id": "root", "access_level": "general",
            "owner_is_admin": False}
-    runs, _, events, stored, deleted = fake_sync(monkeypatch, job, {"gone": {"file_id": "f-gone", "modified_time": "1"}})
+    runs, events, stored, deleted = fake_sync(monkeypatch, job, {"gone": {"file_id": "f-gone", "modified_time": "1"}})
 
     service.sync_folder()
 

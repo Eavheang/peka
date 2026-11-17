@@ -82,7 +82,7 @@ An admin picks one Drive folder as the source of truth under **Admin → Workspa
 
 1. Choose **Choose folder**. The first time, Google asks for read access to your whole Drive (`drive.readonly`), because PEKA must see files added to the folder later. You return to the settings page; choose the folder again.
 2. Set the **daily sync time** (default 00:00, in this browser's time zone) and the access level for synced files, then **Save folder sync**.
-3. Each day at that time, files added to the folder or its subfolders, and files edited there, are added to the knowledge base. Files deleted from the folder are removed. Files already in the folder when you picked it are skipped until someone edits them.
+3. Each day at that time, files added to the folder or its subfolders, and files edited there, are added to the knowledge base. Files deleted from the folder are removed. Files already in the folder when you pick it are added by the first sync, which starts within a minute.
 4. **Sync now** runs within a minute. The card shows the last run, for example "3 added, 1 updated, 0 removed". **Stop syncing** keeps the files already synced; so does picking another folder.
 
 If the server is offline at sync time, the sync runs once it is back online. Manual uploads and imports keep working alongside the sync.

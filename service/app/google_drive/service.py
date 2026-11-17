@@ -224,13 +224,7 @@ def sync_folder() -> None:
                 "the admin who set it up is no longer an active admin. Another admin must save it again")
         token = access_token(job["user_id"], SYNC_SCOPE)
         with httpx.Client(headers={"Authorization": f"Bearer {token}"}, timeout=60) as client:
-            current = _list_tree(client, job["folder_id"])
-            if job["needs_baseline"]:
-                google_drive_repository.save_baseline(
-                    job["folder_id"], {file_id: item["modifiedTime"] for file_id, item in current.items()})
-                result = f"Folder picked with {len(current)} existing files; new and edited files sync from now on."
-            else:
-                result = _mirror(client, job, current)
+            result = _mirror(client, job, _list_tree(client, job["folder_id"]))
         event = "drive_sync_completed"
     except GoogleDriveError as error:
         logger.warning("Google Drive folder sync failed: %s", error)

@@ -41,7 +41,6 @@ class GoogleDriveSync(Base):
     sync_time: Mapped[time] = mapped_column(Time, nullable=False, server_default=text("'00:00'"))
     last_run_on: Mapped[date | None] = mapped_column(Date)
     run_requested: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
-    needs_baseline: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
     last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_result: Mapped[str | None] = mapped_column(Text)
 
@@ -53,6 +52,6 @@ class GoogleDriveSyncedFile(Base):
     sync_id: Mapped[int] = mapped_column(
         SmallInteger, ForeignKey("google_drive_sync.id", ondelete="CASCADE"), nullable=False, server_default=text("1")
     )
-    # NULL: present when the folder was picked, skipped, or deleted in PEKA. An edit in Drive imports it.
+    # NULL: skipped, or deleted in PEKA. An edit in Drive imports it.
     file_id: Mapped[UUID | None] = mapped_column(PostgresUUID(as_uuid=True), ForeignKey("files.id", ondelete="SET NULL"))
     modified_time: Mapped[str] = mapped_column(Text, nullable=False)
