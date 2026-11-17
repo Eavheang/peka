@@ -1,0 +1,160 @@
+{"id":1,"type":"N","q":"According to the RevoluMark company overview, who founded the company and when?","docs":["01","45"],"keys":[["okafor"],["nair"],["2016"]]}
+{"id":2,"type":"P","q":"How many people work in the Singapore office and when did it open?","docs":["01"],"keys":[["48"],["2023"]]}
+{"id":3,"type":"P","q":"How much did the Series B funding round raise and who led it?","docs":["01"],"keys":[["24m","24 million","$24"],["granite peak"]]}
+{"id":4,"type":"N","q":"What do the brand voice guidelines say about using exclamation marks?","docs":["02"],"keys":[["client-facing","client facing"],["one","1"]]}
+{"id":5,"type":"P","q":"Is it okay to write 'leverage' as a verb in our company copy?","docs":["02"],"keys":[["avoid","not","no"]]}
+{"id":6,"type":"P","q":"Which English spelling should London-led client work use?","docs":["02"],"keys":[["uk english","british"]]}
+{"id":7,"type":"N","q":"Under the social media policy, during what hours is client content not allowed to be published?","docs":["03"],"keys":[["10:00 p.m.","10 p.m.","10pm","10:00 pm","22:00"],["6:00 a.m.","6 a.m.","6am","6:00 am","06:00"]]}
+{"id":8,"type":"P","q":"Paid boosts above what amount need Media team sign-off?","docs":["03"],"keys":[["$500","500"]]}
+{"id":9,"type":"P","q":"What phone number do I call to report a social media incident?","docs":["03"],"keys":[["555 0199","555-0199"]]}
+{"id":10,"type":"N","q":"In the client onboarding SOP, on which day is the kickoff meeting held and how long is it?","docs":["04"],"keys":[["day 7"],["90 min"]]}
+{"id":11,"type":"P","q":"What percentage of new clients went live within 21 business days in 2025?","docs":["04"],"keys":[["84%"]]}
+{"id":12,"type":"P","q":"If a new client's onboarding falls more than 5 business days behind schedule, who must be notified?","docs":["04"],"keys":[["vp client services","vice president","vp, client services","sofia"]]}
+{"id":13,"type":"N","q":"In the SEO playbook, what are the intent weights used in the Opportunity Score?","docs":["05"],"keys":[["1.0"],["0.7"],["0.3"],["0.1"]]}
+{"id":14,"type":"P","q":"What Core Web Vitals targets do we use for LCP, INP and CLS?","docs":["05"],"keys":[["2.5"],["200"],["0.1"]]}
+{"id":15,"type":"P","q":"How many articles per month are produced on Enterprise SEO retainers?","docs":["05"],"keys":[["8","eight"]]}
+{"id":16,"type":"N","q":"What was the ROAS of the Northwind Coffee 'Warm Up the Season' holiday 2025 campaign?","docs":["06","45"],"keys":[["4.9"]]}
+{"id":17,"type":"P","q":"Why did Northwind miss its new email subscriber goal last holiday season?","docs":["06"],"keys":[["9 days","nine days"],["freeze","cms"]]}
+{"id":18,"type":"T","q":"What was the TikTok spend and ROAS for Northwind's holiday 2025 campaign?","docs":["06"],"keys":[["186000","186k","186 000"],["3.8"]]}
+{"id":19,"type":"N","q":"In the October 6, 2026 leadership meeting minutes, what merit budget was approved for 2027?","docs":["07","15","25","46"],"keys":[["3.5%"],["1%"]]}
+{"id":20,"type":"P","q":"By when must Orbit Fitness pay its overdue amount to avoid a credit hold, and how much is it?","docs":["07"],"keys":[["october 31","oct 31"],["214"]]}
+{"id":21,"type":"P","q":"Who took the minutes at the October leadership team meeting?","docs":["07"],"keys":[["claire dubois"]]}
+{"id":22,"type":"N","q":"What is the minimum password length in the information security policy?","docs":["08"],"keys":[["14"]]}
+{"id":23,"type":"P","q":"How quickly must a lost or stolen laptop be reported?","docs":["08"],"keys":[["1 hour","one hour"]]}
+{"id":24,"type":"P","q":"Is SMS-based two-factor authentication allowed?","docs":["08"],"keys":[["not","no"],["okta verify","hardware key"]]}
+{"id":25,"type":"N","q":"How does the marketing glossary define MER?","docs":["09"],"keys":[["total revenue"],["marketing spend"]]}
+{"id":26,"type":"P","q":"What statistical confidence do we require before declaring an A/B test winner?","docs":["09"],"keys":[["95%"]]}
+{"id":27,"type":"P","q":"Which attribution model do we fall back to when data volume is too low?","docs":["09"],"keys":[["position-based","position based"]]}
+{"id":28,"type":"N","q":"According to the internal FAQ, how many unused PTO days can I carry over and when do they expire?","docs":["10"],"keys":[["5 days","five days","up to 5"],["march 31"]]}
+{"id":29,"type":"P","q":"How much is the referral bonus for hiring someone at Director level?","docs":["10"],"keys":[["$5000","5000"]]}
+{"id":30,"type":"P","q":"When are UK staff paid?","docs":["10"],"keys":[["25th"]]}
+{"id":31,"type":"N","q":"Which HRIS and payroll tools are listed in the technology stack document?","docs":["11"],"keys":[["rippling"],["deel"]]}
+{"id":32,"type":"P","q":"How long does the security review for a new software tool request take?","docs":["11"],"keys":[["10 business days","ten business days"]]}
+{"id":33,"type":"P","q":"What is the total budgeted SaaS spend for FY2026?","docs":["11"],"keys":[["2.36"]]}
+{"id":34,"type":"N","q":"In the Orbit Fitness 'New Year, Real You' creative brief, what is the new member acquisition target?","docs":["12"],"keys":[["14000","14 000"]]}
+{"id":35,"type":"P","q":"What is the production budget for the Orbit Fitness January 2027 campaign?","docs":["12"],"keys":[["185000","185k"]]}
+{"id":36,"type":"P","q":"Who gives final approval on the Orbit Fitness creative?","docs":["12"],"keys":[["darren fisk"]]}
+{"id":37,"type":"N","q":"According to the influencer marketing guidelines, what minimum audience authenticity score must a creator have?","docs":["13"],"keys":[["85%"]]}
+{"id":38,"type":"P","q":"What is the follower range and typical fee per post for a micro creator?","docs":["13"],"keys":[["10k"],["100k"],["$500"],["5000"]]}
+{"id":39,"type":"P","q":"How are creators paid under our standard contract terms?","docs":["13"],"keys":[["50%"],["net 15"]]}
+{"id":40,"type":"N","q":"On what date was the DataHive Analytics acquisition announced?","docs":["14"],"keys":[["august 18"]]}
+{"id":41,"type":"P","q":"Who became Head of Measurement Science after the acquisition?","docs":["14","17"],"keys":[["oliver grant"]]}
+{"id":42,"type":"P","q":"Who is the media contact for press inquiries and what is the phone number?","docs":["14"],"keys":[["natalie chen"],["555 0142","555-0142"]]}
+{"id":43,"type":"N","q":"How long is parental leave for a primary caregiver according to the employee handbook?","docs":["15","47"],"keys":[["18 weeks"]]}
+{"id":44,"type":"P","q":"What is the probation period for new employees in the UK?","docs":["15"],"keys":[["6 months","six months"]]}
+{"id":45,"type":"P","q":"How long is a written warning valid in the disciplinary procedure?","docs":["15"],"keys":[["6 months","six months"]]}
+{"id":46,"type":"P","q":"After how many years of service can someone take a sabbatical, and how long is it?","docs":["15"],"keys":[["7 years","seven years"],["4 weeks","four weeks"]]}
+{"id":47,"type":"N","q":"What does the Code of Conduct Rule Book say about accepting a gift worth $180?","docs":["16"],"keys":[["register"]]}
+{"id":48,"type":"P","q":"Which industries does RevoluMark refuse to do advertising work for?","docs":["16"],"keys":[["tobacco"],["firearms"],["gambling"],["political"]]}
+{"id":49,"type":"P","q":"By what date must employees certify compliance with the code of conduct each year?","docs":["16"],"keys":[["february 28"]]}
+{"id":50,"type":"N","q":"What is the total program investment in the Helios Solar proposal?","docs":["17","43","07"],"keys":[["1850000","1.85"]]}
+{"id":51,"type":"P","q":"What cost per qualified lead does our solar lead generation proposal target?","docs":["17"],"keys":[["$95"]]}
+{"id":52,"type":"P","q":"How many DMAs are in the Helios geo-holdout test?","docs":["17"],"keys":[["6","six"]]}
+{"id":53,"type":"N","q":"In the Meridian University proposal, what is the target cost per application for 2027?","docs":["18"],"keys":[["$48"]]}
+{"id":54,"type":"P","q":"How much of the university enrollment campaign budget is media pass-through?","docs":["18"],"keys":[["396000","396k"]]}
+{"id":55,"type":"N","q":"Under the Master Services Agreement template, what is the late payment interest rate?","docs":["19","30"],"keys":[["1.5%"]]}
+{"id":56,"type":"P","q":"How long do confidentiality obligations last after a client agreement ends?","docs":["19"],"keys":[["3 years","three years"]]}
+{"id":57,"type":"P","q":"Above what monthly media budget must a client pre-fund media?","docs":["19"],"keys":[["100000","100k"]]}
+{"id":58,"type":"N","q":"What is the monthly retainer in Lumen Health's SOW No. 7?","docs":["20","43"],"keys":[["42000","42k"]]}
+{"id":59,"type":"P","q":"Who is the content lead on the Lumen Health SEO program?","docs":["20"],"keys":[["ravi shankar"]]}
+{"id":60,"type":"P","q":"What has to happen if Lumen Health's tracking requires PHI?","docs":["20"],"keys":[["business associate agreement","baa"]]}
+{"id":61,"type":"N","q":"Under the remote and hybrid work policy, how many days per year can employees work from another country?","docs":["21"],"keys":[["20"]]}
+{"id":62,"type":"P","q":"What is the one-time home office setup allowance in Singapore?","docs":["21"],"keys":[["s$800","sgd 800","800"]]}
+{"id":63,"type":"P","q":"Which VPN must be used on public Wi-Fi?","docs":["21"],"keys":[["tailscale"]]}
+{"id":64,"type":"N","q":"What is the nightly hotel cap in London under the travel and expense policy?","docs":["22"],"keys":[["$350"]]}
+{"id":65,"type":"P","q":"When are employees allowed to fly business class?","docs":["22"],"keys":[["10 hours"],["cfo","c-level"]]}
+{"id":66,"type":"P","q":"What is the mileage reimbursement rate in the US for 2026?","docs":["22"],"keys":[["0.70"]]}
+{"id":67,"type":"N","q":"What is the total budget in the FY2027 own-brand marketing plan?","docs":["23"],"keys":[["1360000","1.36"]]}
+{"id":68,"type":"P","q":"How many attendees is the 'Measured' client summit targeting?","docs":["23"],"keys":[["250"]]}
+{"id":69,"type":"P","q":"How many named accounts will our ABM program target?","docs":["23"],"keys":[["120"]]}
+{"id":70,"type":"N","q":"What is the salary range for the Senior Media Buyer role in New York?","docs":["24"],"keys":[["102000","102k"],["124000","124k"]]}
+{"id":71,"type":"P","q":"How much is a candidate paid for the take-home ad account audit exercise?","docs":["24"],"keys":[["$150"]]}
+{"id":72,"type":"N","q":"According to the performance review process, what merit increase range applies to a rating of 4?","docs":["25"],"keys":[["4%","4 %"],["6%"]]}
+{"id":73,"type":"P","q":"What weight do values carry in performance assessments?","docs":["25"],"keys":[["30%"]]}
+{"id":74,"type":"P","q":"When is an employee placed on a performance improvement plan?","docs":["25"],"keys":[["rated 1","rating of 1","rating 1"],["twice","two consecutive","in a row"]]}
+{"id":75,"type":"N","q":"How long is data from unsuccessful candidates kept under the data privacy policy?","docs":["26"],"keys":[["12 months","twelve months"]]}
+{"id":76,"type":"P","q":"What hashing must customer lists use before upload to ad platforms?","docs":["26"],"keys":[["sha-256","sha256","sha 256"]]}
+{"id":77,"type":"P","q":"Within how many days must we respond to a CCPA data subject request?","docs":["26"],"keys":[["45"]]}
+{"id":78,"type":"N","q":"What was RevoluMark's net income in FY2025 according to the annual report?","docs":["27","37"],"keys":[["6.2"]]}
+{"id":79,"type":"P","q":"How many active clients did we have at year-end 2025, and how many clients were won and lost that year?","docs":["27"],"keys":[["87"],["22"],["7"]]}
+{"id":80,"type":"P","q":"Who chairs the board of directors?","docs":["27","36"],"keys":[["linda hargrove"]]}
+{"id":81,"type":"N","q":"In the Verdant Foods case study, how much did paid social CAC change?","docs":["28","45"],"keys":[["31%"]]}
+{"id":82,"type":"P","q":"What share of the plant-based meal campaign's sales impact happened in retail stores according to MMM?","docs":["28"],"keys":[["62%"]]}
+{"id":83,"type":"N","q":"How many Trail Ready packs were sold in the Bluepeak Outdoor campaign?","docs":["29"],"keys":[["11400","11 400"]]}
+{"id":84,"type":"P","q":"What was the total investment in the Trail Ready campaign and how was it split?","docs":["29"],"keys":[["1.05"],["410"],["520"],["120"]]}
+{"id":85,"type":"N","q":"What is the hourly rate for a Strategy Director on the 2026 rate card?","docs":["30"],"keys":[["$260"]]}
+{"id":86,"type":"P","q":"What discount can an Account Director approve without escalation?","docs":["30"],"keys":[["10%"]]}
+{"id":87,"type":"P","q":"What media management fee applies for monthly spend between $500,001 and $1 million?","docs":["30"],"keys":[["9%"]]}
+{"id":88,"type":"N","q":"What full-year revenue does the Q3 2026 board report forecast?","docs":["31","37"],"keys":[["66.6"]]}
+{"id":89,"type":"P","q":"What cash balance did the company have at the end of Q3 2026?","docs":["31"],"keys":[["14.2"]]}
+{"id":90,"type":"P","q":"Which two clients were lost in Q3 2026 and why?","docs":["31"],"keys":[["sunbelt"],["quill"],["in-house","in house"],["budget"]]}
+{"id":91,"type":"N","q":"What is the response time for a Level 2 crisis in the crisis communication plan?","docs":["32"],"keys":[["4 hours","four hours"]]}
+{"id":92,"type":"P","q":"Who is allowed to speak to the media on behalf of the company?","docs":["32"],"keys":[["ceo"],["president"],["corporate communications"]]}
+{"id":93,"type":"N","q":"Under the procurement policy, what approval is needed for a vendor purchase between $25,001 and $100,000?","docs":["33"],"keys":[["vp"],["cfo"]]}
+{"id":94,"type":"P","q":"Who is our preferred video production vendor in the UK?","docs":["33"],"keys":[["northbank"]]}
+{"id":95,"type":"P","q":"What are the standard payment terms we give to vendors?","docs":["33"],"keys":[["net 45"]]}
+{"id":96,"type":"N","q":"What is the HEX code for Revolu Violet in the brand identity guide?","docs":["34"],"keys":[["5b2eff"]]}
+{"id":97,"type":"P","q":"Which font is used for headlines in our brand materials?","docs":["34"],"keys":[["space grotesk"]]}
+{"id":98,"type":"N","q":"How long were Novaline Cosmetics' ads offline after the Meta ad account suspension?","docs":["35"],"keys":[["41 hours"]]}
+{"id":99,"type":"P","q":"How much did we credit Novaline as goodwill after the account suspension?","docs":["35"],"keys":[["6500"]]}
+{"id":100,"type":"P","q":"What ad claim triggered Meta's policy on unrealistic beauty outcomes?","docs":["35"],"keys":[["erases wrinkles"]]}
+{"id":101,"type":"N","q":"What were RevoluMark's total emissions in 2025 according to the sustainability report?","docs":["36"],"keys":[["1240"]]}
+{"id":102,"type":"P","q":"By what year has the company committed to net zero emissions?","docs":["36"],"keys":[["2035"]]}
+{"id":103,"type":"P","q":"How much did the Austin Food Bank pro bono campaign raise?","docs":["36"],"keys":[["412000","412k"]]}
+{"id":104,"type":"N","q":"In the revenue report, what was actual revenue for FY2024 Q3?","docs":["37"],"keys":[["12"]]}
+{"id":105,"type":"P","q":"What is the forecast revenue for Q4 2026 and how does it compare to plan?","docs":["37"],"keys":[["17.2"],["17.9"]]}
+{"id":106,"type":"T","q":"What was Marketing Analytics & Data revenue for FY2026 year to date (Q1 to Q3)?","docs":["37"],"keys":[["4.6"]]}
+{"id":107,"type":"N","q":"In the 2026 campaign performance spreadsheet, what was the CPA of Kestrel Bank's LinkedIn campaign?","docs":["38"],"keys":[["129.34"]]}
+{"id":108,"type":"P","q":"What ROAS did Bluepeak's Winter Layers Google Shopping campaign achieve?","docs":["38"],"keys":[["2.6"]]}
+{"id":109,"type":"P","q":"What is our target CTR benchmark for LinkedIn?","docs":["38"],"keys":[["0.6%"]]}
+{"id":110,"type":"N","q":"Who is the account director for Tidewater Hotels in the client roster?","docs":["39"],"keys":[["wei jie lim"]]}
+{"id":111,"type":"P","q":"How much does Novaline Cosmetics owe in total as of October 31, 2026?","docs":["39"],"keys":[["272000","272k"]]}
+{"id":112,"type":"P","q":"What action is required when a client's health status is Amber?","docs":["39"],"keys":[["account plan"],["14 days"]]}
+{"id":113,"type":"P","q":"What is Northwind Coffee's annual contract value and when does it renew?","docs":["39"],"keys":[["7100000","7.1"],["2027-03-31","march 31 2027","31 march 2027"]]}
+{"id":114,"type":"N","q":"Which department is most over budget year to date in the FY2026 operating budget?","docs":["40"],"keys":[["data & pulse","data and pulse"]]}
+{"id":115,"type":"P","q":"What was the London office fit-out capex budget and actual spend?","docs":["40"],"keys":[["340000","340k"],["355000","355k"]]}
+{"id":116,"type":"P","q":"When does our Snowflake subscription renew and how much does it cost per year?","docs":["40"],"keys":[["september"],["210000","210k"]]}
+{"id":117,"type":"N","q":"In the headcount report, what is the voluntary attrition rate in the New York office?","docs":["41"],"keys":[["16.7%"]]}
+{"id":118,"type":"P","q":"How many people work in the Data & Pulse department in London?","docs":["41"],"keys":[["21"]]}
+{"id":119,"type":"P","q":"Who is the hiring manager for the Data Scientist, MMM role?","docs":["41"],"keys":[["oliver grant"]]}
+{"id":120,"type":"N","q":"What is the Q1 2027 LinkedIn budget in the Atlas Logistics media plan?","docs":["42"],"keys":[["220000","220k"]]}
+{"id":121,"type":"P","q":"What cost per freight quote request is targeted for Atlas in Q1 2027?","docs":["42"],"keys":[["$281"]]}
+{"id":122,"type":"T","q":"Does the Atlas Logistics Q1 2027 channel allocation add up to the stated total budget?","docs":["42"],"keys":[["775000","775k"],["900000","900k"]]}
+{"id":123,"type":"N","q":"What is the probability and expected close date of the Orchid Air opportunity in the Q4 2026 sales pipeline?","docs":["43"],"keys":[["30%"],["2027-03-01","march 1"]]}
+{"id":124,"type":"P","q":"What is the top reason we lose deals?","docs":["43"],"keys":[["price"]]}
+{"id":125,"type":"P","q":"What is our average sales cycle?","docs":["43"],"keys":[["68 days"]]}
+{"id":126,"type":"N","q":"What is scheduled to be published on December 8, 2026 in the content calendar?","docs":["44"],"keys":[["2027 predictions"]]}
+{"id":127,"type":"P","q":"What target share of our own-brand content should be thought leadership?","docs":["44"],"keys":[["35%"]]}
+{"id":128,"type":"N","q":"What are the next steps listed in the company pitch deck?","docs":["45"],"keys":[["discovery workshop"],["10 business days"]]}
+{"id":129,"type":"P","q":"How much does a Growth retainer cost per month?","docs":["45","30"],"keys":[["35000","35k"]]}
+{"id":130,"type":"N","q":"What were the Q4 priorities in the Q3 2026 quarterly business review?","docs":["46"],"keys":[["helios"],["pulse beta"],["48 days"]]}
+{"id":131,"type":"P","q":"What DSO level does the company aim to get back below in Q4 2026?","docs":["46"],"keys":[["48"]]}
+{"id":132,"type":"N","q":"What happens on day 3 of a new hire's first week according to the new hire onboarding deck?","docs":["47"],"keys":[["buddy"]]}
+{"id":133,"type":"P","q":"On which day of their first week do new hires do security awareness and privacy training?","docs":["47"],"keys":[["day 2","second day"]]}
+{"id":134,"type":"N","q":"What is the campaign budget for Tidewater Hotels' 'Stay a Little Longer' 2027 campaign?","docs":["48"],"keys":[["2.1"]]}
+{"id":135,"type":"P","q":"What average length of stay is the hotel chain's 2027 campaign aiming for?","docs":["48"],"keys":[["3.1"]]}
+{"id":136,"type":"P","q":"How much budget goes to creators in the Tidewater plan and how many creators are involved?","docs":["48"],"keys":[["220000","220k"],["24"]]}
+{"id":137,"type":"N","q":"Who won Rookie of the Year at the Annual Kickoff 2026?","docs":["49"],"keys":[["wei jie lim"]]}
+{"id":138,"type":"P","q":"What were the three big bets for 2026?","docs":["49"],"keys":[["pulse"],["apac"],["regulated"]]}
+{"id":139,"type":"P","q":"How many creative variants per client per month did we aim to test in 2026?","docs":["49"],"keys":[["20"]]}
+{"id":140,"type":"N","q":"According to the AI marketing strategy, how many clients should adopt Pulse by 2027?","docs":["50"],"keys":[["40"]]}
+{"id":141,"type":"P","q":"What is planned for Q3 2027 on the AI roadmap?","docs":["50"],"keys":[["pacing"]]}
+{"id":142,"type":"P","q":"How many hours of AI upskilling will each employee get?","docs":["50"],"keys":[["12 hours"]]}
+{"id":143,"type":"X","q":"Which client was our largest by FY2025 revenue, and what is its current account health status?","docs":["01","37","27","39"],"keys":[["northwind"],["green"]]}
+{"id":144,"type":"X","q":"How much does Orbit Fitness owe us and who is their account director?","docs":["07","39","46","12"],"keys":[["214"],["leah morgan"]]}
+{"id":145,"type":"X","q":"What is the hourly rate on the rate card for the role Dr. Oliver Grant holds?","docs":["30","14","17"],"keys":[["$280"]]}
+{"id":146,"type":"X","q":"The Senior Media Buyer job is level L3. What title examples does the career framework give for L3?","docs":["15","24"],"keys":[["senior specialist"],["senior designer"]]}
+{"id":147,"type":"X","q":"How did Novaline's Glow Theory Launch Meta campaign perform in 2026, and what incident hit that launch?","docs":["38","35"],"keys":[["5.51"],["suspen"]]}
+{"id":148,"type":"X","q":"Compare Kestrel Bank's FY2025 revenue with its current annual contract value.","docs":["01","37","39"],"keys":[["5.1"],["5.4","5400000"]]}
+{"id":149,"type":"T","q":"In which month were the 22 DataHive employees added to headcount, and what was the closing headcount that month?","docs":["41"],"keys":[["august"],["313"]]}
+{"id":150,"type":"T","q":"What was the purchase price for DataHive Analytics?","docs":["14","01"],"keys":[["not disclosed","undisclosed","were not disclosed"]]}
+{"id":151,"type":"T","q":"What was the ROAS of the Crestline Motors EV Test Drive YouTube campaign?","docs":["38"],"keys":[["n/a","not applicable","lead gen","lead generation","not available","no roas"]]}
+{"id":152,"type":"U","q":"What is Daniel Okafor's annual salary?","docs":[],"keys":[]}
+{"id":153,"type":"U","q":"What is the Wi-Fi password for the Austin office?","docs":[],"keys":[]}
+{"id":154,"type":"U","q":"What was RevoluMark's revenue in FY2020?","docs":[],"keys":[]}
+{"id":155,"type":"U","q":"What was the CPA of the Harbor & Vine Wines Google Search campaign?","docs":[],"keys":[]}
+{"id":156,"type":"U","q":"How many parking spaces does the New York office have?","docs":[],"keys":[]}
+{"id":157,"type":"U","q":"What dental insurance coverage do UK employees get?","docs":[],"keys":[]}
+{"id":158,"type":"U","q":"Who is the CEO of Helios Solar?","docs":[],"keys":[]}
+{"id":159,"type":"U","q":"What was the ROAS of Northwind's holiday 2024 campaign?","docs":[],"keys":[]}
+{"id":160,"type":"U","q":"What stock ticker does RevoluMark trade under?","docs":[],"keys":[]}

@@ -1,6 +1,6 @@
 # What is PEKA?
 
-PEKA (**Personal Knowledge Base**) is an organization-private assistant that answers questions using **your uploaded documents**, with **role-aware access** and **citations**. Optionally, it can also use public web search (Exa) when a user turns that on.
+PEKA (**Private Enterprise Knowledge Assistant**) is an organization-private assistant that answers questions using **your uploaded documents**, with **role-aware access** and **citations**. Optionally, it can also use public web search (Exa) when a user turns that on.
 
 ## The problem it solves
 

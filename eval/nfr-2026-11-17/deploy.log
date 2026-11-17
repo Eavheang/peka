@@ -1,0 +1,26 @@
+2026-11-17 16:32:15 host: 7.3.3-pikaos, 16 CPU threads, 14 GiB RAM; docker 28.5.2+dfsg4; commit 4a08cd9
+2026-11-17 16:32:15 START clone
+2026-11-17 16:32:15 END clone rc=0 0s
+2026-11-17 16:32:15 START env-files
+2026-11-17 16:32:15 END env-files rc=0 0s
+2026-11-17 16:32:15 START make-setup
+2026-11-17 16:33:13 END make-setup rc=0 58s
+2026-11-17 16:33:13 START make-llm
+2026-11-17 16:33:15 END make-llm rc=0 2s
+2026-11-17 16:33:15 START wait-api
+2026-11-17 16:33:15 END wait-api rc=0 0s
+2026-11-17 16:33:15 START wait-llama
+2026-11-17 16:34:15 END wait-llama rc=0 60s
+2026-11-17 16:34:15 START wait-ui
+2026-11-17 16:37:31 END wait-ui rc=0 196s
+2026-11-17 16:37:31 START login
+2026-11-17 16:37:31 END login rc=0 0s
+2026-11-17 16:37:31 TOTAL 316s
+embeddings Up 5 minutes (healthy)
+index-worker Up 4 minutes
+llama Up 3 minutes (healthy)
+postgres Up 5 minutes (healthy)
+proxy Up 4 minutes
+reranker Up 5 minutes (healthy)
+service Up 5 minutes
+webclient Up 6 seconds

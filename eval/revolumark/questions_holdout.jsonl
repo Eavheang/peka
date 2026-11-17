@@ -1,0 +1,65 @@
+{"id":201,"type":"P","q":"Where are the company's offices?","docs":["01","45","24","31","41"],"keys":[["austin"],["new york"],["london"],["singapore"]]}
+{"id":202,"type":"P","q":"What is the company's official tagline?","docs":["02","23","45"],"keys":[["attention measured"]]}
+{"id":203,"type":"P","q":"How long does the brand team take to review a new external-facing template?","docs":["02"],"keys":[["two business days","2 business days"]]}
+{"id":204,"type":"P","q":"Where must client account passwords be stored?","docs":["03","08"],"keys":[["1password"]]}
+{"id":205,"type":"P","q":"What CSAT score do we target at the 30-day check-in with a new client?","docs":["04"],"keys":[["4.5"]]}
+{"id":206,"type":"P","q":"How many referring domains with Domain Rating above 50 do we aim to win per quarter in SEO work?","docs":["05"],"keys":[["6-10","6 to 10","six to ten"]]}
+{"id":207,"type":"T","q":"How much revenue did TikTok generate in Northwind's Warm Up the Season campaign?","docs":["06"],"keys":[["706800","706.8"]]}
+{"id":208,"type":"P","q":"What 2026 holiday budget did Northwind's CMO approve?","docs":["06"],"keys":[["1.45"]]}
+{"id":209,"type":"P","q":"When and where will the 2027 annual kickoff be held?","docs":["07"],"keys":[["january 12","jan 12"],["austin"]]}
+{"id":210,"type":"P","q":"What eNPS did the latest engagement survey report?","docs":["07","31","46"],"keys":[["32"]]}
+{"id":211,"type":"P","q":"How quickly is a suspected security incident triaged outside business hours?","docs":["08"],"keys":[["2 hours","two hours"]]}
+{"id":212,"type":"P","q":"How often are phishing simulations run?","docs":["08"],"keys":[["quarter"]]}
+{"id":213,"type":"P","q":"What LTV to CAC ratio do we consider healthy for subscription clients?","docs":["09"],"keys":[["3:1","3 to 1"]]}
+{"id":214,"type":"P","q":"What is the daily meal allowance when traveling abroad for work?","docs":["10","22"],"keys":[["$95","95"]]}
+{"id":215,"type":"P","q":"How much is the monthly wellness stipend?","docs":["15"],"keys":[["$75","75"]]}
+{"id":216,"type":"P","q":"Which tool do we use to track time?","docs":["11","47"],"keys":[["harvest"]]}
+{"id":217,"type":"P","q":"How many gyms does Orbit Fitness operate?","docs":["12"],"keys":[["46"]]}
+{"id":218,"type":"P","q":"What churn rate are we aiming for among Orbit's January joiners?","docs":["12"],"keys":[["45%"]]}
+{"id":219,"type":"P","q":"What engagement rate must a mid-tier creator have?","docs":["13"],"keys":[["1.8%"]]}
+{"id":220,"type":"P","q":"How many clients did DataHive serve when it was acquired?","docs":["14"],"keys":[["18"]]}
+{"id":221,"type":"P","q":"How much bereavement leave do employees get for immediate family?","docs":["15"],"keys":[["5 days","five days"]]}
+{"id":222,"type":"P","q":"What is the maximum annual bonus for a manager?","docs":["15"],"keys":[["15%"]]}
+{"id":223,"type":"P","q":"How soon must a conflict of interest be declared?","docs":["16"],"keys":[["10 business days","ten business days"]]}
+{"id":224,"type":"P","q":"What share of Helios Solar's current leads fail credit or roof-suitability checks?","docs":["17"],"keys":[["41%"]]}
+{"id":225,"type":"P","q":"When would the Helios program launch if the contract is signed in time?","docs":["17"],"keys":[["february 1"]]}
+{"id":226,"type":"P","q":"How many undergraduate applications is Meridian targeting for 2027?","docs":["18"],"keys":[["21160"]]}
+{"id":227,"type":"P","q":"How much notice is needed to cancel a statement of work for convenience?","docs":["19"],"keys":[["60 days","sixty days"]]}
+{"id":228,"type":"P","q":"How many clinic location pages are monitored for Core Web Vitals in the Lumen program?","docs":["20"],"keys":[["42"]]}
+{"id":229,"type":"P","q":"For how long must new employees be in the office at least 4 days a week?","docs":["21","47"],"keys":[["4 weeks","four weeks"]]}
+{"id":230,"type":"P","q":"What is the nightly hotel limit in a standard city?","docs":["22"],"keys":[["$275","275"]]}
+{"id":231,"type":"P","q":"How many new logos do we aim to win in FY2027?","docs":["23"],"keys":[["32"]]}
+{"id":232,"type":"P","q":"How many years of paid social buying experience does the Senior Media Buyer role require?","docs":["24"],"keys":[["4"]]}
+{"id":233,"type":"P","q":"When does the year-end self-review open?","docs":["25"],"keys":[["november 16"]]}
+{"id":234,"type":"P","q":"How long are employee records kept after someone leaves?","docs":["26"],"keys":[["7 years","seven years"]]}
+{"id":235,"type":"P","q":"What was revenue per employee in FY2025?","docs":["27"],"keys":[["198"]]}
+{"id":236,"type":"P","q":"How many recipes were in Verdant's content hub?","docs":["28"],"keys":[["140"]]}
+{"id":237,"type":"P","q":"How many creators took part in Trail Ready and how many of them were micro creators?","docs":["29","13"],"keys":[["64"],["48"]]}
+{"id":238,"type":"P","q":"What does the full Pulse suite cost per month?","docs":["30","17"],"keys":[["4500"]]}
+{"id":239,"type":"P","q":"What capital investment in Pulse is the board being asked to approve for 2027?","docs":["31","50"],"keys":[["1.2"]]}
+{"id":240,"type":"P","q":"Which risk is rated High in the Q3 2026 board report?","docs":["31"],"keys":[["dso","late pay"]]}
+{"id":241,"type":"P","q":"How often are social mentions monitored during a crisis?","docs":["32"],"keys":[["30 minutes","thirty minutes"]]}
+{"id":242,"type":"P","q":"What general liability insurance must production company vendors carry?","docs":["33"],"keys":[["$2m","2 million","2m"]]}
+{"id":243,"type":"P","q":"What is the primary color ratio in our brand identity?","docs":["34"],"keys":[["60%"],["30%"],["10%"]]}
+{"id":244,"type":"P","q":"When was Novaline's ad account reinstated?","docs":["35"],"keys":[["march 16","mar 16"]]}
+{"id":245,"type":"P","q":"What share of office electricity was renewable in 2025?","docs":["36"],"keys":[["81%"]]}
+{"id":246,"type":"T","q":"What EBITDA margin is forecast for FY2026 in the annual P&L summary?","docs":["37"],"keys":[["17.9"]]}
+{"id":247,"type":"T","q":"Which 2026 campaign had the highest CPA?","docs":["38"],"keys":[["156.2"]]}
+{"id":248,"type":"T","q":"How much does Kestrel Bank owe that is 1 to 30 days overdue?","docs":["39"],"keys":[["96000","96k"]]}
+{"id":249,"type":"T","q":"What is the Creative Studio's FY2026 annual budget?","docs":["40"],"keys":[["8100000","8.1"]]}
+{"id":250,"type":"T","q":"What was the closing headcount in May 2026?","docs":["41"],"keys":[["294"]]}
+{"id":251,"type":"T","q":"What is the YouTube budget for March 2027 in the Atlas media plan?","docs":["42"],"keys":[["30000","30k"]]}
+{"id":252,"type":"T","q":"Which opportunity in the Q4 2026 pipeline has the largest deal value?","docs":["43"],"keys":[["orchid"]]}
+{"id":253,"type":"T","q":"Who owns the Black Friday blog post in the content calendar and when is it published?","docs":["44"],"keys":[["victor osei"],["november 24","nov 24","2026-11-24"]]}
+{"id":254,"type":"P","q":"What cost per booking is Tidewater's 2027 campaign targeting?","docs":["48"],"keys":[["$42","42"]]}
+{"id":255,"type":"P","q":"What guardrails apply to AI use in 2027?","docs":["50","16","08"],"keys":[["human"],["consent"]]}
+{"id":256,"type":"P","q":"Who won the Evidence over Ego Award?","docs":["49"],"keys":[["hannah kowalski"]]}
+{"id":257,"type":"P","q":"What eNPS target was set for 2026?","docs":["49"],"keys":[["30"]]}
+{"id":258,"type":"X","q":"Who is the account director for the client whose ad account was suspended in March 2026, and what is that client's health status?","docs":["35","39"],"keys":[["chloe martin"],["red"]]}
+{"id":259,"type":"X","q":"What is the annual contract value of the client running the 'Stay a Little Longer' campaign?","docs":["48","39"],"keys":[["3100000","3.1 million","3.1m"]]}
+{"id":260,"type":"X","q":"What is the hourly rate for an SEO Specialist, and who is hiring one right now?","docs":["30","41"],"keys":[["135"],["hannah"]]}
+{"id":261,"type":"U","q":"What is the name of the CFO's executive assistant?","docs":[],"keys":[]}
+{"id":262,"type":"U","q":"When was the London office lease signed?","docs":[],"keys":[]}
+{"id":263,"type":"U","q":"What is the name of Kestrel Bank's CEO?","docs":[],"keys":[]}
+{"id":264,"type":"U","q":"How many Instagram followers does RevoluMark have?","docs":[],"keys":[]}
+{"id":265,"type":"U","q":"What is the FY2028 revenue target?","docs":[],"keys":[]}

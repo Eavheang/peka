@@ -10,12 +10,13 @@ Postgres with the `vector` extension (pgvector). Schema is owned by Alembic; do 
 | `invitations` | Pending and accepted invites: `email`, `role`, `token_hash` (SHA-256; the token itself is never stored), `invited_by`, `expires_at`, `accepted_at`. One pending invite per address |
 | `files` | Relative `path`, `content_type`, unique `sha256`, `author_id`, `access_level` (`general` \| `confidential`) |
 | `index_jobs` | PK `file_id` → files; `status` (`queued` \| `processing` \| `completed` \| `failed`); `attempts` 0–3; `last_error` |
-| `chunk_sets` | Per-file index generations: `building` \| `active` \| `superseded`; `centroid` (mean embedding, tells format copies from unrelated files with the same name) |
+| `chunk_sets` | Per-file index generations: `building` \| `active` \| `superseded`; `chunker_version` (outdated sets are re-indexed); `centroid` (mean embedding, tells format copies from unrelated files with the same name) |
 | `knowledge_chunks` | `heading`, `content`, `source_locations` JSONB (extractor locators, see [indexing](../architecture/indexing.md#chunking-for-retrieval)), `embedding vector(384)`, `file_path` copy, generated `search_words` tsvector (GIN index), HNSW index on `embedding`, FKs to file + chunk_set |
 | `conversations` | Owned chat threads (`owner_id`, title, timestamps) |
-| `messages` | `role` `user` \| `assistant`; content; citations JSONB |
+| `messages` | `sequence`, `role` `user` \| `assistant`; content; `refused`; citations JSONB (GIN index); `status` (an answer stopped by the user is kept) |
 | `provider_settings` | Single row `id=1`, JSONB `value` for LLM/Exa overrides |
 | `audit_events` | Admin audit log: `type` (`sync` \| `query` \| `system`), nullable `actor_id`, `summary`, `metadata` JSONB, `created_at`. Indexes `(type, created_at DESC)` and `(created_at DESC)`. List order is `created_at DESC, id DESC` |
+| `google_drive_connections` | PK `user_id` → users (cascade); Google OAuth `refresh_token` (scope `drive.file`, stored as plain text), timestamps. One row per user who connected Drive |
 
 Conversation list uses index `(owner_id, updated_at DESC, id DESC)` for cursor pagination.
 
@@ -43,6 +44,8 @@ Conversation list uses index `(owner_id, updated_at DESC, id DESC)` for cursor p
 | `020_allow_stopped_messages` | allow stopped assistant messages |
 | `021_add_search_indexes` | chunk `file_path` and `search_words` (GIN), HNSW on `embedding`, chunk set `centroid` |
 | `022_rename_okf_jobs` | `okf_jobs` renamed to `index_jobs` |
+| `023_add_chunker_version` | `chunk_sets.chunker_version`; GIN index on `messages.citations` |
+| `024_release_uncited_chunks` | Trigger: a superseded chunk kept for an old citation is deleted with the last message that cites it |
 
 Apply:
 

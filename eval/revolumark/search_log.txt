@@ -1,0 +1,10 @@
+Recall@1: 144/151 = 95.4%
+Recall@3: 150/151 = 99.3%
+Recall@5: 151/151 = 100.0%
+Recall@10: 151/151 = 100.0%
+  type N: Recall@5 50/50
+  type P: Recall@5 89/89
+  type T: Recall@5 6/6
+  type X: Recall@5 6/6
+search ms mean 385 p95 615
+misses @5: []

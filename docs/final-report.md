@@ -6,15 +6,19 @@ To run PEKA yourself, start with [System requirements and running PEKA locally](
 
 ## Verdict
 
+The targets are the approved ones: Objectives 3 to 5 from the project proposal (15 July 2026), and NFR02 and NFR04 as refined in the Review 1 document (27 August 2026). Objectives 1 and 2, the offline test (NFR03) and the deployment test (NFR07) are judged in [Objectives and evaluation](project/objectives-and-evaluation.md).
+
 | Requirement | Result | Verdict |
 |-------------|--------|---------|
-| **Objective 3**: Recall@5 ≥ 85% over 200+ documents | Recall@5 **100%** on 400 generated questions over **220 distinct documents** (270 files, 1,682 chunks); 100% and 98.3% on the two real question sets | **Met**, with the caveats below |
-| **Objective 5 / NFR02**: response latency and time to first token | One user: first token **4.9 s median, 7.5 s p95**; full answer **5.6 s median, 8.3 s p95** | **Measured.** The repo states no target, so there is no pass or fail |
-| **NFR04**: 10 concurrent users while indexing runs | **20 of 20** requests answered with 10 users while 8 files indexed; the slowest took 80 s | **Met** in that every request was answered. The repo states no limit on the wait, and this was one run |
+| **Objective 3**: Recall@5 ≥ 85% over 200+ documents | Recall@5 **100%** on 400 generated questions over **220 distinct documents** (270 files, 1,682 chunks); 100% and 98.3% on the two real question sets; **100%** on 211 reworded questions over [50 distinct documents](#evaluation-on-50-distinct-documents-2026-11-12) | **Met**, with the caveats below |
+| **Objective 4**: every answer carries an application-generated citation, and its claims are supported | Citations on **211 of 211** answers to answerable questions on 50 distinct documents; **202 of 211** answers fully correct, 3 wrong | **Citation coverage met. Claim support partly met** (see [Objective 4](#objective-4-citations)) |
+| **Objective 5**: average response under 3 s for standard queries | Full answer **6.0 s mean** (5.6 s median); 5.3 s and 5.1 s mean on the 50-document runs | **Not met** on the minimum hardware with the local model |
+| **NFR02**: time to first token under 10 s in local mode, warm model | **4.9 s median, 7.5 s p95**; 219 of 225 questions under 10 s on the 50-document runs (slowest 14.6 s) | **Met** for the median and p95. 6 of 225 questions took longer |
+| **NFR04**: 500 documents and about 10 concurrent users without response-time degradation, also while indexing | **20 of 20** requests answered with 10 users while 8 files indexed, but the median first token rose from 4.9 s to 15.5 s and the slowest answer took 80 s. Tested on 220 documents, not 500 | **Partly met.** Every request is answered, but responses slow down under load |
 | Answer quality (supporting result) | 57 of 59 answerable questions correct, 1 partly correct, 1 wrongly declined; 8 of 8 unanswerable declined, hand-graded | Good on the test set |
 | Answer quality on 50 distinct documents (2026-11-12) | **145 of 151** correct on the main set and **57 of 60** on a held-out set; Recall@5 **100%** on both; 14 of 14 unanswerable declined | Good; the misses need a stronger model or a second search |
 
-In short: PEKA finds the right documents reliably and answers correctly. On the minimum hardware it answers two questions at a time and queues the rest, so 10 people can use it together but may wait over a minute. Indexing no longer competes for the model. The result on 200+ documents comes from generated documents. A test on 50 distinct, varied documents with reworded questions (2026-11-12) found the right document every time, but a test on 200+ such documents is still open (issue #104).
+In short: PEKA finds the right documents reliably, cites a source for every answer it gives, and answers correctly. On the minimum hardware it answers two questions at a time and queues the rest, so 10 people can use it together but may wait over a minute. Indexing no longer competes for the model. The result on 200+ documents comes from generated documents. A test on 50 distinct, varied documents with reworded questions (2026-11-12) found the right document every time, which closed issue #104. No single run has used 200+ distinct real documents.
 
 ## What was built and tested
 
@@ -41,7 +45,7 @@ PEKA is an organization-private RAG assistant. Users upload documents, and a bac
 | Scale corpus (Objective 3, latency and load runs) | the real corpus plus 200 generated documents: 270 files, 1,682 chunks, 220 distinct documents |
 | Users | one admin account (concurrent users are separate logins of that account) |
 
-Raw output is kept locally and is not published in this repository. The model ran at about 85 tokens per second throughout, which the run checked before and after every step, and the service logged no `Context size has been exceeded` errors and no reranker failures.
+Raw output is in [`eval/results-perf/2026-11-07-final/`](../eval/results-perf/2026-11-07-final/notes.md). The model ran at about 85 tokens per second throughout, which the run checked before and after every step, and the service logged no `Context size has been exceeded` errors and no reranker failures.
 
 ## Objective 3: Recall@5 over 200+ documents
 
@@ -62,9 +66,25 @@ The one miss at rank 5 is set 2 question 31, which is found by rank 10. Set 1 qu
 
 **Caveats**
 
-- **The 200 added documents are generated, not real.** They follow one template with unique invented names, and each question names its document, like most of the real questions. A real corpus of 200+ varied reports is likely harder. Treat these figures as the ceiling for well-named documents, not a field result. Issue #104 tracks a test on real questions.
+- **The 200 added documents are generated, not real.** They follow one template with unique invented names, and each question names its document, like most of the real questions. A real corpus of 200+ varied reports is likely harder. Treat these figures as the ceiling for well-named documents, not a field result. Issue #104 asked for a test on real documents with reworded questions, and the [50-document run](#evaluation-on-50-distinct-documents-2026-11-12) answered it (Recall@5 100% on 211 questions), but on 50 documents, not 200+.
 - **The upload path was not exercised at this size.** The real corpus was uploaded through the API, and the generated documents were inserted directly.
 - **Section Recall@5 on set 1 cannot be compared with the earlier run.** It reads 0% because `questions.jsonl` holds the section names of the old OKF pages, and chunks now use the headings of the original documents. The earlier source-text run measured a passage with the answer in the top 5 for 94.9% of set 2, on the same search.
+
+## Objective 4: citations
+
+Objective 4 asks for a citation on 100% of answers and for every claim to be supported by its source. Citations are built by the server from the search results, never taken from the model's text. When the model names no source although the results were relevant, the server scores each part of the answer against the sources with the reranker and cites the best match that holds every number the part states (2026-11-09). With weak results, an answer is kept only if it cites a source (2026-11-12).
+
+Coverage counts the answers to answerable questions that carry at least one citation, on the 50-document run.
+
+| Run | Answers with a citation | Fully correct | Partly correct | Declined | Wrong |
+|-----|-------------------------|---------------|----------------|----------|-------|
+| Before the 2026-11-12 fixes, main set | 146 of 148 (3 more refused by the server) | 141 of 151 | 1 | 7 | 2 |
+| After, main set | **151 of 151** | **145** | 3 | 2 | 1 |
+| After, held-out set | **60 of 60** | **57** | 1 | 0 | 2 |
+
+- **Coverage is 100%** on 211 answers after the fixes. It is measured, not guaranteed: a part of an answer that matches no source above the floor stays uncited. The 2026-11-07 run on set 2, before these changes, had two correct answers with no citation (questions 2 and 14).
+- **Claim support is not 100%.** 202 of 211 answers were fully correct. The 3 wrong answers are described under [What still fails](#what-still-fails).
+- **A decline can carry a citation.** On the main set, 5 of the 9 unanswerable questions got a reply such as "The provided documents do not contain this. [1]", which points to the closest document although it holds no answer.
 
 ## Objective 5 / NFR02: latency and time to first token
 
@@ -77,6 +97,8 @@ The one miss at rank 5 is set 2 question 31, which is found by rank 10. Set 1 qu
 | **Full answer** | 6.0 s | 5.6 s | 8.3 s | 13.3 s |
 
 All 20 answered. The 67 questions of the answer-quality run, on 70 files, gave the same picture (first token 5.3 s median and 8.1 s p95, full answer 6.2 s and 9.6 s), so corpus size is not what drives latency. On 2026-10-30 the first token took 8.0 s median and 12.0 s p95.
+
+Against the targets: the proposal's average of under 3 s (Objective 5) is not met, since the full answer takes 6.0 s on average and only 6 of the 225 questions of the 50-document runs finished in under 3 s. The refined NFR02 target, a first token in under 10 s in local mode, is met for the median and p95, and 219 of those 225 questions were under 10 s.
 
 - **Almost all of the wait is the model.** Search takes under a second, then the model reads 5 sources before it writes the answer. The answer then appears within about a second, so it behaves like a pause followed by a block of text, not a stream.
 - **A follow-up question adds about 2 s** to rewrite its search. These questions were all first questions.
@@ -179,7 +201,7 @@ The earlier run on the same search got question 29 fully right, cited question 2
 
 ## Evaluation on 50 distinct documents (2026-11-12)
 
-The earlier real corpus held 20 documents, each in several formats. This run used 50 documents that are all different, from one fictional marketing agency: 14 Markdown, 12 Word, 10 PDF, 8 Excel and 6 PowerPoint files. They include policies, proposals, contracts, financial reports, spreadsheets of campaigns, pipeline and budgets, and slide decks. The files were uploaded through the API to a fresh database, and the stack ran the local model on the minimum hardware.
+The earlier real corpus held 20 documents, each in several formats. This run used 50 documents that are all different, from one fictional marketing agency: 14 Markdown, 12 Word, 10 PDF, 8 Excel and 6 PowerPoint files. They include policies, proposals, contracts, financial reports, spreadsheets of campaigns, pipeline and budgets, and slide decks. The files were uploaded through the API to a fresh database, and the stack ran the local model on the minimum hardware. The questions, raw results and the script (`python3 run.py search|chat [holdout]`) are in [`eval/revolumark/`](../eval/README.md#runs).
 
 | Question set | Answerable | Kinds | Unanswerable |
 |--------------|------------|-------|--------------|
@@ -238,15 +260,15 @@ On the minimum hardware, with the current configuration:
 | 10 users asking together (NFR04) | **Supported, with waiting**: 20 of 20 answered, the slowest in 80 s |
 | Throughput | About **14 answers a minute** (20 answers in 88 s) |
 
-People who ask a question only now and then rarely overlap, so a team of occasional users seldom waits, while 10 people asking at once wait in turn. Whether 80 s is acceptable is for the project to decide, since NFR04 sets no limit.
+People who ask a question only now and then rarely overlap, so a team of occasional users seldom waits, while 10 people asking at once wait in turn. NFR04 asks for no response-time degradation, and the waits above show that the minimum hardware does not meet that with 10 users at once. It sets no number for how long a wait may be.
 
 ## Recommendations
 
 In order of value:
 
-1. **Test recall on real documents (#104).** A real set of 200+ independent reports with independently written questions is the proper proof of Objective 3. The 50-document run is a step toward it.
+1. **Test recall on 200+ distinct real documents.** The 50-document run closed issue #104, but a set of 200+ independent reports with independently written questions would be the full proof of Objective 3.
 2. **Search twice for questions that join two facts.** This was the largest group of misses on the 50-document run. Not tried.
-3. **Set a response-time target for NFR02 and NFR04.** Without one these results cannot pass or fail on speed.
+3. **Set a limit on the wait under load for NFR04.** "No degradation" cannot hold on two model slots, so a number such as a p95 first token for 10 users would make the result pass or fail.
 4. **Mark near misses as refused.** Letting the model flag "the sources do not contain this" as its own answer type would set `refused` on the 7 of 8 near misses that the score cannot catch. Not tried.
 5. **Keep the model out of indexing.** OKF enrichment sent each whole document to the model that serves chat, outside the chat queue, and the last run with the model in indexing answered 4 of 20. Enrichment was off for this evaluation and has since been removed.
 6. **Make the queue first come, first served** if the longest waits matter more than the median.
@@ -257,7 +279,7 @@ In order of value:
 - **One machine, one run per cell.** Latency has 20 samples, each load level was run once, and the 6 GB laptop GPU may differ from the target server.
 - **Concurrent users share one account.** They use separate logins and conversations, but the same role and document access.
 - **Synthetic indexing load.** The uploaded files are small and generated, and each indexing run overlapped chat for only 7 to 12 s.
-- **No thresholds for latency or concurrency** are written in the repo. Only Objective 3 (85%) has a number.
+- **The targets are not in the repo.** Objectives 3 to 5, NFR02 and NFR04 come from the proposal and the Review 1 document. NFR04 sets no number for an acceptable wait.
 - **The refusal floor was set on these question sets.** A different corpus or rerank model may need a new `SEARCH_EVIDENCE_FLOOR`. Setting it too high refuses questions the documents can answer.
 - **The API was tested, not the web client, and only on an isolated dev-style stack.** `make prod-up` was not part of the evaluation.
 - **An existing `.env` keeps its old limit.** `LLM_MAX_TOKENS=8192` in a `service/.env` overrides the new default of 2048, and it needs changing by hand.
@@ -266,7 +288,7 @@ In order of value:
 
 ## Reproducing the results
 
-These commands need the local `eval/` folder, which is not in this repository. They are recorded to show the method. The stack must be running with the local model (see [System requirements](system-requirements.md)). The scripts use only the Python standard library. The scripts overwrite their output files, so point `RESULTS_DIR` at a new folder. A step that runs longer than the access token (`JWT_ACCESS_TOKEN_EXPIRE_MINUTES`, 30 by default) fails with HTTP 401. Before a run, keep the machine from sleeping and check that the model is fast: on this GPU, llama's log should show about 85 tokens per second.
+The scripts are in [`eval/`](../eval/README.md); the test documents are not in the repository (see its README). The stack must be running with the local model (see [System requirements](system-requirements.md)). The scripts use only the Python standard library. The scripts overwrite their output files, so point `RESULTS_DIR` at a new folder. A step that runs longer than the access token (`JWT_ACCESS_TOKEN_EXPIRE_MINUTES`, 30 by default) fails with HTTP 401. Before a run, keep the machine from sleeping and check that the model is fast: on this GPU, llama's log should show about 85 tokens per second.
 
 ```bash
 cd eval

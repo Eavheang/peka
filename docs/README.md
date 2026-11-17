@@ -1,6 +1,6 @@
 # PEKA Documentation
 
-**PEKA** (Personal Knowledge Base) is an organization-private RAG assistant. Users upload documents, the system chunks their original text into a knowledge base, embeds it for retrieval, and answers questions with citations—optionally augmented by web search.
+**PEKA** (Private Enterprise Knowledge Assistant) is an organization-private RAG assistant. Users upload documents, the system chunks their original text into a knowledge base, embeds it for retrieval, and answers questions with citations—optionally augmented by web search.
 
 ## Start here (understand the product)
 
@@ -13,6 +13,20 @@ Read these first if you want to know **what PEKA does** and **how it works**:
 | 3 | [User guide](user-guide.md) | Screens and tasks by role |
 | 4 | [Indexing](architecture/indexing.md) | Document pipeline deep dive |
 | 5 | [Chat & RAG](architecture/chat-and-rag.md) | Question → retrieval → answer deep dive |
+
+## Project record (requirements, design, testing, evaluation)
+
+The academic record of the project, checked against the code: see [Project record](project/README.md).
+
+| Document | Contents |
+|----------|----------|
+| [Objectives and evaluation](project/objectives-and-evaluation.md) | Problem, aim, the five objectives with verdicts, offline and deployment tests |
+| [Requirements](project/requirements.md) | Roles, FR01–FR21 and NFR01–NFR07 with final status, user stories |
+| [Design](project/design.md) | Architecture, ER, sequence, use-case and deployment diagrams |
+| [Testing](project/testing.md) | Test inventory, test cases, traceability, defect log |
+| [Related work](project/related-work.md) | Existing systems, techniques, tool choices, references |
+| [Methodology and timeline](project/methodology-and-timeline.md) | Process, reviews, quality controls, risks |
+| [Scope changes](project/scope-changes.md) | Proposal versus final system, and why |
 
 ## Reference (build, operate, integrate)
 
@@ -28,9 +42,10 @@ Read these first if you want to know **what PEKA does** and **how it works**:
 | [Config & Docker](config/README.md) | Ops | Compose, Makefile, nginx, llama |
 | [Security & roles](security.md) | Everyone | JWT, ACL, bootstrap |
 | [Development & CI](development.md) | Contributors | Tests, Husky, PR checks |
-| [Answer-quality evaluation](evaluation.md) | Everyone | RAGAS scores, method, limitations |
+| [Answer-quality evaluation](evaluation.md) | Everyone | Graded and RAGAS answer-quality runs, why OKF was dropped, limitations |
 | [Final report](final-report.md) | Everyone | Verdict on the objectives: Recall@5 over 200+ docs, latency, users served on 6 GB VRAM |
 | [System requirements](system-requirements.md) | Everyone | Hardware, software, how to run PEKA locally, what to expect |
+| [Backup and restore](backup-and-restore.md) | Ops | What holds state, backup and restore commands |
 | [Glossary & troubleshooting](glossary-and-troubleshooting.md) | Everyone | Terms and common fixes |
 
 ## Repository layout
@@ -41,6 +56,7 @@ peka/
 ├── service/      # FastAPI API + indexing background worker
 ├── webclient/    # Next.js App Router UI
 ├── docs/         # This documentation
+├── eval/         # Evaluation scripts, question sets and raw results
 ├── .github/      # PR CI workflows
 └── .husky/       # pre-commit / pre-push gates
 ```
