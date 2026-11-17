@@ -50,7 +50,7 @@ Since this count, the Google Drive folder sync (PR #131) grew `test_google_drive
 
 ## Test cases
 
-TC-01 to TC-24 are the Review 2 test cases (30 September 2026). TC-25 onwards were added for the final system. "Pass" means the named test passed in the CI run of 12 November 2026; TC-43 to TC-45 passed in a local run on 17 November 2026, against a real PostgreSQL, with Google Drive replaced by a fake (PR #131).
+TC-01 to TC-24 are the Review 2 test cases (30 September 2026). TC-25 onwards were added for the final system. "Pass" means the named test passed in the CI run of 12 November 2026; TC-43 to TC-45 passed in a local run on 17 November 2026, against a real PostgreSQL, with Google Drive replaced by a fake (PR #131). The folder sync was also checked by hand against a real Google Drive the same day.
 
 | ID | Requirement | Input | Expected | Actual | Status | Evidence |
 |----|-------------|-------|----------|--------|--------|----------|
