@@ -116,7 +116,7 @@ export default function InviteUser({ open, onOpenChange, onInvited }: InviteUser
             disabled={inviteUser.isPending}
             type="submit"
           >
-            {inviteUser.isPending ? "Sending..." : "Send invitation"}
+            {inviteUser.isPending ? "Sending…" : "Send invitation"}
           </Button>
         </form>
       </DialogContent>

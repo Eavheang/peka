@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import Alertdialog from "@/components/Alertdialog";
-import { useRouter } from "next/navigation";
 import { useGetCurrentUser } from "@/services/auth";
 import type { InvitationResponse } from "@/interface/auth";
 import { Button } from "@/components/ui/button";
@@ -14,7 +13,6 @@ import {
   useUpdateUserRole,
 } from "@/services/user";
 import { toast } from "@/components/ui/toast";
-import { getStoredToken } from "@/utils/auth-storage";
 import {
   Table,
   TableBody,
@@ -37,8 +35,6 @@ import {
 const PAGE_SIZE = 10;
 
 export default function AdminPage() {
-  const router = useRouter();
-  const [token, setToken] = useState("");
   const [inviteOpen, setInviteOpen] = useState(false);
   const [invitation, setInvitation] = useState<InvitationResponse | null>(null);
   const [page, setPage] = useState(1);
@@ -46,16 +42,13 @@ export default function AdminPage() {
     type: "deactivate" | "delete";
     id: string;
   } | null>(null);
-  const me = useGetCurrentUser(token);
+  // The admin layout loads the current user before rendering; this reads that cache.
+  const me = useGetCurrentUser("");
   const users = useListUsers();
   const updateUser = useUpdateUserActivation();
   const updateRole = useUpdateUserRole();
   const deleteUser = useDeleteUser();
 
-  useEffect(() => setToken(getStoredToken("peka_access_token") ?? ""), []);
-  useEffect(() => {
-    if (me.data && me.data.role !== "admin") router.replace("/workspace");
-  }, [me.data, router]);
 
   function confirmActionSubmit() {
     if (!confirmAction) return;
@@ -92,36 +85,20 @@ export default function AdminPage() {
   const currentPage = Math.min(page, pageCount);
   const pageUsers = users.data?.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
-  if (!me.data || me.data.role !== "admin") return null;
+  if (!me.data) return null;
 
   return (
-    <section className="mx-auto max-w-5xl space-y-8 p-6 lg:p-10">
-      <div className="flex items-start justify-between gap-4">
+    <section className="flex flex-col gap-8">
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">User management</h1>
-          <p className="mt-1 text-sm text-muted">Invite and manage workspace users.</p>
+          <h2 className="text-lg font-semibold">Users</h2>
+          <p className="mt-1 text-sm text-muted">
+            Invite people, change their role, or turn off their access.
+          </p>
         </div>
-        <div className="flex flex-wrap justify-end gap-2">
-          <Button
-            className="border-border"
-            type="button"
-            variant="outline"
-            onClick={() => router.push("/workspace/admin/settings")}
-          >
-            Workspace settings
-          </Button>
-          <Button
-            className="border-border"
-            type="button"
-            variant="outline"
-            onClick={() => router.push("/workspace/admin/audit")}
-          >
-            Audit events
-          </Button>
-          <Button className="px-4 py-2" type="button" onClick={() => setInviteOpen(true)}>
-            Invite user
-          </Button>
-        </div>
+        <Button className="px-4 py-2" type="button" onClick={() => setInviteOpen(true)}>
+          Invite user
+        </Button>
       </div>
       <InviteUser open={inviteOpen} onOpenChange={setInviteOpen} onInvited={setInvitation} />
       <InviteResult invitation={invitation} onClose={() => setInvitation(null)} />
@@ -142,24 +119,28 @@ export default function AdminPage() {
       />
 
       {users.isLoading ? (
-        <p className="text-sm text-muted">Loading users...</p>
+        <p className="text-sm text-muted" role="status">
+          Loading users…
+        </p>
       ) : users.isError ? (
-        <p className="text-sm text-danger">Unable to load users.</p>
+        <p className="text-sm text-danger" role="alert">
+          Unable to load users. Refresh the page to try again.
+        </p>
       ) : (
         <div className="overflow-hidden rounded-2xl border border-border bg-background shadow-sm">
           <Table>
             <TableHeader className="bg-secondary/70">
               <TableRow className="border-border hover:bg-secondary/70">
-                <TableHead className="px-5 py-4 text-xs uppercase tracking-[0.14em] text-muted">
+                <TableHead>
                   Email
                 </TableHead>
-                <TableHead className="px-5 py-4 text-xs uppercase tracking-[0.14em] text-muted">
+                <TableHead>
                   Role
                 </TableHead>
-                <TableHead className="px-5 py-4 text-xs uppercase tracking-[0.14em] text-muted">
+                <TableHead>
                   Status
                 </TableHead>
-                <TableHead className="px-5 py-4 text-center text-xs uppercase tracking-[0.14em] text-muted">
+                <TableHead className="text-center">
                   Actions
                 </TableHead>
               </TableRow>
@@ -242,7 +223,7 @@ export default function AdminPage() {
           </Table>
           {pageCount > 1 && (
             <div className="flex items-center justify-between border-t border-border px-5 py-3">
-              <p className="text-sm text-muted">
+              <p className="text-sm text-muted tabular-nums">
                 Page {currentPage} of {pageCount}
               </p>
               <div className="flex gap-2">

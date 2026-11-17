@@ -7,6 +7,8 @@ export const ROUTE = {
   WORKSPACE: "/workspace",
   SETTINGS: "/workspace/settings",
   ADMIN: "/workspace/admin",
+  ADMIN_SETTINGS: "/workspace/admin/settings",
+  ADMIN_AUDIT: "/workspace/admin/audit",
   KNOWLEDGE: "/workspace/knowledge",
 } as const;
 
