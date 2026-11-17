@@ -26,7 +26,7 @@ Solid lines stay on the machine. Dotted lines are optional services outside it; 
 |-----------|------|
 | **webclient** | Auth UI, chat (SSE), knowledge library with Google Drive import, account settings, admin users, audit events and provider settings |
 | **service** | REST + SSE API: auth, files, Google Drive import, search, chat, audit log, admin provider settings |
-| **index-worker** | Polls `index_jobs`, chunks original text, embeds, activates chunk sets |
+| **index-worker** | Polls `index_jobs`, chunks original text, embeds, activates chunk sets. Once a minute, runs the Google Drive folder sync when due |
 | **postgres** | Users, invitations, files, jobs, chunk sets, chunks (vector), conversations, messages, audit events, Google Drive connections, provider settings |
 | **embeddings** | Hugging Face Text Embeddings Inference (OpenAI-compatible `/v1/embeddings`) |
 | **reranker** | Hugging Face Text Embeddings Inference with a cross-encoder; scores the top 20 search candidates on the CPU |
@@ -70,7 +70,7 @@ Workspace routes are gated by Next.js 16 `proxy.ts` (cookie presence) and furthe
 | TEI embeddings | `EMBEDDING_*` | Query and chunk vectors |
 | Exa | `EXA_*` (optional) | Web search when user enables it |
 | TEI reranker | `RERANK_*` | Rescores search candidates |
-| Google Drive API | `GOOGLE_*`, `APP_BASE_URL` (optional) | One-off import of files a user picks |
+| Google Drive API | `GOOGLE_*`, `APP_BASE_URL` (optional) | One-off import of files a user picks; daily admin folder sync |
 | SMTP server | `SMTP_*` (optional) | Invitation emails; without it the admin copies the invite link |
 
 Admin can override LLM/Exa URL, key, and model at runtime via `/admin/settings/providers` (stored in `provider_settings`). Embedding settings remain environment-only.

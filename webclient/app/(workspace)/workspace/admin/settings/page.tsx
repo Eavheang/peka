@@ -15,6 +15,8 @@ import {
 import { useServerStatus } from "@/services/status";
 import { getStoredToken } from "@/utils/auth-storage";
 
+import DriveSync from "./_partials/driveSync";
+
 export default function ProviderSettingsPage() {
   const router = useRouter();
   const [token, setToken] = useState("");
@@ -79,7 +81,7 @@ export default function ProviderSettingsPage() {
         </Button>
         <h1 className="mt-3 text-2xl font-semibold">Provider settings</h1>
         <p className="mt-1 text-sm text-muted">
-          Configure workspace-wide LLM and web search access.
+          Configure workspace-wide LLM, web search, and Google Drive folder sync.
         </p>
       </div>
       {settings.isLoading ? (
@@ -223,6 +225,7 @@ export default function ProviderSettingsPage() {
           </form>
         </>
       )}
+      <DriveSync />
     </section>
   );
 }

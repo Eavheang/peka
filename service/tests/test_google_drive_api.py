@@ -2,9 +2,11 @@ from urllib.parse import parse_qs, urlparse
 from uuid import uuid4
 
 import httpx
+import pytest
 from pydantic import SecretStr
 
 from app.auth import routes as auth_routes
+from app.files.service import DuplicateFileError
 from app.google_drive import service
 
 REAL_CLIENT = httpx.Client
@@ -131,3 +133,206 @@ def test_staff_cannot_import_confidential(client, monkeypatch):
     response = client.post("/integrations/google/files", headers=headers,
                            json={"files": [{"id": "x", "access_level": "confidential"}]})
     assert response.status_code == 403
+
+
+DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+
+def fake_drive(monkeypatch, tree, fail_folder=None):
+    """`tree` maps a folder ID to its children: (id, name, mimeType, modifiedTime)."""
+    items = {child[0]: child for children in tree.values() for child in children}
+
+    def as_json(child):
+        return dict(zip(("id", "name", "mimeType", "modifiedTime"), child))
+
+    def drive(request: httpx.Request) -> httpx.Response:
+        path, params = request.url.path, request.url.params
+        if path == "/drive/v3/files":
+            folder = params["q"].split("'")[1]
+            if folder == fail_folder:
+                return httpx.Response(500)
+            children = tree[folder]
+            if "pageToken" not in params and len(children) > 1:  # two pages, to cover paging
+                return httpx.Response(200, json={"files": [as_json(children[0])], "nextPageToken": "next"})
+            rest = children[1:] if "pageToken" in params else children
+            return httpx.Response(200, json={"files": [as_json(child) for child in rest]})
+        file_id = path.rsplit("/", 1)[1]
+        if params.get("fields") == "trashed":
+            return httpx.Response(200, json={"trashed": False})
+        if params.get("alt") == "media":
+            return httpx.Response(200, content=file_id.encode())
+        return httpx.Response(200, json={"name": items[file_id][1], "mimeType": items[file_id][2]})
+
+    monkeypatch.setattr(service.httpx, "Client",
+                        lambda **kwargs: REAL_CLIENT(transport=httpx.MockTransport(drive), **kwargs))
+
+
+def fake_sync(monkeypatch, job, known):
+    """In-memory sync tables; `known` is the synced-files table and changes in place."""
+    runs, baseline, events, stored, deleted = [], {}, [], [], []
+    repository = service.google_drive_repository
+    monkeypatch.setattr(repository, "is_due", lambda: True)
+    monkeypatch.setattr(repository, "claim_due", lambda: job)
+    monkeypatch.setattr(repository, "synced_files", lambda: {key: dict(value) for key, value in known.items()})
+    monkeypatch.setattr(repository, "record_synced", lambda drive_id, file_id, modified: known.__setitem__(
+        drive_id, {"file_id": file_id, "modified_time": modified}))
+    monkeypatch.setattr(repository, "forget_synced", known.pop)
+    monkeypatch.setattr(repository, "save_baseline", lambda folder_id, files: baseline.update(files))
+    monkeypatch.setattr(repository, "finish_run", lambda folder_id, result: runs.append(result))
+    monkeypatch.setattr(service, "access_token", lambda user_id, scope=None: "fresh")
+    monkeypatch.setattr(service, "record_audit_event", lambda event, **kwargs: events.append(event))
+
+    def store_files(uploads, author_id, levels):
+        name = uploads[0].filename
+        if name == "dup.pdf":
+            raise DuplicateFileError("A file with identical content already exists")
+        stored.append((name, uploads[0].file.read(), levels[0]))
+        return [{"id": f"file-{name}"}]
+
+    monkeypatch.setattr(service, "store_files", store_files)
+    monkeypatch.setattr(service, "delete_file", lambda file_id, user_id, is_admin: deleted.append(file_id))
+    return runs, baseline, events, stored, deleted
+
+
+SYNC_TREE = {
+    "root": [
+        ("same", "same.pdf", "application/pdf", "1"),
+        ("picked", "picked.pdf", "application/pdf", "1"),
+        ("edited", "edited.pdf", "application/pdf", "2"),
+        ("sub", "Sub", service.FOLDER_MIME_TYPE, "1"),
+    ],
+    "sub": [
+        ("picked-then-edited", "old.docx", DOCX, "2"),
+        ("new", "new.pdf", "application/pdf", "1"),
+        ("video", "clip.mp4", "video/mp4", "1"),
+        ("shortcut", "report.pdf", "application/vnd.google-apps.shortcut", "1"),
+        ("dup", "dup.pdf", "application/pdf", "1"),
+    ],
+}
+
+
+def test_sync_imports_new_and_edited_files_and_removes_deleted_ones(monkeypatch):
+    configure(monkeypatch)
+    fake_drive(monkeypatch, SYNC_TREE)
+    known = {
+        "same": {"file_id": "f-same", "modified_time": "1"},
+        "picked": {"file_id": None, "modified_time": "1"},
+        "edited": {"file_id": "f-edited", "modified_time": "1"},
+        "picked-then-edited": {"file_id": None, "modified_time": "1"},
+        "gone": {"file_id": "f-gone", "modified_time": "1"},
+        "gone-unimported": {"file_id": None, "modified_time": "1"},
+    }
+    job = {"user_id": uuid4(), "folder_id": "root", "access_level": "confidential", "needs_baseline": False,
+           "owner_is_admin": True}
+    runs, _, events, stored, deleted = fake_sync(monkeypatch, job, known)
+
+    service.sync_folder()
+
+    assert sorted(stored) == [("edited.pdf", b"edited", "confidential"), ("new.pdf", b"new", "confidential"),
+                              ("old.docx", b"picked-then-edited", "confidential")]
+    assert sorted(deleted) == ["f-edited", "f-gone"]
+    assert known == {
+        "same": {"file_id": "f-same", "modified_time": "1"},
+        "picked": {"file_id": None, "modified_time": "1"},  # in the folder when picked, never edited
+        "edited": {"file_id": "file-edited.pdf", "modified_time": "2"},
+        "picked-then-edited": {"file_id": "file-old.docx", "modified_time": "2"},
+        "new": {"file_id": "file-new.pdf", "modified_time": "1"},
+        "video": {"file_id": None, "modified_time": "1"},
+        "shortcut": {"file_id": None, "modified_time": "1"},
+        "dup": {"file_id": None, "modified_time": "1"},
+    }
+    assert runs == ["2 added, 1 updated, 1 removed, 3 skipped (unsupported, too large, or duplicate)."]
+    assert events == ["drive_sync_completed"]
+
+
+def test_sync_deletes_nothing_when_any_folder_fails_to_list(monkeypatch):
+    configure(monkeypatch)
+    fake_drive(monkeypatch, SYNC_TREE, fail_folder="sub")
+    known = {"gone": {"file_id": "f-gone", "modified_time": "1"}}
+    job = {"user_id": uuid4(), "folder_id": "root", "access_level": "general", "needs_baseline": False,
+           "owner_is_admin": True}
+    runs, _, events, stored, deleted = fake_sync(monkeypatch, job, known)
+
+    service.sync_folder()
+
+    assert stored == [] and deleted == []
+    assert known == {"gone": {"file_id": "f-gone", "modified_time": "1"}}
+    assert runs == ["Sync failed: Unable to list the synced Google Drive folder"]
+    assert events == ["drive_sync_failed"]
+
+
+def test_first_sync_records_existing_files_without_importing(monkeypatch):
+    configure(monkeypatch)
+    fake_drive(monkeypatch, SYNC_TREE)
+    job = {"user_id": uuid4(), "folder_id": "root", "access_level": "general", "needs_baseline": True,
+           "owner_is_admin": True}
+    runs, baseline, _, stored, deleted = fake_sync(monkeypatch, job, {})
+
+    service.sync_folder()
+
+    assert stored == [] and deleted == []
+    assert baseline == {"same": "1", "picked": "1", "edited": "2", "picked-then-edited": "2", "new": "1",
+                        "video": "1", "shortcut": "1", "dup": "1"}
+    assert runs[0].startswith("Folder picked with 8 existing files")
+
+
+def test_sync_stops_when_the_owner_is_no_longer_an_admin(monkeypatch):
+    configure(monkeypatch)
+    fake_drive(monkeypatch, SYNC_TREE)
+    job = {"user_id": uuid4(), "folder_id": "root", "access_level": "general", "needs_baseline": False,
+           "owner_is_admin": False}
+    runs, _, events, stored, deleted = fake_sync(monkeypatch, job, {"gone": {"file_id": "f-gone", "modified_time": "1"}})
+
+    service.sync_folder()
+
+    assert stored == [] and deleted == []
+    assert runs[0].startswith("Sync failed: the admin who set it up is no longer an active admin")
+    assert events == ["drive_sync_failed"]
+
+
+def test_sync_scope_is_required_for_folder_sync(monkeypatch):
+    account, _ = login(monkeypatch, role="admin")
+    tokens = configure(monkeypatch)
+    tokens[account["id"]] = "r"
+    fake_token_endpoint(monkeypatch, (200, {"access_token": "fresh", "scope": service.SCOPE}))
+    with pytest.raises(service.GoogleDriveNotConnectedError):
+        service.access_token(account["id"], service.SYNC_SCOPE)
+    fake_token_endpoint(monkeypatch, (200, {"access_token": "fresh", "scope": f"{service.SCOPE} {service.SYNC_SCOPE}"}))
+    assert service.access_token(account["id"], service.SYNC_SCOPE) == "fresh"
+
+
+def test_folder_sync_is_admin_only(client, monkeypatch):
+    configure(monkeypatch)
+    _, headers = login(monkeypatch)
+    assert client.get("/integrations/google/sync", headers=headers).status_code == 403
+    assert client.post("/integrations/google/sync/run", headers=headers).status_code == 403
+    assert client.get("/integrations/google/sync/connect", headers=headers).status_code == 403
+    assert client.get("/integrations/google/sync/picker", headers=headers).status_code == 403
+
+
+def test_sync_settings_reject_bad_timezone_and_folder_id(client, monkeypatch):
+    _, headers = login(monkeypatch, role="admin")
+    body = {"folder_id": "abc_123-X", "folder_name": "Policies", "timezone": "Asia/Phnom_Penh", "sync_time": "22:30"}
+    assert client.put("/integrations/google/sync", headers=headers,
+                      json={**body, "timezone": "Mars/Base"}).status_code == 422
+    assert client.put("/integrations/google/sync", headers=headers,
+                      json={**body, "folder_id": "x' or name contains '"}).status_code == 422
+
+
+def test_sync_connect_returns_to_admin_settings(client, monkeypatch):
+    account, headers = login(monkeypatch, role="admin")
+    tokens = configure(monkeypatch)
+    fake_token_endpoint(monkeypatch, (200, {"access_token": "a", "refresh_token": "r"}))
+
+    url = client.get("/integrations/google/sync/connect", headers=headers).json()["url"]
+    query = parse_qs(urlparse(url).query)
+    assert query["scope"] == [service.SYNC_SCOPE]
+
+    response = client.get("/integrations/google/callback",
+                          params={"code": "c", "state": query["state"][0]}, follow_redirects=False)
+    assert response.headers["location"].endswith("/workspace/admin/settings?google_drive=connected")
+    assert tokens == {account["id"]: "r"}
+
+    refused = client.get("/integrations/google/callback",
+                         params={"error": "access_denied", "state": query["state"][0]}, follow_redirects=False)
+    assert refused.headers["location"].endswith("/workspace/admin/settings?google_drive=error")

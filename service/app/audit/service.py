@@ -9,11 +9,13 @@ from app.audit.schemas import AuditEventType
 
 logger = logging.getLogger(__name__)
 
-AuditEventName = Literal["sync_completed", "sync_failed", "chat_turn", "chat_turn_stopped", "chat_turn_failed", "login_success", "admin_gate_deny"]
+AuditEventName = Literal["sync_completed", "sync_failed", "drive_sync_completed", "drive_sync_failed", "chat_turn", "chat_turn_stopped", "chat_turn_failed", "login_success", "admin_gate_deny"]
 
 AUDIT_EVENTS: dict[AuditEventName, tuple[AuditEventType, str]] = {
     "sync_completed": ("sync", "Sync completed"),
     "sync_failed": ("sync", "Sync failed"),
+    "drive_sync_completed": ("sync", "Google Drive folder sync completed"),
+    "drive_sync_failed": ("sync", "Google Drive folder sync failed"),
     "chat_turn": ("query", "Chat turn"),
     "chat_turn_stopped": ("query", "Chat turn stopped"),
     "chat_turn_failed": ("query", "Chat turn failed"),

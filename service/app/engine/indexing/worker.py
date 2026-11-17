@@ -10,6 +10,7 @@ from app.engine.chunks.chunker import CHUNKER_VERSION, chunk_extraction
 from app.engine.chunks.embeddings import embed_chunks
 from app.engine.chunks.repository import knowledge_chunks_repository
 from app.engine.indexing.job_repository import index_jobs_repository
+from app.google_drive.service import sync_folder
 
 
 logger = logging.getLogger(__name__)
@@ -51,7 +52,14 @@ def run_worker(stop: threading.Event | None = None) -> None:
     # ponytail: one worker serializes shared indexes; add per-organization locks before scaling.
     index_jobs_repository.reset_processing()
     index_jobs_repository.queue_outdated(CHUNKER_VERSION)
+    next_drive_check = 0.0
     while stop is None or not stop.is_set():
+        if time.monotonic() >= next_drive_check:
+            next_drive_check = time.monotonic() + 60
+            try:
+                sync_folder()
+            except Exception:
+                logger.exception("Google Drive folder sync check failed")
         if not process_next_job():
             if stop is None:
                 time.sleep(1)

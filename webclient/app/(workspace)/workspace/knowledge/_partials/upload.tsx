@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/select";
 import type { AccessLevel } from "@/interface/files";
 import { useUploadFiles } from "@/services/files";
+import { useDriveConnectResult } from "@/hooks/useDriveConnectResult";
 import { pickGoogleDriveFiles, useImportDriveFiles } from "@/services/google-drive";
 import { useGetCurrentUser } from "@/services/auth";
 import { useServerStatus } from "@/services/status";
@@ -83,19 +84,9 @@ export function Upload() {
   const driveConfigured = configured?.google_drive ?? false;
   const canSetConfidential = user.data?.role === "admin";
 
-  useEffect(() => {
-    const url = new URL(window.location.href);
-    const result = url.searchParams.get("google_drive");
-    if (result) {
-      toast.add(
-        result === "connected"
-          ? { title: "Google Drive connected.", type: "success" }
-          : { title: "Google Drive could not be connected. Please try again.", type: "error" },
-      );
-      url.searchParams.delete("google_drive");
-      window.history.replaceState(null, "", url);
-    }
+  useDriveConnectResult("Google Drive connected.");
 
+  useEffect(() => {
     try {
       const saved = window.sessionStorage.getItem(DRIVE_PICKS_STORAGE_KEY);
       window.sessionStorage.removeItem(DRIVE_PICKS_STORAGE_KEY);

@@ -11,7 +11,7 @@ It can run entirely on your own machine, including the language model.
 - **Hybrid search:** keyword and vector search, reranked by a local cross-encoder.
 - **Access control:** `admin`, `senior` and `staff` roles, with `general` and `confidential` documents.
 - **Team features:** email invitations and an admin audit log.
-- **Optional integrations:** public web search through Exa, and Google Drive import.
+- **Optional integrations:** public web search through Exa, and Google Drive import with an admin-chosen folder synced daily.
 - **Any OpenAI-compatible model:** use the bundled llama.cpp server or a hosted service.
 
 ## Requirements

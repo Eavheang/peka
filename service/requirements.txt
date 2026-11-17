@@ -10,6 +10,7 @@ pgvector
 SQLAlchemy
 alembic
 PyJWT
+cryptography
 pwdlib[argon2]
 python-multipart
 PyMuPDF
