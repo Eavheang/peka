@@ -4,14 +4,24 @@ from urllib.parse import urlparse
 
 import httpx
 
+from app import connectivity
 from app.config import settings
 from app.workspace_settings import provider_config
 
 
+def web_search_configured() -> bool:
+    key = provider_config()["exa_api_key"]
+    return bool(key and key.strip())
+
+
+def web_search_available() -> bool:
+    return web_search_configured() and connectivity.is_online()
+
+
 def web_search(query: str) -> list[dict[str, Any]]:
-    config = provider_config()
-    if not config["exa_api_key"] or not config["exa_api_key"].strip():
+    if not web_search_configured():
         raise RuntimeError("Web search is not configured")
+    config = provider_config()
 
     try:
         response = httpx.post(

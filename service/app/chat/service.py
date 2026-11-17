@@ -30,7 +30,7 @@ from app.engine.ai_runtime import (
 from app.engine.chunks.chunker import passage_text
 from app.engine.search.repository import search_repository
 from app.engine.search.service import access_levels_for_role, rerank_scores, search_knowledge
-from app.engine.web_search.service import web_search as perform_web_search
+from app.engine.web_search.service import web_search as perform_web_search, web_search_available
 from app.workspace_settings import provider_config
 
 logger = logging.getLogger(__name__)
@@ -485,6 +485,8 @@ def _search_plan(
     web_search: bool,
     timezone_name: str | None = None,
 ) -> SearchPlan:
+    # Offline or no Exa key: answer from the documents instead of failing on web search.
+    web_search = web_search and web_search_available()
     # A first turn has nothing to rewrite, and the only other thing the model adds is choosing
     # web search, so spend the model call only when the user has turned web search on.
     if not history and not web_search:

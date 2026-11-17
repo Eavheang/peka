@@ -98,6 +98,7 @@ def test_chat_uses_web_search_only_when_enabled(monkeypatch) -> None:
             }]
         )
 
+    monkeypatch.setattr(chat_service, "web_search_available", lambda: True)
     monkeypatch.setattr(chat_service, "perform_web_search", lambda query: web_results)
     monkeypatch.setattr(chat_service, "generate_structured", generate)
 

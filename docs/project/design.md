@@ -331,5 +331,6 @@ All endpoints are listed in the [API reference](../service/api-reference.md). Th
 | Audit log | `/admin/audit-events` | Admin |
 | Provider settings | `/admin/settings/providers` | Admin |
 | Health | `/health` | Public |
+| Online status and configured features | `/status` | All users |
 
 The web client talks only to the API through nginx; it has no database access. The service talks to the embedding, reranking and language model servers through their OpenAI-compatible or TEI HTTP APIs.

@@ -8,6 +8,7 @@ import type { UserResponse } from "@/interface/auth";
 import { endSession, getStoredToken } from "@/utils/auth-storage";
 import { useGetCurrentUser } from "@/services/auth";
 
+import { OfflineBadge } from "./_partials/offlineBadge";
 import { WorkspaceSidebar } from "./_partials/sidebar";
 
 export default function WorkspaceLayout({ children }: Readonly<{ children: ReactNode }>) {
@@ -49,6 +50,7 @@ export default function WorkspaceLayout({ children }: Readonly<{ children: React
           >
             <Menu aria-hidden="true" size={20} />
           </button>
+          <OfflineBadge className="ml-auto border-border bg-transparent text-muted" />
         </header>
         <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">{children}</main>
       </div>

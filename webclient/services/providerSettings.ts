@@ -30,7 +30,10 @@ export const useSaveProviderSettings = () => {
   return useMutation({
     mutationFn: async (data: ProviderSettingsUpdate) =>
       (await axiosInstance.put<ProviderSettings>("/admin/settings/providers", data)).data,
-    onSuccess: (data) => client.setQueryData(["admin", "provider-settings"], data),
+    onSuccess: (data) => {
+      client.setQueryData(["admin", "provider-settings"], data);
+      void client.invalidateQueries({ queryKey: ["status"] });
+    },
   });
 };
 

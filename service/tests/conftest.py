@@ -10,7 +10,14 @@ os.environ.setdefault("LLM_BASE_URL", "http://localhost:8080/v1")
 os.environ.setdefault("LLM_API_KEY", "test-only-key")
 os.environ.setdefault("LLM_MODEL", "test-model")
 
+from app import connectivity
 from app.main import app
+
+
+@pytest.fixture(autouse=True)
+def online(monkeypatch) -> None:
+    """Tests never probe the real network: a cache that never expires says online. Offline tests seed False."""
+    monkeypatch.setattr(connectivity, "_last_check", (float("inf"), True))
 
 
 @pytest.fixture()

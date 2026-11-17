@@ -40,11 +40,15 @@ class GoogleDriveRequestError(RuntimeError):
     pass
 
 
+def google_drive_configured() -> bool:
+    return bool(settings.google_client_id and settings.google_client_secret
+                and settings.google_api_key and settings.google_app_id)
+
+
 def _client_credentials() -> tuple[str, str]:
-    client_id, client_secret = settings.google_client_id, settings.google_client_secret
-    if not (client_id and client_secret and settings.google_api_key and settings.google_app_id):
+    if not google_drive_configured():
         raise GoogleDriveNotConfiguredError("Google Drive is not configured")
-    return client_id, client_secret.get_secret_value()
+    return settings.google_client_id, settings.google_client_secret.get_secret_value()
 
 
 def authorization_url(user_id: UUID) -> str:

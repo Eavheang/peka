@@ -28,6 +28,7 @@ export interface InvitationSummary {
 export interface InvitationResponse extends InvitationSummary {
   invite_url: string;
   email_sent: boolean;
+  email_error?: "not_configured" | "offline" | "failed" | null;
 }
 
 export interface InvitationPreview {

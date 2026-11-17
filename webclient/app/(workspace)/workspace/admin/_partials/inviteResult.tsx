@@ -8,6 +8,12 @@ import type { InvitationResponse } from "@/interface/auth";
 
 type InviteResultProps = { invitation: InvitationResponse | null; onClose: () => void };
 
+const EMAIL_NOT_SENT = {
+  offline: "PEKA is offline, so no email was sent.",
+  not_configured: "Email isn’t set up.",
+  failed: "The email couldn’t be delivered.",
+};
+
 export default function InviteResult({ invitation, onClose }: InviteResultProps) {
   async function copyLink() {
     if (!invitation) return;
@@ -31,7 +37,7 @@ export default function InviteResult({ invitation, onClose }: InviteResultProps)
           <DialogDescription className="mt-2 text-sm leading-6 text-panel-foreground/70">
             {invitation?.email_sent
               ? `We emailed ${invitation.email}. The link works until ${expires}.`
-              : `Email is not configured or could not be delivered. Copy this link and send it to ${invitation?.email}. It works until ${expires}.`}
+              : `${EMAIL_NOT_SENT[invitation?.email_error ?? "failed"]} Copy this link and send it to ${invitation?.email}. It works until ${expires}.`}
           </DialogDescription>
         </div>
         <div className="grid gap-3 border-t border-panel-foreground/15 p-6">

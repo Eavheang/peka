@@ -17,9 +17,11 @@ import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 
 import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/toast";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ChatMessage, ChatResult } from "@/interface/chat";
 import { getConversation, sendChatMessageStream, useGetConversation } from "@/services/chat";
+import { useServerStatus } from "@/services/status";
 import { getApiErrorMessage } from "@/utils/api-error";
 import { AnswerMarkdown } from "./answerMarkdown";
 
@@ -66,6 +68,7 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
   // Persisted message count before the in-flight turn; Retry only restores if the reload grew past this.
   const savedMessageCountAtTurnStart = useRef(0);
   const conversationQuery = useGetConversation(conversationId);
+  const { offline, configured } = useServerStatus();
 
   useEffect(() => {
     return () => {
@@ -463,31 +466,46 @@ export function ChatPanel({ conversationId }: { conversationId?: string }) {
                   }
                 }}
               />
-              <div className="flex items-center gap-3 px-3 pb-1 pt-2">
-                <div className="inline-flex items-center gap-2 text-xs font-medium text-copy">
-                  <Tooltip>
-                    <TooltipTrigger
-                      aria-label={webSearchEnabled ? "Disable web search" : "Enable web search"}
-                      aria-pressed={webSearchEnabled}
-                      className="rounded-md p-1 text-muted transition-colors hover:bg-secondary hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 aria-pressed:bg-primary/10 aria-pressed:text-primary aria-pressed:ring-1 aria-pressed:ring-primary/30"
-                      type="button"
-                      onClick={() => {
-                        const enabled = !webSearchEnabled;
-                        setWebSearchEnabled(enabled);
-                        window.localStorage.setItem(WEB_SEARCH_STORAGE_KEY, String(enabled));
-                      }}
-                    >
-                      <Globe2 aria-hidden="true" size={14} />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      {webSearchEnabled
-                        ? "Peka may search the public web when current information is needed."
-                        : "Click to allow Peka to search the public web when needed."}
-                    </TooltipContent>
-                  </Tooltip>
-                  <span>Web search</span>
+              {configured?.web_search && (
+                <div className="flex items-center gap-3 px-3 pb-1 pt-2">
+                  <div className="inline-flex items-center gap-2 text-xs font-medium text-copy">
+                    <Tooltip>
+                      <TooltipTrigger
+                        aria-label={webSearchEnabled ? "Disable web search" : "Enable web search"}
+                        aria-pressed={webSearchEnabled && !offline}
+                        aria-disabled={offline || undefined}
+                        className="rounded-md p-1 text-muted transition-colors hover:bg-secondary hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 aria-pressed:bg-primary/10 aria-pressed:text-primary aria-pressed:ring-1 aria-pressed:ring-primary/30 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-muted"
+                        type="button"
+                        onClick={() => {
+                          if (offline) {
+                            toast.add({
+                              title:
+                                "Web search needs internet. PEKA is offline, so answers come from your documents only.",
+                              type: "warning",
+                            });
+                            return;
+                          }
+                          const enabled = !webSearchEnabled;
+                          setWebSearchEnabled(enabled);
+                          window.localStorage.setItem(WEB_SEARCH_STORAGE_KEY, String(enabled));
+                        }}
+                      >
+                        <Globe2 aria-hidden="true" size={14} />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        {offline
+                          ? "PEKA is offline. Answers come from your documents only."
+                          : webSearchEnabled
+                            ? "Peka may search the public web when current information is needed."
+                            : "Click to allow Peka to search the public web when needed."}
+                      </TooltipContent>
+                    </Tooltip>
+                    <span className={offline ? "text-muted" : undefined}>
+                      {offline ? "Web search unavailable offline" : "Web search"}
+                    </span>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
             {isPending ? (
               <Button

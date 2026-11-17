@@ -2,12 +2,16 @@ import asyncio
 from contextlib import asynccontextmanager
 
 import psycopg
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 
-from app import routers
+from app import connectivity, routers
+from app.auth.mailer import mail_configured
 from app.auth.repository import auth_repository
+from app.auth.routes import authenticated
 from app.auth.security import hash_password
 from app.config import settings
+from app.engine.web_search.service import web_search_configured
+from app.google_drive.service import google_drive_configured
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
@@ -34,3 +38,16 @@ for router in routers:
 @app.get("/health", tags=["health"])
 async def healthcheck() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/status", tags=["health"])
+def feature_status(_: dict = Depends(authenticated)) -> dict:
+    """`online`: the server reaches the internet. `configured`: features an admin has set up; each needs `online`."""
+    return {
+        "online": connectivity.is_online(),
+        "configured": {
+            "web_search": web_search_configured(),
+            "google_drive": google_drive_configured(),
+            "email": mail_configured(),
+        },
+    }

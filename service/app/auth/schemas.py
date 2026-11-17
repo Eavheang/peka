@@ -98,6 +98,7 @@ class InvitationSummary(BaseModel):
 class InvitationResponse(InvitationSummary):
     invite_url: str
     email_sent: bool
+    email_error: Literal["not_configured", "offline", "failed"] | None = None
 
 
 class InvitationPreview(BaseModel):

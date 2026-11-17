@@ -20,7 +20,7 @@ If your session expires, the client tries one token refresh; if that fails you r
 ### New chat
 
 1. Open **New chat** in the sidebar (`/workspace`).
-2. Optionally enable **web search** (stored in browser as `peka_web_search_enabled`). Needs a configured Exa key on the server.
+2. Optionally enable **web search** (stored in browser as `peka_web_search_enabled`). The toggle shows only when the server has an Exa key. When the server has no internet, the sidebar shows **Offline**, web search and Google Drive are greyed out (clicking them explains why), and invitations give a link to copy instead of sending an email. Documents and chat keep working.
 3. Type a question (max 4000 characters) and send.
 4. Watch streaming status/text. When finished, citations may appear under the answer. If other people's answers are being generated, the status reads "Waiting for other answers to finish..." until a model slot is free.
 5. The URL updates to `/workspace/<conversationId>` after the first message.
