@@ -1,0 +1,52 @@
+{
+  "indexed_files": 70,
+  "indexed_stems": 20,
+  "questions.jsonl": {
+    "questions": 57,
+    "skipped_file_not_indexed": [
+      18,
+      19,
+      31,
+      32,
+      54,
+      55,
+      56,
+      57,
+      68,
+      69,
+      70
+    ],
+    "doc_recall@1": 0.9649122807017544,
+    "doc_recall@5": 1.0,
+    "doc_recall@10": 1.0,
+    "search_ms": {
+      "n": 57,
+      "mean": 184.09146096491656,
+      "p50": 183.69889399991735,
+      "p95": 193.7868290001461,
+      "max": 202.3182089999409
+    },
+    "misses@5": [],
+    "heading_recall@5": 0.43859649122807015,
+    "heading_recall@10": 0.631578947368421
+  },
+  "question-2.json": {
+    "questions": 59,
+    "skipped_file_not_indexed": [],
+    "doc_recall@1": 0.8813559322033898,
+    "doc_recall@5": 0.9491525423728814,
+    "doc_recall@10": 1.0,
+    "search_ms": {
+      "n": 59,
+      "mean": 186.70159532203118,
+      "p50": 184.7501329998522,
+      "p95": 199.79697400003715,
+      "max": 219.9608939999962
+    },
+    "misses@5": [
+      1,
+      15,
+      26
+    ]
+  }
+}

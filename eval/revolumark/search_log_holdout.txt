@@ -1,0 +1,9 @@
+Recall@1: 57/60 = 95.0%
+Recall@3: 60/60 = 100.0%
+Recall@5: 60/60 = 100.0%
+Recall@10: 60/60 = 100.0%
+  type P: Recall@5 48/48
+  type T: Recall@5 9/9
+  type X: Recall@5 3/3
+search ms mean 368 p95 601
+misses @5: []

@@ -1,0 +1,29 @@
+{
+  "started": "2026-11-17 09:38:30 +0000",
+  "outbound_huggingface.co:443": "blocked (gaierror: [Errno -3] Temporary failure in name resolution)",
+  "outbound_1.1.1.1:443": "blocked (OSError: [Errno 101] Network is unreachable)",
+  "uploaded": [
+    "others/08_QC_Procedure_Dried_Mango.txt",
+    "pdf/06_Supply_Agreement.pdf"
+  ],
+  "index_status": [
+    "completed",
+    "completed"
+  ],
+  "index_seconds": 3.0,
+  "chat_seconds": 12.9,
+  "question": "What are the critical control points in our dried mango QC procedure?",
+  "answer": "The critical control points in the dried mango QC procedure include checks for specific parameters and limits to ensure the product is safe and meets specifications.\n\nThe procedure requires stopping the line if a critical limit is missed for metal detection, water activity (aw), or moisture. [1]\n\nSpecific parameters and their limits include:\n\nMoisture: 14 - 18 % [2]\n\nWater activity (aw): 0.65 maximum [2]\n\nColour: Golden to deep orange, with no browning patches [2]\n\nForeign matter: None [2]\n\nNet weight: Not below declared weight (average of 10 packs) [2]\n\nSeal integrity: No leaks under a gentle squeeze and water-immersion test [2]\n\nLabel: Lot number, best-before date, and allergen statement must be present [2]\n\nShelf life: 12 months from the packing date [2]",
+  "refused": false,
+  "citations": [
+    {
+      "title": "08_QC_Procedure_Dried_Mango.txt",
+      "heading": "Text"
+    },
+    {
+      "title": "08_QC_Procedure_Dried_Mango.txt",
+      "heading": "Text"
+    }
+  ],
+  "finished": "2026-11-17 09:38:46 +0000"
+}

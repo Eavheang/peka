@@ -1,0 +1,159 @@
+{
+  "1": {
+    "requests": 1,
+    "ok": 1,
+    "errors": [],
+    "first_status_s": {
+      "n": 1,
+      "mean": 0.013451974999952654,
+      "p50": 0.013451974999952654,
+      "p95": 0.013451974999952654,
+      "max": 0.013451974999952654
+    },
+    "ttft_s": {
+      "n": 1,
+      "mean": 8.64979878999975,
+      "p50": 8.64979878999975,
+      "p95": 8.64979878999975,
+      "max": 8.64979878999975
+    },
+    "total_s": {
+      "n": 1,
+      "mean": 10.883931995999774,
+      "p50": 10.883931995999774,
+      "p95": 10.883931995999774,
+      "max": 10.883931995999774
+    }
+  },
+  "2": {
+    "requests": 2,
+    "ok": 2,
+    "errors": [],
+    "first_status_s": {
+      "n": 2,
+      "mean": 0.015558182999939163,
+      "p50": 0.015558182999939163,
+      "p95": 0.015870061999976315,
+      "max": 0.015870061999976315
+    },
+    "ttft_s": {
+      "n": 2,
+      "mean": 10.6039119914999,
+      "p50": 10.6039119914999,
+      "p95": 11.556876962999922,
+      "max": 11.556876962999922
+    },
+    "total_s": {
+      "n": 2,
+      "mean": 12.21422122649983,
+      "p50": 12.21422122649983,
+      "p95": 12.510504478999792,
+      "max": 12.510504478999792
+    }
+  },
+  "3": {
+    "requests": 3,
+    "ok": 0,
+    "errors": [
+      "AI provider request failed",
+      "AI provider request failed",
+      "AI provider request failed"
+    ],
+    "first_status_s": {
+      "n": 0
+    },
+    "ttft_s": {
+      "n": 0
+    },
+    "total_s": {
+      "n": 0
+    }
+  },
+  "4": {
+    "requests": 4,
+    "ok": 0,
+    "errors": [
+      "AI provider request failed",
+      "AI provider request failed",
+      "AI provider request failed",
+      "AI provider request failed"
+    ],
+    "first_status_s": {
+      "n": 0
+    },
+    "ttft_s": {
+      "n": 0
+    },
+    "total_s": {
+      "n": 0
+    }
+  },
+  "6": {
+    "requests": 6,
+    "ok": 1,
+    "errors": [
+      "AI provider request failed",
+      "AI provider request failed",
+      "AI provider request failed",
+      "AI provider request failed",
+      "AI provider request failed"
+    ],
+    "first_status_s": {
+      "n": 1,
+      "mean": 0.029413488000045618,
+      "p50": 0.029413488000045618,
+      "p95": 0.029413488000045618,
+      "max": 0.029413488000045618
+    },
+    "ttft_s": {
+      "n": 1,
+      "mean": 32.29036653899993,
+      "p50": 32.29036653899993,
+      "p95": 32.29036653899993,
+      "max": 32.29036653899993
+    },
+    "total_s": {
+      "n": 1,
+      "mean": 33.829449621000094,
+      "p50": 33.829449621000094,
+      "p95": 33.829449621000094,
+      "max": 33.829449621000094
+    }
+  },
+  "10": {
+    "requests": 10,
+    "ok": 1,
+    "errors": [
+      "AI provider request failed",
+      "AI provider request failed",
+      "AI provider request failed",
+      "AI provider request failed",
+      "AI provider request failed",
+      "AI provider request failed",
+      "AI provider request failed",
+      "AI provider request failed",
+      "AI provider request failed"
+    ],
+    "first_status_s": {
+      "n": 1,
+      "mean": 0.034635053999863885,
+      "p50": 0.034635053999863885,
+      "p95": 0.034635053999863885,
+      "max": 0.034635053999863885
+    },
+    "ttft_s": {
+      "n": 1,
+      "mean": 51.27091586000006,
+      "p50": 51.27091586000006,
+      "p95": 51.27091586000006,
+      "max": 51.27091586000006
+    },
+    "total_s": {
+      "n": 1,
+      "mean": 53.81912823899984,
+      "p50": 53.81912823899984,
+      "p95": 53.81912823899984,
+      "max": 53.81912823899984
+    }
+  }
+}

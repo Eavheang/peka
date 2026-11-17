@@ -1,0 +1,4 @@
+# NFR03 test only: the project network gets no route outside the host.
+networks:
+  default:
+    internal: true

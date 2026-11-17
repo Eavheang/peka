@@ -1,0 +1,474 @@
+[
+  {
+    "id": 1,
+    "question": "How many people work in the Sales and Marketing department, and what is the lead role?",
+    "reference": "12 people, led by the Commercial Manager.",
+    "file": "01_Company_Profile.md",
+    "evidence": "Sales and Marketing | 12 | Commercial Manager"
+  },
+  {
+    "id": 2,
+    "question": "By how much is gross margin supposed to improve in FY2027, and from what level?",
+    "reference": "From 31% to 34% (the overview deck gives 34.4%).",
+    "file": [
+      "01_Company_Profile.md",
+      "05_Company_Overview_Deck.pptx",
+      "07_Marketing_Plan_FY2027.docx"
+    ],
+    "evidence": "from 31% to 34%"
+  },
+  {
+    "id": 3,
+    "question": "How much notice must an employee give to resign if they have worked there for more than two years?",
+    "reference": "60 days written notice (30 days if under two years of service).",
+    "file": "02_Employee_Handbook.docx",
+    "evidence": "60 days after two years"
+  },
+  {
+    "id": 4,
+    "question": "How many paid sick days do employees get per year, and when is a medical certificate required?",
+    "reference": "Up to 6 days of paid sick leave per year; a medical certificate is needed for absences of 3 or more consecutive days.",
+    "file": "02_Employee_Handbook.docx",
+    "evidence": "Up to 6 days of paid sick leave per year"
+  },
+  {
+    "id": 5,
+    "question": "What is the largest gift value a staff member may accept from a supplier without telling their manager?",
+    "reference": "USD 25.",
+    "file": "02_Employee_Handbook.docx",
+    "evidence": "worth more than USD 25 without telling your manager"
+  },
+  {
+    "id": 6,
+    "question": "How often are employee performance reviews held, and when do salary reviews take place?",
+    "reference": "Performance reviews every six months; salary reviews once a year in January.",
+    "file": "02_Employee_Handbook.docx",
+    "evidence": "Salary reviews take place once a year in January"
+  },
+  {
+    "id": 7,
+    "question": "What are the four steps of the disciplinary process?",
+    "reference": "Verbal warning, written warning, final written warning, then dismissal (only after a fair hearing).",
+    "file": "02_Employee_Handbook.docx",
+    "evidence": "Final written warning"
+  },
+  {
+    "id": 8,
+    "question": "How much of the FY2027 marketing budget is set aside for trade fairs and export support?",
+    "reference": "USD 48,000, 29% of the USD 168,000 total.",
+    "file": "07_Marketing_Plan_FY2027.docx",
+    "evidence": "Trade fairs and export support | 48,000 | 29%"
+  },
+  {
+    "id": 9,
+    "question": "What online repeat purchase rate does the marketing plan aim for, and what is it today?",
+    "reference": "Baseline 14%, FY2027 target 25%.",
+    "file": "07_Marketing_Plan_FY2027.docx",
+    "evidence": "Online repeat purchase rate | 14% | 25%"
+  },
+  {
+    "id": 10,
+    "question": "In which quarter will the small-batch range launch, and with how many flavours?",
+    "reference": "Q2, with three premium flavours.",
+    "file": "07_Marketing_Plan_FY2027.docx",
+    "evidence": "Launch three premium flavours"
+  },
+  {
+    "id": 11,
+    "question": "What share of the estimated season value may the company advance to a farmer group?",
+    "reference": "Up to 20% of the estimated season value, deducted from later deliveries.",
+    "file": "06_Supply_Agreement.pdf",
+    "evidence": "advance up to 20% of the estimated season value"
+  },
+  {
+    "id": 12,
+    "question": "How many days does a party have to fix a serious breach of the farmer supply agreement before the other side can end it?",
+    "reference": "30 days from written notice.",
+    "file": "06_Supply_Agreement.pdf",
+    "evidence": "within 30 days of written notice"
+  },
+  {
+    "id": 13,
+    "question": "What Brix range and minimum fruit weight define grade A fresh mango under the grading standard?",
+    "reference": "Brix 14 to 18 and fruit weight of 300 g or more.",
+    "file": "06_Supply_Agreement.pdf",
+    "evidence": "Ripeness (Brix) | 14 to 18"
+  },
+  {
+    "id": 14,
+    "question": "How soon after an accepted delivery are farmers paid?",
+    "reference": "Within 3 working days, by bank transfer or mobile wallet.",
+    "file": "06_Supply_Agreement.pdf",
+    "evidence": "within 3 working days of accepted delivery"
+  },
+  {
+    "id": 15,
+    "question": "What water activity limit must finished dried mango meet, and how often is the metal detector tested?",
+    "reference": "Water activity 0.65 or lower; metal detector tested every 2 hours.",
+    "file": "05_Company_Overview_Deck.pptx",
+    "evidence": "water activity is kept at 0.65 or lower"
+  },
+  {
+    "id": 16,
+    "question": "What chlorine level must the wash water have and how often is it checked?",
+    "reference": "50 to 100 ppm, checked every 2 hours.",
+    "file": "08_QC_Procedure_Dried_Mango.txt",
+    "evidence": "Chlorine in wash water 50 to 100 ppm"
+  },
+  {
+    "id": 17,
+    "question": "What format does the internal lot number follow for incoming fruit?",
+    "reference": "MH-YYMMDD-SUPPLIER-NN.",
+    "file": "08_QC_Procedure_Dried_Mango.txt",
+    "evidence": "MH-YYMMDD-SUPPLIER-NN"
+  },
+  {
+    "id": 18,
+    "question": "How long must the dried mango QC forms be kept?",
+    "reference": "2 years (shelf life plus 12 months).",
+    "file": "08_QC_Procedure_Dried_Mango.txt",
+    "evidence": "kept for 2 years"
+  },
+  {
+    "id": 19,
+    "question": "How quickly must a non-conformance report be raised after a critical limit is missed, and which form is used?",
+    "reference": "Within 1 hour, using form QC-F09.",
+    "file": "08_QC_Procedure_Dried_Mango.txt",
+    "evidence": "Raise a Non-Conformance Report (form QC-F09) within 1 hour"
+  },
+  {
+    "id": 20,
+    "question": "What did the Singapore distributor ask for in Q4?",
+    "reference": "A 15% larger order, for chili-lime cashews.",
+    "file": "09_Management_Meeting_Minutes.txt",
+    "evidence": "Singapore distributor asked for a 15% larger order"
+  },
+  {
+    "id": 21,
+    "question": "What was August's gross margin and why was it below target?",
+    "reference": "30.2%, slightly below the 31% target because of higher cashew prices.",
+    "file": "09_Management_Meeting_Minutes.txt",
+    "evidence": "Gross margin for August was 30.2%"
+  },
+  {
+    "id": 22,
+    "question": "What was the on-time delivery rate in the latest meeting and how full is the warehouse?",
+    "reference": "96% on-time delivery (target 95%); warehouse at 88% capacity.",
+    "file": "09_Management_Meeting_Minutes.txt",
+    "evidence": "On-time delivery 96% (target 95%)"
+  },
+  {
+    "id": 23,
+    "question": "Who has to send updated Korean label proofs and by which date?",
+    "reference": "The QA Manager, by 07 October (Korean allergen labelling).",
+    "file": "09_Management_Meeting_Minutes.txt",
+    "evidence": "QA Manager | Send updated Korean label proofs | 07 Oct"
+  },
+  {
+    "id": 24,
+    "question": "How many inventory items are at REORDER status and what is the total stock value?",
+    "reference": "2 items are at REORDER; total stock value is USD 121,293.",
+    "file": "04_Inventory_Tracker.xlsx",
+    "evidence": "Total stock value (USD): 121293"
+  },
+  {
+    "id": 25,
+    "question": "What payment terms does the Mondulkiri Cashew Cooperative have?",
+    "reference": "30% deposit, balance on delivery (14-day lead time).",
+    "file": "04_Inventory_Tracker.xlsx",
+    "evidence": "30% deposit, balance on delivery"
+  },
+  {
+    "id": 26,
+    "question": "Which approved supplier has the longest typical lead time?",
+    "reference": "Lotus Packaging Co., at 21 days.",
+    "file": "04_Inventory_Tracker.xlsx",
+    "evidence": "Lotus Packaging Co. | Pouches, cartons, jars | Manufacturer | Net 30 days | 21"
+  },
+  {
+    "id": 27,
+    "question": "Which product line brings in 40% of revenue, and what oven temperature is used to dry it?",
+    "reference": "Sun-Gold Dried Mango; oven temperature 60 to 65 C.",
+    "file": [
+      "01_Company_Profile.md",
+      "05_Company_Overview_Deck.pptx",
+      "08_QC_Procedure_Dried_Mango.txt"
+    ],
+    "evidence": "Oven temperature 60 to 65 C"
+  },
+  {
+    "id": 28,
+    "question": "What did management decide about cashew purchasing, and how much had cashew prices risen?",
+    "reference": "Bring forward 30% of the Q1 cashew requirement to October; prices up about 6% quarter on quarter.",
+    "file": "09_Management_Meeting_Minutes.txt",
+    "evidence": "Bring forward 30% of the Q1 cashew requirement to October"
+  },
+  {
+    "id": 29,
+    "question": "A mango delivery has 10% total defects by count. Does it pass goods-in inspection, and does it breach the supply agreement's rejection limit?",
+    "reference": "It fails the QC procedure (accepts 8% or less) but is within the supply agreement's 12% rejection limit.",
+    "file": [
+      "08_QC_Procedure_Dried_Mango.txt",
+      "06_Supply_Agreement.pdf"
+    ],
+    "evidence": "total defects are 8% or less by count"
+  },
+  {
+    "id": 30,
+    "question": "What net profit does the company project for FY2027 and how does it compare with FY2026?",
+    "reference": "$350K, up from $184K.",
+    "file": "05_Company_Overview_Deck.pptx",
+    "evidence": "from $184K to $350K"
+  },
+  {
+    "id": 31,
+    "question": "What are Mekong Harvest Foods' biggest risks if a harvest fails?",
+    "reference": "Harvest shortfall/weather shock is high impact; mitigated by contracts with at least 12 farmer groups across 3 provinces and safety stock of dried mango.",
+    "file": "01_Company_Profile.md",
+    "evidence": "Contracts with at least 12 farmer groups across 3 provinces"
+  },
+  {
+    "id": 32,
+    "question": "Who owns home office stipends in the remote work policy, and what are the baseline and target?",
+    "reference": "Regional Managers; baseline 56%, target 90%.",
+    "file": "01-remote-work-policy",
+    "evidence": "Home Office Stipends | 56% | 90% | Regional Managers"
+  },
+  {
+    "id": 33,
+    "question": "What target does the remote work policy set for performance reviews, and who owns it?",
+    "reference": "Target 91% (baseline 52%), owned by Quality Office.",
+    "file": "01-remote-work-policy",
+    "evidence": "Performance Reviews | 52% | 91% | Quality Office"
+  },
+  {
+    "id": 34,
+    "question": "Which team is responsible for pricing tiers in the churn analysis and what is the target?",
+    "reference": "Operations Team; baseline 53%, target 76%.",
+    "file": "02-customer-churn-analysis",
+    "evidence": "Pricing Tiers | 53% | 76% | Operations Team"
+  },
+  {
+    "id": 35,
+    "question": "What are the baseline and target for backup rotation, and who owns the metric?",
+    "reference": "Baseline 73%, target 71%, owned by Engineering Leads.",
+    "file": "03-data-retention-policy",
+    "evidence": "Backup Rotation | 73% | 71% | Engineering Leads"
+  },
+  {
+    "id": 36,
+    "question": "What is the target for personal data in the data retention policy, and who owns it?",
+    "reference": "Target 70% (baseline 86%), owned by Regional Managers.",
+    "file": "03-data-retention-policy",
+    "evidence": "Personal Data | 86% | 70% | Regional Managers"
+  },
+  {
+    "id": 37,
+    "question": "What baseline and target does the supply chain review give for supplier diversification?",
+    "reference": "Baseline 76%, target 71%, owned by Finance Group.",
+    "file": "04-supply-chain-resilience",
+    "evidence": "Supplier Diversification | 76% | 71% | Finance Group"
+  },
+  {
+    "id": 38,
+    "question": "Who owns demand forecasting in the supply chain resilience review and what target is set?",
+    "reference": "Finance Group; baseline 85%, target 95%.",
+    "file": "04-supply-chain-resilience",
+    "evidence": "Demand Forecasting | 85% | 95% | Finance Group"
+  },
+  {
+    "id": 39,
+    "question": "What are the baseline, target and owner of the first-week checklist in the onboarding guide?",
+    "reference": "Baseline 57%, target 76%, owned by Product Office.",
+    "file": "05-employee-onboarding-guide",
+    "evidence": "First-Week Checklist | 57% | 76% | Product Office"
+  },
+  {
+    "id": 40,
+    "question": "Which team owns training modules for onboarding, and what target is set?",
+    "reference": "Operations Team; baseline 88%, target 77%.",
+    "file": "05-employee-onboarding-guide",
+    "evidence": "Training Modules | 88% | 77% | Operations Team"
+  },
+  {
+    "id": 41,
+    "question": "Who owns user satisfaction in the AI chatbot evaluation and what is its target?",
+    "reference": "Finance Group; baseline 80%, target 89%.",
+    "file": "06-ai-chatbot-evaluation",
+    "evidence": "User Satisfaction | 80% | 89% | Finance Group"
+  },
+  {
+    "id": 42,
+    "question": "What target does the chatbot evaluation set for escalation handoff and who owns it?",
+    "reference": "Target 72% (baseline 56%), owned by Operations Team.",
+    "file": "06-ai-chatbot-evaluation",
+    "evidence": "Escalation Handoff | 56% | 72% | Operations Team"
+  },
+  {
+    "id": 43,
+    "question": "What are the baseline and target for energy yield in the solar microgrid pilot, and which team owns it?",
+    "reference": "Baseline 83%, target 98%, owned by Product Office.",
+    "file": "07-solar-microgrid-pilot",
+    "evidence": "Energy Yield | 83% | 98% | Product Office"
+  },
+  {
+    "id": 44,
+    "question": "Which group owns load balancing in the microgrid pilot and what are its baseline and target?",
+    "reference": "Finance Group; baseline 53%, target 73%.",
+    "file": "07-solar-microgrid-pilot",
+    "evidence": "Load Balancing | 53% | 73% | Finance Group"
+  },
+  {
+    "id": 45,
+    "question": "Who owns foot traffic in the cafe expansion plan and what are the baseline and target?",
+    "reference": "Engineering Leads; baseline 86%, target 79%.",
+    "file": "08-cafe-expansion-plan",
+    "evidence": "Foot Traffic | 86% | 79% | Engineering Leads"
+  },
+  {
+    "id": 46,
+    "question": "What target is set for menu costing in the cafe plan, and which team owns it?",
+    "reference": "Target 87% (baseline 90%), owned by Quality Office.",
+    "file": "08-cafe-expansion-plan",
+    "evidence": "Menu Costing | 90% | 87% | Quality Office"
+  },
+  {
+    "id": 47,
+    "question": "Who owns version deprecation in the API migration guide, and what are the baseline and target?",
+    "reference": "Regional Managers; baseline 64%, target 88%.",
+    "file": "09-api-migration-guide",
+    "evidence": "Version Deprecation | 64% | 88% | Regional Managers"
+  },
+  {
+    "id": 48,
+    "question": "What are the baseline and target for alert threshold in the database outage postmortem?",
+    "reference": "Baseline 71%, target 93%, owned by Quality Office.",
+    "file": "10-database-outage-postmortem",
+    "evidence": "Alert Threshold | 71% | 93% | Quality Office"
+  },
+  {
+    "id": 49,
+    "question": "Which team owns runbook gaps after the database outage and what target is set?",
+    "reference": "Operations Team; baseline 74%, target 94%.",
+    "file": "10-database-outage-postmortem",
+    "evidence": "Runbook Gaps | 74% | 94% | Operations Team"
+  },
+  {
+    "id": 50,
+    "question": "What baseline and target does the campaign brief give for creative testing, and who owns it?",
+    "reference": "Baseline 54%, target 72%, owned by Quality Office.",
+    "file": "11-marketing-campaign-brief",
+    "evidence": "Creative Testing | 54% | 72% | Quality Office"
+  },
+  {
+    "id": 51,
+    "question": "Who owns the campaign budget metric in the marketing campaign brief and what is its target?",
+    "reference": "Finance Group; baseline 83%, target 81%.",
+    "file": "11-marketing-campaign-brief",
+    "evidence": "Campaign Budget | 83% | 81% | Finance Group"
+  },
+  {
+    "id": 52,
+    "question": "Who owns the vendor selection RFP and what date does it carry?",
+    "reference": "People and Culture, dated 2026-06-12.",
+    "file": "20-vendor-selection-rfp",
+    "evidence": "Owner: People and Culture · Date: 2026-06-12"
+  },
+  {
+    "id": 53,
+    "question": "In the vendor selection RFP, what are the baseline and target for scoring criteria, and who owns it?",
+    "reference": "Baseline 79%, target 81%, owned by Finance Group.",
+    "file": "20-vendor-selection-rfp",
+    "evidence": "Scoring Criteria | 79% | 81% | Finance Group"
+  },
+  {
+    "id": 54,
+    "question": "Who owns total cost of ownership in the vendor RFP and what is the target?",
+    "reference": "Quality Office; baseline 76%, target 93%.",
+    "file": "20-vendor-selection-rfp",
+    "evidence": "Total Cost Of Ownership | 76% | 93% | Quality Office"
+  },
+  {
+    "id": 55,
+    "question": "What baseline and target are set for reference checks when selecting a vendor, and which team owns them?",
+    "reference": "Baseline 90%, target 75%, owned by Operations Team.",
+    "file": "20-vendor-selection-rfp",
+    "evidence": "Reference Checks | 90% | 75% | Operations Team"
+  },
+  {
+    "id": 56,
+    "question": "Which group is accountable for service levels in the RFP and what are the baseline and target?",
+    "reference": "Finance Group; baseline 65%, target 97%.",
+    "file": "20-vendor-selection-rfp",
+    "evidence": "Service Levels | 65% | 97% | Finance Group"
+  },
+  {
+    "id": 57,
+    "question": "Who owns the security questionnaire metric for vendor selection and what is the target?",
+    "reference": "Regional Managers; baseline 79%, target 82%.",
+    "file": "20-vendor-selection-rfp",
+    "evidence": "Security Questionnaire | 79% | 82% | Regional Managers"
+  },
+  {
+    "id": 58,
+    "question": "What are the contract terms baseline and target in the vendor selection RFP, and who owns them?",
+    "reference": "Baseline 50%, target 88%, owned by Product Office.",
+    "file": "20-vendor-selection-rfp",
+    "evidence": "Contract Terms | 50% | 88% | Product Office"
+  },
+  {
+    "id": 59,
+    "question": "In the vendor selection RFP executive summary, by how much did the security questionnaire move against the prior baseline?",
+    "reference": "11 percent.",
+    "file": "20-vendor-selection-rfp",
+    "evidence": "security questionnaire moved by 11 percent"
+  },
+  {
+    "id": 60,
+    "question": "How many weeks of paid maternity leave does Mekong Harvest Foods give?",
+    "unanswerable": true,
+    "reference": "The documents do not contain this information."
+  },
+  {
+    "id": 61,
+    "question": "Which vendor won the vendor selection RFP?",
+    "unanswerable": true,
+    "reference": "The documents do not contain this information."
+  },
+  {
+    "id": 62,
+    "question": "What is the total contract value in dollars of the vendor selection RFP?",
+    "unanswerable": true,
+    "reference": "The documents do not contain this information."
+  },
+  {
+    "id": 63,
+    "question": "What is the retail selling price of the 250g dried mango pouch?",
+    "unanswerable": true,
+    "reference": "The documents do not contain this information."
+  },
+  {
+    "id": 64,
+    "question": "What is the name of Mekong Harvest Foods' Chief Executive Officer?",
+    "unanswerable": true,
+    "reference": "The documents do not contain this information."
+  },
+  {
+    "id": 65,
+    "question": "What is the FY2027 capital expenditure budget?",
+    "unanswerable": true,
+    "reference": "The documents do not contain this information."
+  },
+  {
+    "id": 66,
+    "question": "How many seats will the new cafe have?",
+    "unanswerable": true,
+    "reference": "The documents do not contain this information."
+  },
+  {
+    "id": 67,
+    "question": "What interest rate do lenders charge Mekong Harvest Foods?",
+    "unanswerable": true,
+    "reference": "The documents do not contain this information."
+  }
+]
