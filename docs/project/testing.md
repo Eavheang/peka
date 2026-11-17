@@ -44,11 +44,13 @@ Counted on `main` at commit `4a08cd9`. The backend run in CI on 12 November 2026
 | **Backend total** | **328** | |
 | `webclient/utils/*.test.ts` | 9 | Citation excerpt matching; images and raw HTML dropped from answers |
 
+Since this count, the Google Drive folder sync (PR #131) grew `test_google_drive_api.py` from 6 to 14 tests and added `test_google_drive_sync_database.py` (3 tests, real PostgreSQL). The backend suite passed locally with 343 tests on 17 November 2026.
+
 **Not automated:** the full upload, index and answer pipeline with real models (covered by the system runs), the web client pages (no component or end-to-end tests), and usability.
 
 ## Test cases
 
-TC-01 to TC-24 are the Review 2 test cases (30 September 2026). TC-25 onwards were added for the final system. "Pass" means the named test passed in the CI run of 12 November 2026.
+TC-01 to TC-24 are the Review 2 test cases (30 September 2026). TC-25 onwards were added for the final system. "Pass" means the named test passed in the CI run of 12 November 2026; TC-43 to TC-45 passed in a local run on 17 November 2026, against a real PostgreSQL, with Google Drive replaced by a fake (PR #131).
 
 | ID | Requirement | Input | Expected | Actual | Status | Evidence |
 |----|-------------|-------|----------|--------|--------|----------|
@@ -94,6 +96,9 @@ TC-01 to TC-24 are the Review 2 test cases (30 September 2026). TC-25 onwards we
 | TC-40 | FR07 | A long history and question | Both fit one character budget; an oversize message is cut, not dropped | As expected | Pass | `test_history_and_question_share_one_character_budget`, `test_message_that_overflows_the_budget_is_cut_not_dropped` |
 | TC-41 | NFR03 | Upload, index and chat with no route outside the host | Works; outbound connections fail | As expected | Pass | [NFR03](objectives-and-evaluation.md#nfr03-offline-operation), 17 Nov 2026 |
 | TC-42 | NFR07 | Deploy from a clean clone | Signed in within 30 minutes | 5 min 16 s, with defect D-27 | Pass | [NFR07](objectives-and-evaluation.md#nfr07-deployment-time), 17 Nov 2026 |
+| TC-43 | FR02 | Folder sync run on a tree with subfolders: new, edited, unchanged, picked-but-unedited, deleted, unsupported, shortcut and duplicate files | New and edited files imported (old copy replaced), deleted ones removed, the rest left or skipped; files present at pick time recorded, not imported | As expected | Pass | `test_sync_imports_new_and_edited_files_and_removes_deleted_ones`, `test_first_sync_records_existing_files_without_importing` |
+| TC-44 | FR02 | One subfolder fails to list during a sync | Nothing imported or deleted; the run reports the failure | As expected | Pass | `test_sync_deletes_nothing_when_any_folder_fails_to_list` |
+| TC-45 | FR02 | Sync schedule and access: daily time in the folder's time zone, Sync now, staff calls, a demoted owner, refresh-token storage | Runs once a day after the local time; Sync now runs once; staff refused (403); a demoted owner's run fails visibly; tokens stored encrypted | As expected | Pass | `test_runs_once_a_day_at_local_time_and_on_request`, `test_folder_sync_is_admin_only`, `test_sync_stops_when_the_owner_is_no_longer_an_admin`, `test_refresh_tokens_are_encrypted` |
 
 **Summary:** 42 test cases; 40 passed, 2 retired with OKF, 0 failed, 0 not run.
 
@@ -104,7 +109,7 @@ Each requirement, the design and code that implement it, and the tests that chec
 | Requirement | Design | Module | Tests |
 |-------------|--------|--------|-------|
 | FR01 | [Security](../security.md) | `app/auth/` | TC-01, TC-02, TC-05 |
-| FR02 | [Design: components](design.md#components) | `app/google_drive/` | TC-25, TC-26 |
+| FR02 | [Design: components](design.md#components) | `app/google_drive/` | TC-25, TC-26, TC-43 to TC-45 |
 | FR03 | [Indexing](../architecture/indexing.md) | `app/files/` | TC-09, TC-11 |
 | FR04 | [Indexing: extraction](../architecture/indexing.md#extraction) | `app/engine/source_extractor.py` | TC-27 |
 | FR05 | — | Removed | TC-16, TC-17 retired |
