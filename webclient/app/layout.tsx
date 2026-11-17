@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "PEKA",
-  description: "PEKA - Personal Knowledge Base",
+  description: "PEKA - Private Enterprise Knowledge Assistant",
   icons: {
     icon: "/peka.svg",
   },

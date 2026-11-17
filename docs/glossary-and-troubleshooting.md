@@ -2,7 +2,7 @@
 
 | Term | Meaning |
 |------|---------|
-| **PEKA** | Personal Knowledge Base — this product |
+| **PEKA** | Private Enterprise Knowledge Assistant — this product |
 | **OKF** | Open Knowledge Format. An earlier design indexed LLM-written OKF pages; it was removed, and older results still mention it |
 | **index-worker** | Background process that drains `index_jobs`, chunks original text, and embeds |
 | **chunk set** | Versioned embedding index for a file (`building` → `active` → `superseded`) |
@@ -33,4 +33,8 @@
 | Admin pages redirect | User `role` must be `admin` (`GET /auth/me`) |
 | Compose UI can't reach API | `NEXT_PUBLIC_API_URL` should be `/api` in Docker builds; nginx up? |
 | Migration errors | Run `make migrate` from `config/`; ensure Postgres healthy |
-| llama profile won't start | NVIDIA toolkit, GGUF present, `model:` filename matches file under `config/model/` |
+| llama profile won't start | NVIDIA toolkit, GGUF present, `model:` filename matches file under `config/model/`. If `config/model/` is owned by root and empty, Docker created it because it was missing when llama started: remove it, create it as your user, put the model in, then `make llm` |
+| Web client restarts with `next: not found` (fresh `make setup`) | The first `bun install` into the new `node_modules` volume can leave the `next` package incomplete (defect D-27). Run `docker compose -f compose.yaml -f compose.dev.yaml run --rm webclient bun install --frozen-lockfile --force`, then `docker compose -f compose.yaml -f compose.dev.yaml restart webclient` |
+| `pytest` stops with `DATABASE_URL uses the old default Postgres password` | `service/.env` still has the pre-November default. Set `POSTGRES_PASSWORD` in `config/.env` and the matching `DATABASE_URL` in `service/.env` (see [Getting started: existing install](getting-started.md#existing-install)) |
+| Google Drive import returns 503 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_API_KEY`, `GOOGLE_APP_ID` and `APP_BASE_URL` must be set in `service/.env`, and the machine needs internet access |
+| Invite email not sent | `SMTP_*` unset or failing: the dialog shows the link to copy instead. Audit events show the failure reason |

@@ -22,8 +22,10 @@ If your session expires, the client tries one token refresh; if that fails you r
 1. Open **New chat** in the sidebar (`/workspace`).
 2. Optionally enable **web search** (stored in browser as `peka_web_search_enabled`). Needs a configured Exa key on the server.
 3. Type a question (max 4000 characters) and send.
-4. Watch streaming status/text. When finished, citations may appear under the answer.
+4. Watch streaming status/text. When finished, citations may appear under the answer. If other people's answers are being generated, the status reads "Waiting for other answers to finish..." until a model slot is free.
 5. The URL updates to `/workspace/<conversationId>` after the first message.
+
+**Stop and regenerate:** **Stop response** ends an answer while it streams; the text shown so far is kept and marked "Response stopped". **Regenerate response** asks the last question again and replaces the last answer.
 
 ### Continuing a chat
 
@@ -58,11 +60,21 @@ Path: `/workspace/knowledge`.
 
 ### Upload
 
-1. Drag/drop or choose files: `.pdf`, `.docx`, `.pptx`, `.xlsx`, `.md`, `.txt` (max 25 MB each).
+1. Drag/drop or choose files under **Your computer**: `.pdf`, `.docx`, `.pptx`, `.xlsx`, `.md`, `.txt` (max 25 MB each). Or use **Import from Drive** (see below).
 2. Choose access level:
    - **General** — visible to staff, senior, admin  
    - **Confidential** — senior + admin only (**setting confidential requires admin**)
 3. Submit. Files appear with indexing status.
+
+### Import from Google Drive
+
+Available when the server has Google credentials (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_API_KEY`, `GOOGLE_APP_ID`) and internet access.
+
+1. Under **Google Drive**, choose **Import from Drive**. The first time, sign in with Google and allow access; you return to the Knowledge library with "Google Drive connected."
+2. Pick up to 50 files in the Google Picker. Google Docs, Sheets and Slides are exported as DOCX, XLSX and PPTX.
+3. Set each file's access level and submit. Keep the page open until the import finishes.
+
+The import is a one-time copy: later edits in Drive are not picked up. To refresh a file, delete the old copy and import it again. PEKA only sees the files you pick (Google scope `drive.file`).
 
 ### Status meanings
 
@@ -88,6 +100,7 @@ Path: `/workspace/knowledge`.
 
 - Update **display name**
 - Change **password** (min 12 characters). After a successful change you are signed out and must sign in again (tokens revoked).
+- **Appearance:** pick one of four themes (Clay, Daylight, Sage, Midnight). It applies right away and is saved in this browser only.
 
 ---
 
@@ -107,9 +120,17 @@ First admin can also be bootstrapped via `ADMIN_EMAIL` / `ADMIN_PASSWORD` on API
 
 ---
 
+## Admin: audit events
+
+**Who:** `admin` only. Path: `/workspace/admin/audit` (button **Audit events** on the User management page).
+
+The table lists sync (indexing finished or failed), query (a chat turn) and system (sign-in, denied admin request) events, newest first, with the actor and a summary. Filter by type and page with **Next**. Questions and answers themselves are never stored in the log.
+
+---
+
 ## Admin: provider settings
 
-**Who:** `admin` only. Path: `/workspace/admin/settings`.
+**Who:** `admin` only. Path: `/workspace/admin/settings` (button **Workspace settings** on the User management page).
 
 Configure or override:
 
@@ -131,6 +152,8 @@ Actions: **Test** connection, **Save**. Keys are never returned on GET—only �
 | Change file access level | | | ✓ |
 | Manage users | | | ✓ |
 | Provider settings | | | ✓ |
+| Audit events | | | ✓ |
+| Import from Google Drive (general files) | ✓ | ✓ | ✓ |
 
 ---
 

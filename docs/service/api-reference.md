@@ -83,7 +83,7 @@ Roles: `admin` | `senior` | `staff`.
 
 | Method | Path | Auth | Body / query | Response |
 |--------|------|------|--------------|----------|
-| `POST` | `/chat` | bearer | `{ query, conversation_id?, web_search? }` | `ChatResponse` |
+| `POST` | `/chat` | bearer | `{ query, conversation_id?, new_conversation_id?, web_search?, regenerate?, timezone? }` | `ChatResponse`; 409 when `regenerate` has no last answer to replace |
 | `POST` | `/chat/stream` | bearer | same | SSE `text/event-stream` |
 | `POST` | `/chat/source-preview` | bearer | `{ chunk_id?, title, heading }` | `{ content, file_id? }` or 404 |
 | `GET` | `/chat/conversations` | bearer | `limit` 1–50 (default 15), `cursor?` | `{ items, next_cursor }` |
@@ -95,6 +95,21 @@ Roles: `admin` | `senior` | `staff`.
 ### Stream events
 
 Lines of the form `data: <payload>`. Event kinds: `status`, `text`, `done`, `error`, then `data: [DONE]`.
+
+---
+
+## Google Drive import — `/integrations/google`
+
+Needs `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_API_KEY`, `GOOGLE_APP_ID` and `APP_BASE_URL`; otherwise 503. Scope `drive.file`: PEKA only reaches files the user picks.
+
+| Method | Path | Auth | Body / notes | Response |
+|--------|------|------|--------------|----------|
+| `GET` | `/integrations/google/connect` | bearer | Start Google sign-in | `{ url }`; 503 not configured |
+| `GET` | `/integrations/google/callback` | none (signed `state`) | Google redirects here; stores the refresh token for the user in `state` | Redirect to `/workspace/knowledge?google_drive=connected` or `error` |
+| `GET` | `/integrations/google/picker` | bearer | Short-lived token for the Google Picker | `{ access_token, api_key, app_id }`; 409 not connected; 502 Google error |
+| `POST` | `/integrations/google/files` | bearer | `{ files: [{ id, access_level }] }`, 1 to 50 files. Google Docs, Sheets and Slides are exported as DOCX, XLSX and PPTX | `FileResponse[]` 201; 403 confidential non-admin; 409 duplicate or not connected; 413 too large; 415 unsupported |
+
+The import is a one-time copy; later changes in Drive are not synced (issue #102).
 
 ---
 

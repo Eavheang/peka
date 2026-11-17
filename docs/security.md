@@ -80,6 +80,18 @@ Use a secret manager in real deployments.
 
 `compose.yaml` publishes only the nginx proxy (`WEBCLIENT_PORT`, default 3000). Dev publishes Postgres on `127.0.0.1:5432` and the API on `127.0.0.1:8000`. pgAdmin is opt-in on `127.0.0.1:5050`. The llama profile publishes `127.0.0.1:8080`. To open a dev port on the LAN, edit the bind address in `config/compose.dev.yaml` (for example `"127.0.0.1:5432:5432"` to `"5432:5432"`). Postgres is protected only by its password, and llama has no authentication.
 
+## Network boundary
+
+In local mode (the default), documents, embeddings, search, reranking and the language model stay on the machine. This was tested on 17 November 2026 with the stack's network cut off from the outside: upload, indexing and a cited answer all worked ([NFR03](project/objectives-and-evaluation.md#nfr03-offline-operation)).
+
+| Leaves the machine | When | What is sent |
+|--------------------|------|--------------|
+| First setup | Once | Docker image pulls and the embedding and reranking model downloads; the language model file is downloaded by hand |
+| Hosted language model | Only if an admin sets a non-local `LLM_BASE_URL` | The question, recent history and the retrieved passages for that turn. Never whole files, embeddings or the index |
+| Web search (Exa) | Only when a user turns it on for a question and `EXA_API_KEY` is set | The search query |
+| Invitation email | Only when `SMTP_*` is set | The invitee's email address and the invite link |
+| Google Drive import | Only when `GOOGLE_*` is set and a user imports | Google sign-in and the picked files' download. The Drive refresh token is stored in `google_drive_connections` as plain text; its scope (`drive.file`) only reaches files the user picked |
+
 ## Prompt injection and answer rendering
 
 Indexed documents are untrusted, any signed-in user can upload general files, and the model can repeat Markdown planted in those documents.

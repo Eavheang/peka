@@ -4,7 +4,7 @@ This page is for someone who wants to run PEKA on their own machine and use it. 
 
 ## What PEKA is
 
-PEKA (Personal Knowledge Base) is an organization-private assistant. You upload documents (PDF, Word, PowerPoint, Excel, Markdown or text), PEKA indexes them, and you ask questions in a chat. Each answer cites the passages it came from, and people only see documents their role allows. Everything runs on your own machine: the database, the embedding and reranking models and, optionally, the language model. See [What is PEKA?](what-is-peka.md) and [How it works](how-it-works.md).
+PEKA (Private Enterprise Knowledge Assistant) is an organization-private assistant. You upload documents (PDF, Word, PowerPoint, Excel, Markdown or text), PEKA indexes them, and you ask questions in a chat. Each answer cites the passages it came from, and people only see documents their role allows. Everything runs on your own machine: the database, the embedding and reranking models and, optionally, the language model. See [What is PEKA?](what-is-peka.md) and [How it works](how-it-works.md).
 
 ## Minimum requirements
 
@@ -36,7 +36,7 @@ Software:
 
 Run the Compose commands from `config/`.
 
-1. **Get the model.** Download the Gemma 4 E4B QAT GGUF (`UD-Q4_K_XL` quantisation) and save it as `config/model/gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf`. The file name must match `model:` in `config/llama/config.yaml`. The folder is gitignored.
+1. **Get the model.** Download the Gemma 4 E4B QAT GGUF (`UD-Q4_K_XL` quantisation) and save it as `config/model/gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf` (the build used here is from the Hugging Face repository `unsloth/gemma-4-E4B-it-qat-GGUF`). A fresh clone has no `config/model/` folder, because it is gitignored, so create it first (`mkdir -p config/model`). The file name must match `model:` in `config/llama/config.yaml`.
 2. **Create the service settings.**
 
    ```bash

@@ -1,6 +1,6 @@
 # PEKA
 
-PEKA (Personal Knowledge Base) is a self-hosted assistant for an organization's documents. Upload your files, ask questions in chat, and get answers that cite the passages they came from.
+PEKA (Private Enterprise Knowledge Assistant) is a self-hosted assistant for an organization's documents. Upload your files, ask questions in chat, and get answers that cite the passages they came from.
 
 It can run entirely on your own machine, including the language model.
 
@@ -103,7 +103,7 @@ Measured on a laptop with an RTX 3060 (6 GB VRAM) and the local model, using 67 
 - 57 of 59 answerable questions were answered correctly, 1 partly, and 1 was wrongly declined.
 - All 8 unanswerable questions were declined.
 
-These figures come from one test corpus and were graded by a single person. See the [final report](docs/final-report.md) for the method, limits, and multi-user results. Evaluation scripts and test documents are not included in this repository.
+These figures come from one test corpus and were graded by a single person. See the [final report](docs/final-report.md) for the method, limits, and multi-user results. Evaluation scripts, question sets and raw results are in [`eval/`](eval/README.md); the test documents are not included in this repository.
 
 ## Security
 
@@ -120,4 +120,5 @@ See [Security](docs/security.md) for details.
 - **Use it:** [What is PEKA?](docs/what-is-peka.md) · [User guide](docs/user-guide.md) · [System requirements](docs/system-requirements.md)
 - **Understand it:** [How it works](docs/how-it-works.md) · [Indexing](docs/architecture/indexing.md) · [Chat and retrieval](docs/architecture/chat-and-rag.md)
 - **Build on it:** [Getting started](docs/getting-started.md) · [Architecture](docs/architecture/overview.md) · [API reference](docs/service/api-reference.md) · [Docker and config](docs/config/README.md)
+- **Project record:** [Requirements, design, testing and evaluation](docs/project/README.md) · [Backup and restore](docs/backup-and-restore.md)
 - **All documentation:** [docs/](docs/README.md)

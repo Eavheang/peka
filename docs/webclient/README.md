@@ -2,7 +2,7 @@
 
 Next.js App Router UI for PEKA: marketing landing, sign-in, workspace chat with citations, knowledge library, account settings, and admin user/provider management.
 
-App metadata title: **PEKA** — description: **PEKA - Personal Knowledge Base**.
+App metadata title: **PEKA** — description: **PEKA - Private Enterprise Knowledge Assistant**.
 
 ## Tech stack
 
