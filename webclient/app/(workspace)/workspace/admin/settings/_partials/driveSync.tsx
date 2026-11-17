@@ -92,6 +92,23 @@ export default function DriveSync() {
     });
   }
 
+  function saveSync() {
+    save.mutate(
+      { ...form, timezone },
+      {
+        onSuccess: () => {
+          setDraft({});
+          toast.add({ title: "Folder sync saved.", type: "success" });
+        },
+        onError: (error) =>
+          toast.add({
+            title: getApiErrorMessage(error, "Unable to save the folder sync."),
+            type: "error",
+          }),
+      },
+    );
+  }
+
   function stopSync() {
     stop.mutate(undefined, {
       onSuccess: () => {
@@ -103,30 +120,45 @@ export default function DriveSync() {
     });
   }
 
+  const loaded = !sync.isLoading && !sync.isError;
+
   return (
-    <SettingsSection
-      title="Google Drive sync"
-      description="Once a day, new and edited files in one Drive folder and its subfolders are added to the knowledge base, and files deleted from it are removed. Files already in the folder when you pick it are skipped until they are edited."
-    >
-      <form
-        className="flex flex-col gap-4"
-        onSubmit={(event) => {
-          event.preventDefault();
-          save.mutate(
-            { ...form, timezone },
-            {
-              onSuccess: () => {
-                setDraft({});
-                toast.add({ title: "Folder sync saved.", type: "success" });
-              },
-              onError: (error) =>
-                toast.add({
-                  title: getApiErrorMessage(error, "Unable to save the folder sync."),
-                  type: "error",
-                }),
-            },
-          );
-        }}
+    <>
+      <SettingsSection
+        title="Google Drive sync"
+        description="Once a day, new and edited files in one Drive folder and its subfolders are added to the knowledge base, and files deleted from it are removed. Files already in the folder are added on the first sync after you pick it."
+        onSubmit={saveSync}
+        actions={
+          loaded && (
+            <>
+              <Button type="submit" disabled={!form.folder_id || save.isPending}>
+                {save.isPending ? "Saving…" : "Save folder sync"}
+              </Button>
+              {current && (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={run.isPending || current.run_requested}
+                    aria-disabled={offline || undefined}
+                    onClick={runNow}
+                  >
+                    Sync now
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    className="sm:ml-auto"
+                    disabled={stop.isPending}
+                    onClick={() => setConfirmStop(true)}
+                  >
+                    Stop syncing
+                  </Button>
+                </>
+              )}
+            </>
+          )
+        }
       >
         {sync.isLoading ? (
           <div
@@ -212,35 +244,9 @@ export default function DriveSync() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex flex-wrap gap-3">
-              <Button type="submit" disabled={!form.folder_id || save.isPending}>
-                {save.isPending ? "Saving…" : "Save folder sync"}
-              </Button>
-              {current && (
-                <>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={run.isPending || current.run_requested}
-                    aria-disabled={offline || undefined}
-                    onClick={runNow}
-                  >
-                    Sync now
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    disabled={stop.isPending}
-                    onClick={() => setConfirmStop(true)}
-                  >
-                    Stop syncing
-                  </Button>
-                </>
-              )}
-            </div>
           </>
         )}
-      </form>
+      </SettingsSection>
       <Alertdialog
         open={confirmStop}
         onOpenChange={setConfirmStop}
@@ -250,6 +256,6 @@ export default function DriveSync() {
         onConfirm={stopSync}
         pending={stop.isPending}
       />
-    </SettingsSection>
+    </>
   );
 }

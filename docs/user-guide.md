@@ -143,13 +143,13 @@ The table lists sync (indexing finished or failed), query (a chat turn) and syst
 
 **Who:** `admin` only. Path: `/workspace/admin/settings` (**Workspace settings** tab).
 
-Three sections:
+Three cards, one per feature. Each card has its own **Save** button that saves only that card:
 
 - **Language model**: base URL, model, API key  
 - **Web search**: Exa base URL, API key  
 - **Google Drive sync**: see [Google Drive folder sync](#google-drive-folder-sync-admin) (shown only when Google Drive is configured)
 
-Actions: **Test connection** (tests the saved settings, so save first) and **Save provider settings** (saves the language model and web search together). Keys are never returned on GET—only “configured” flags. Saved values live in the database and override env for LLM/Exa at runtime. Embeddings stay on environment variables.
+The language model and web search cards also have **Test connection**, which tests the saved settings, so save first. Keys are never returned on GET—only “configured” flags. Saved values live in the database and override env for LLM/Exa at runtime. Embeddings stay on environment variables.
 
 ---
 
