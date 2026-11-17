@@ -134,22 +134,22 @@ export function KnowledgeTable({
         <TableHeader className="bg-secondary/70">
           <TableRow className="border-border hover:bg-secondary/70">
             {canManageAccess && <TableHead className="w-12 px-3 py-4" />}
-            <TableHead className="px-5 py-4 text-xs uppercase tracking-[0.14em] text-muted">
+            <TableHead>
               Name
             </TableHead>
-            <TableHead className="px-5 py-4 text-xs uppercase tracking-[0.14em] text-muted">
+            <TableHead>
               Uploaded
             </TableHead>
-            <TableHead className="px-5 py-4 text-xs uppercase tracking-[0.14em] text-muted">
+            <TableHead>
               Type
             </TableHead>
-            <TableHead className="px-5 py-4 text-xs uppercase tracking-[0.14em] text-muted">
+            <TableHead>
               Access
             </TableHead>
-            <TableHead className="px-5 py-4 text-xs uppercase tracking-[0.14em] text-muted">
+            <TableHead>
               Status
             </TableHead>
-            <TableHead className="px-5 py-4 text-right text-xs uppercase tracking-[0.14em] text-muted">
+            <TableHead className="text-right">
               Actions
             </TableHead>
           </TableRow>

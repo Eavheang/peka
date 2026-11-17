@@ -27,6 +27,8 @@ import { useDriveConnectResult } from "@/hooks/useDriveConnectResult";
 import { useServerStatus } from "@/services/status";
 import { getApiErrorMessage } from "@/utils/api-error";
 
+import SettingsSection, { FIELD_LABEL } from "./settingsSection";
+
 type DriveSyncForm = Omit<DriveSyncUpdate, "timezone">;
 
 const EMPTY_FORM: DriveSyncForm = {
@@ -102,9 +104,12 @@ export default function DriveSync() {
   }
 
   return (
-    <>
+    <SettingsSection
+      title="Google Drive sync"
+      description="Once a day, new and edited files in one Drive folder and its subfolders are added to the knowledge base, and files deleted from it are removed. Files already in the folder when you pick it are skipped until they are edited."
+    >
       <form
-        className="flex flex-col gap-4 rounded-xl border border-border p-5"
+        className="flex flex-col gap-4"
         onSubmit={(event) => {
           event.preventDefault();
           save.mutate(
@@ -123,14 +128,6 @@ export default function DriveSync() {
           );
         }}
       >
-        <div>
-          <h2 className="font-semibold">Google Drive folder sync</h2>
-          <p className="mt-1 text-sm text-muted">
-            Once a day, new and edited files in this folder and its subfolders are added to the
-            knowledge base, and files deleted from it are removed. Files already in the folder when
-            you pick it are skipped until they are edited.
-          </p>
-        </div>
         {sync.isLoading ? (
           <div
             role="status"
@@ -138,12 +135,14 @@ export default function DriveSync() {
             className="h-24 animate-pulse rounded-lg bg-secondary motion-reduce:animate-none"
           />
         ) : sync.isError ? (
-          <p className="text-sm text-danger">Unable to load folder sync.</p>
+          <p className="text-sm text-danger" role="alert">
+            Unable to load folder sync. Refresh the page to try again.
+          </p>
         ) : (
           <>
             {current && (
               <div
-                className="flex flex-col gap-1 rounded-lg bg-muted/40 p-3 text-sm"
+                className="flex flex-col gap-1 rounded-lg border border-border bg-secondary/60 p-3 text-sm"
                 aria-live="polite"
               >
                 <p>
@@ -159,9 +158,9 @@ export default function DriveSync() {
                 </p>
               </div>
             )}
-            <div className="flex flex-col gap-1 text-sm">
+            <div className={FIELD_LABEL}>
               Folder
-              <div className="flex items-center gap-3">
+              <div className="flex min-w-0 items-center gap-3 font-normal">
                 <Button
                   type="button"
                   variant="outline"
@@ -171,16 +170,18 @@ export default function DriveSync() {
                 >
                   {form.folder_id ? "Change folder" : "Choose folder"}
                 </Button>
-                <span className="truncate text-muted">
+                <span className="min-w-0 truncate text-muted">
                   {form.folder_name || "No folder chosen"}
                 </span>
               </div>
             </div>
-            <label className="flex flex-col gap-1 text-sm">
+            <label className={FIELD_LABEL}>
               Daily sync time ({timezone})
               <Input
                 required
                 type="time"
+                name="sync_time"
+                className="w-40"
                 value={form.sync_time}
                 onChange={(e) => setDraft({ ...draft, sync_time: e.target.value })}
               />
@@ -190,7 +191,7 @@ export default function DriveSync() {
                 Saved for {current.timezone}. Saving switches it to this browser’s time zone.
               </p>
             )}
-            <div className="flex flex-col gap-1 text-sm">
+            <div className={FIELD_LABEL}>
               Access level for synced files
               <Select
                 items={ACCESS_LEVELS}
@@ -249,6 +250,6 @@ export default function DriveSync() {
         onConfirm={stopSync}
         pending={stop.isPending}
       />
-    </>
+    </SettingsSection>
   );
 }

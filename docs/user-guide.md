@@ -78,7 +78,7 @@ The import is a one-time copy: later edits in Drive are not picked up. To refres
 
 ### Google Drive folder sync (admin)
 
-An admin picks one Drive folder as the source of truth under **Admin → Provider settings → Google Drive folder sync**.
+An admin picks one Drive folder as the source of truth under **Admin → Workspace settings → Google Drive sync**.
 
 1. Choose **Choose folder**. The first time, Google asks for read access to your whole Drive (`drive.readonly`), because PEKA must see files added to the folder later. You return to the settings page; choose the folder again.
 2. Set the **daily sync time** (default 00:00, in this browser's time zone) and the access level for synced files, then **Save folder sync**.
@@ -117,7 +117,7 @@ If the server is offline at sync time, the sync runs once it is back online. Man
 
 ## Admin: users
 
-**Who:** `admin` only. Path: `/workspace/admin`. Non-admins are redirected to `/workspace`.
+**Who:** `admin` only. Path: `/workspace/admin` (**Users** tab). Non-admins are redirected to `/workspace`. The Admin area has three tabs: **Users**, **Workspace settings** and **Audit log**.
 
 | Task | Behavior |
 |------|----------|
@@ -131,24 +131,25 @@ First admin can also be bootstrapped via `ADMIN_EMAIL` / `ADMIN_PASSWORD` on API
 
 ---
 
-## Admin: audit events
+## Admin: audit log
 
-**Who:** `admin` only. Path: `/workspace/admin/audit` (button **Audit events** on the User management page).
+**Who:** `admin` only. Path: `/workspace/admin/audit` (**Audit log** tab).
 
 The table lists sync (indexing finished or failed), query (a chat turn) and system (sign-in, denied admin request) events, newest first, with the actor and a summary. Filter by type and page with **Next**. Questions and answers themselves are never stored in the log.
 
 ---
 
-## Admin: provider settings
+## Admin: workspace settings
 
-**Who:** `admin` only. Path: `/workspace/admin/settings` (button **Workspace settings** on the User management page).
+**Who:** `admin` only. Path: `/workspace/admin/settings` (**Workspace settings** tab).
 
-Configure or override:
+Three sections:
 
-- LLM base URL, model, API key  
-- Exa base URL, API key  
+- **Language model**: base URL, model, API key  
+- **Web search**: Exa base URL, API key  
+- **Google Drive sync**: see [Google Drive folder sync](#google-drive-folder-sync-admin) (shown only when Google Drive is configured)
 
-Actions: **Test** connection, **Save**. Keys are never returned on GET—only “configured” flags. Saved values live in the database and override env for LLM/Exa at runtime. Embeddings stay on environment variables.
+Actions: **Test connection** (tests the saved settings, so save first) and **Save provider settings** (saves the language model and web search together). Keys are never returned on GET—only “configured” flags. Saved values live in the database and override env for LLM/Exa at runtime. Embeddings stay on environment variables.
 
 ---
 
@@ -162,8 +163,8 @@ Actions: **Test** connection, **Save**. Keys are never returned on GET—only �
 | Upload confidential | | | ✓ |
 | Change file access level | | | ✓ |
 | Manage users | | | ✓ |
-| Provider settings | | | ✓ |
-| Audit events | | | ✓ |
+| Workspace settings | | | ✓ |
+| Audit log | | | ✓ |
 | Import from Google Drive (general files) | ✓ | ✓ | ✓ |
 | Google Drive folder sync | | | ✓ |
 

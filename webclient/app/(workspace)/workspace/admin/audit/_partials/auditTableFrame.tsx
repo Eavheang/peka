@@ -11,10 +11,7 @@ export default function AuditTableFrame({ children }: { children: ReactNode }) {
         <TableHeader className="bg-secondary/70">
           <TableRow className="border-border hover:bg-secondary/70">
             {AUDIT_TABLE_COLUMNS.map((column) => (
-              <TableHead
-                key={column}
-                className="px-5 py-4 text-xs uppercase tracking-[0.14em] text-muted"
-              >
+              <TableHead key={column}>
                 {column}
               </TableHead>
             ))}

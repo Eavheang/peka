@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
 import { useChangePassword, useGetCurrentUser, useUpdateProfile } from "@/services/auth";
 import { endSession, getStoredToken } from "@/utils/auth-storage";
+import { ROUTE } from "@/variables/routes";
 import { THEMES, type ThemeId, getTheme, setTheme } from "@/utils/theme";
 
 type ProfileForm = { display_name: string };
@@ -116,7 +117,7 @@ export default function ProfileSettingsPage() {
               </p>
               <Link
                 className="mt-4 inline-flex h-9 w-full items-center justify-center rounded-lg border border-border bg-background px-3 text-sm font-medium hover:bg-secondary"
-                href="/workspace/admin/settings"
+                href={ROUTE.ADMIN_SETTINGS}
               >
                 Open workspace settings
               </Link>

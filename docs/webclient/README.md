@@ -65,8 +65,9 @@ Route groups `(public)` / `(workspace)` do not appear in the URL.
 | `/workspace/[conversationId]` | Existing conversation |
 | `/workspace/knowledge` | Upload + file table |
 | `/workspace/settings` | Profile + password |
-| `/workspace/admin` | User management (admin) |
-| `/workspace/admin/settings` | LLM / Exa providers (admin) |
+| `/workspace/admin` | Users and invitations (admin); `admin/layout.tsx` adds the tabs and the admin-only check |
+| `/workspace/admin/settings` | Language model, web search, Google Drive sync (admin) |
+| `/workspace/admin/audit` | Audit log (admin) |
 
 ### Sidebar nav (`variables/routes.ts`)
 

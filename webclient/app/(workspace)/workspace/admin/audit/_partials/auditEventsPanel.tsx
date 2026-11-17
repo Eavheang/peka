@@ -22,7 +22,7 @@ export default function AuditEventsPanel({ type }: { type?: AuditEventType }) {
   if (eventsQuery.isError && !eventsQuery.data) {
     return (
       <p className="text-sm text-danger" role="alert">
-        Unable to load audit events.
+        Unable to load audit events. Refresh the page to try again.
       </p>
     );
   }
@@ -63,7 +63,7 @@ export default function AuditEventsPanel({ type }: { type?: AuditEventType }) {
               variant="outline"
               onClick={() => void goNext()}
             >
-              {eventsQuery.isFetchingNextPage ? "Loading..." : "Next"}
+              {eventsQuery.isFetchingNextPage ? "Loading…" : "Next"}
             </Button>
           </div>
         </div>

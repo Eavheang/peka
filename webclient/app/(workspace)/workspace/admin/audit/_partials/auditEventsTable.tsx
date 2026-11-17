@@ -20,7 +20,7 @@ export default function AuditEventsTable({ events }: { events: AuditEvent[] }) {
           <TableCell className="px-5 py-4 font-medium text-foreground">
             {AUDIT_EVENT_TYPE_LABELS[event.type]}
           </TableCell>
-          <TableCell className="px-5 py-4 text-foreground">
+          <TableCell className="px-5 py-4 text-foreground tabular-nums">
             <time dateTime={event.created_at}>
               {new Date(event.created_at).toLocaleString(undefined, {
                 dateStyle: "medium",

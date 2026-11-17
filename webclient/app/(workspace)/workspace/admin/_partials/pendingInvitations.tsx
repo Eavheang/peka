@@ -64,16 +64,16 @@ export default function PendingInvitations({ onResent }: PendingInvitationsProps
         <Table>
           <TableHeader className="bg-secondary/70">
             <TableRow className="border-border hover:bg-secondary/70">
-              <TableHead className="px-5 py-4 text-xs uppercase tracking-[0.14em] text-muted">
+              <TableHead>
                 Email
               </TableHead>
-              <TableHead className="px-5 py-4 text-xs uppercase tracking-[0.14em] text-muted">
+              <TableHead>
                 Role
               </TableHead>
-              <TableHead className="px-5 py-4 text-xs uppercase tracking-[0.14em] text-muted">
+              <TableHead>
                 Expires
               </TableHead>
-              <TableHead className="px-5 py-4 text-center text-xs uppercase tracking-[0.14em] text-muted">
+              <TableHead className="text-center">
                 Actions
               </TableHead>
             </TableRow>
