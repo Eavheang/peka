@@ -73,10 +73,10 @@ AnythingLLM is an open-source (MIT) application for chatting with documents thro
 | Model | Hosted providers [4] | Gemini (hosted) | Any OpenAI-compatible server | Built-in local engine or many providers | Local Gemma 4 E4B by default; optional OpenAI-compatible endpoint |
 | Document access control | Workspace access rules [3] | Not verified | No roles in the open-source project [6] | Three roles, access per workspace [8] | Three roles and a level per document, enforced inside the search query |
 | Citations | Yes [3] | Inline [5] | Yes [6] | Yes [7] | Built by the server from search results, with page, slide, sheet or section |
-| Works with no internet | No | No | Depends on setup [6] | Locally by default; some features call out [7] | Yes after setup, tested (NFR03) |
+| Works with no internet | No | No | Depends on setup [6] | Locally by default; some features call out [7] | Yes after setup, tested (NFR03); internet features pause offline |
 | Evaluation on stated hardware | Not published | Not published | Not verified | Not verified | Recall, answers, latency and load published for a 6 GB GPU |
 | Cost | Business or Enterprise plan [3] | Free and paid tiers (pricing not verified) | Free (Apache-2.0) | Free (MIT) | Free; hardware and running costs only |
-| Main limitation | Data processed in the cloud | Data processed in the cloud; manual sources | No user management | Workspace-level access only | English only; slower than hosted models; one machine; Drive import not synced |
+| Main limitation | Data processed in the cloud | Data processed in the cloud; manual sources | No user management | Workspace-level access only | English only; slower than hosted models; one machine; Drive sync limited to one folder, once a day |
 
 ## The gap PEKA addresses
 

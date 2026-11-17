@@ -90,7 +90,8 @@ In local mode (the default), documents, embeddings, search, reranking and the la
 | Hosted language model | Only if an admin sets a non-local `LLM_BASE_URL` | The question, recent history and the retrieved passages for that turn. Never whole files, embeddings or the index |
 | Web search (Exa) | Only when a user turns it on for a question and `EXA_API_KEY` is set | The search query |
 | Invitation email | Only when `SMTP_*` is set | The invitee's email address and the invite link |
-| Google Drive import | Only when `GOOGLE_*` is set and a user imports | Google sign-in and the picked files' download. The Drive refresh token is stored in `google_drive_connections` as plain text; its scope (`drive.file`) only reaches files the user picked |
+| Google Drive import | Only when `GOOGLE_*` is set and a user imports | Google sign-in and the picked files' download. The Drive refresh token is stored encrypted in `google_drive_connections`; its scope (`drive.file`) only reaches files the user picked |
+| Google Drive folder sync | Only when an admin sets it up; daily at the chosen time and on **Sync now** | Listing of the chosen folder tree and downloads of new and edited files, with the admin's token. That token has `drive.readonly`, which reads the admin's whole Drive, so all refresh tokens are Fernet-encrypted with a key derived from `JWT_SECRET_KEY` (rotating it means reconnecting Drive). Sync stops if the owner is no longer an active admin |
 
 ## Prompt injection and answer rendering
 

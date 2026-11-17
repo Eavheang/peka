@@ -101,16 +101,37 @@ Lines of the form `data: <payload>`. Event kinds: `status`, `text`, `done`, `err
 
 ## Google Drive import — `/integrations/google`
 
-Needs `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_API_KEY`, `GOOGLE_APP_ID` and `APP_BASE_URL`; otherwise 503. Scope `drive.file`: PEKA only reaches files the user picks.
+Needs `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_API_KEY`, `GOOGLE_APP_ID` and `APP_BASE_URL`; otherwise 503. Import uses scope `drive.file`: PEKA only reaches files the user picks. Folder sync (admin only, `/integrations/google/sync/*`) adds `drive.readonly`, because it lists files nobody picked.
 
 | Method | Path | Auth | Body / notes | Response |
 |--------|------|------|--------------|----------|
 | `GET` | `/integrations/google/connect` | bearer | Start Google sign-in | `{ url }`; 503 not configured |
-| `GET` | `/integrations/google/callback` | none (signed `state`) | Google redirects here; stores the refresh token for the user in `state` | Redirect to `/workspace/knowledge?google_drive=connected` or `error` |
+| `GET` | `/integrations/google/callback` | none (signed `state`) | Google redirects here; stores the encrypted refresh token for the user in `state` | Redirect to the page that started it (`/workspace/knowledge` or `/workspace/admin/settings`) with `?google_drive=connected` or `error` |
 | `GET` | `/integrations/google/picker` | bearer | Short-lived token for the Google Picker | `{ access_token, api_key, app_id }`; 409 not connected; 502 Google error |
 | `POST` | `/integrations/google/files` | bearer | `{ files: [{ id, access_level }] }`, 1 to 50 files. Google Docs, Sheets and Slides are exported as DOCX, XLSX and PPTX | `FileResponse[]` 201; 403 confidential non-admin; 409 duplicate or not connected; 413 too large; 415 unsupported |
 
-The import is a one-time copy; later changes in Drive are not synced (issue #102).
+The import is a one-time copy; later changes in Drive are not synced. For that, an admin sets up folder sync.
+
+### Folder sync — admin only
+
+One workspace-wide folder. Once a day at `sync_time` in `timezone`, or within a minute of **Sync now**, the index worker lists the folder and all its subfolders and:
+
+- imports files that are new since the last run, and files that changed in Drive (the old copy is deleted after the new one is stored);
+- deletes the PEKA copy of files removed from the tree (deleted, trashed or moved out). Nothing is deleted unless every folder in the tree listed without error;
+- skips unsupported, too large and duplicate files.
+
+Files already in the folder when it is picked are recorded and skipped until they are edited. Stopping the sync or picking another folder keeps the files already synced. Each run writes a `sync` audit event.
+
+| Method | Path | Auth | Body / notes | Response |
+|--------|------|------|--------------|----------|
+| `GET` | `/integrations/google/sync/connect` | admin | Start Google sign-in with `drive.readonly` added; returns to the admin settings page | `{ url }`; 503 not configured |
+| `GET` | `/integrations/google/sync/picker` | admin | Picker token for choosing the sync folder | `{ access_token, api_key, app_id }`; 409 until the connection has `drive.readonly`; 502 Google error |
+| `GET` | `/integrations/google/sync` | admin | Current settings and the last run | `DriveSyncSettings` or `null` |
+| `PUT` | `/integrations/google/sync` | admin | `{ folder_id, folder_name, access_level, timezone (IANA), sync_time ("HH:MM") }`. Makes this admin the owner (their Drive is read). A different folder starts over and is listed again; a changed time or time zone applies today | `DriveSyncSettings`; 422 bad time zone or folder ID |
+| `POST` | `/integrations/google/sync/run` | admin | Sync now | 202; 404 not set up; 503 offline |
+| `DELETE` | `/integrations/google/sync` | admin | Stop syncing; synced files stay | 204 |
+
+`DriveSyncSettings` adds `owner_email`, `run_requested` (true from **Sync now** or a new folder until that run finishes), `last_synced_at` and `last_result` to the `PUT` body.
 
 ---
 

@@ -74,7 +74,18 @@ Available when the server has Google credentials (`GOOGLE_CLIENT_ID`, `GOOGLE_CL
 2. Pick up to 50 files in the Google Picker. Google Docs, Sheets and Slides are exported as DOCX, XLSX and PPTX.
 3. Set each file's access level and submit. Keep the page open until the import finishes.
 
-The import is a one-time copy: later edits in Drive are not picked up. To refresh a file, delete the old copy and import it again. PEKA only sees the files you pick (Google scope `drive.file`).
+The import is a one-time copy: later edits in Drive are not picked up. To refresh a file, delete the old copy and import it again. PEKA only sees the files you pick (Google scope `drive.file`). To keep a whole folder in step, an admin sets up folder sync.
+
+### Google Drive folder sync (admin)
+
+An admin picks one Drive folder as the source of truth under **Admin → Provider settings → Google Drive folder sync**.
+
+1. Choose **Choose folder**. The first time, Google asks for read access to your whole Drive (`drive.readonly`), because PEKA must see files added to the folder later. You return to the settings page; choose the folder again.
+2. Set the **daily sync time** (default 00:00, in this browser's time zone) and the access level for synced files, then **Save folder sync**.
+3. Each day at that time, files added to the folder or its subfolders, and files edited there, are added to the knowledge base. Files deleted from the folder are removed. Files already in the folder when you picked it are skipped until someone edits them.
+4. **Sync now** runs within a minute. The card shows the last run, for example "3 added, 1 updated, 0 removed". **Stop syncing** keeps the files already synced; so does picking another folder.
+
+If the server is offline at sync time, the sync runs once it is back online. Manual uploads and imports keep working alongside the sync.
 
 ### Status meanings
 
@@ -154,6 +165,7 @@ Actions: **Test** connection, **Save**. Keys are never returned on GET—only �
 | Provider settings | | | ✓ |
 | Audit events | | | ✓ |
 | Import from Google Drive (general files) | ✓ | ✓ | ✓ |
+| Google Drive folder sync | | | ✓ |
 
 ---
 

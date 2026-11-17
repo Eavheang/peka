@@ -12,7 +12,7 @@ What changed between the approved proposal (15 July 2026) and the final system (
 | AI orchestration | LangChain or LlamaIndex | Neither: a small pipeline written directly in the FastAPI service | August 2026 | Review 1 |
 | Roles | Admin and regular user | `admin`, `senior`, `staff`, and a `general` or `confidential` level per document | August 2026 | Review 1 |
 | Language model choice | Local model only | Local model by default, or any OpenAI-compatible endpoint chosen by the admin | August 2026 | Review 1 |
-| Google Drive | Automatic sync of a designated folder (FR02) | Deferred, then a one-off import of picked files (October 2026). Automatic sync is future work | August and October 2026 | Review 1 (deferral), Review 2 |
+| Google Drive | Automatic sync of a designated folder (FR02) | Deferred, then a one-off import of picked files (October 2026), then a daily sync of one admin-designated folder (November 2026) | August, October and November 2026 | Review 1 (deferral), Review 2, PR #131 |
 | Accounts | Admins create accounts | Email invitations; the invitee sets their own password | September 2026 | Review 2 |
 | Web search | Excluded | Opt-in public web search (Exa), off by default (FR17) | September 2026 | Review 2 |
 | OKF conversion | Every document converted to OKF before indexing (FR05) | Withdrawn; the original extracted text is indexed | 7 November 2026 | Team decision after evaluation |
@@ -44,6 +44,8 @@ An organization without a suitable GPU still needs a usable assistant (architect
 ### Google Drive deferred, then imported once
 
 Review 0 asked the team to finish the core document-to-answer workflow before secondary features, so Drive sync was deferred at Review 1 and manual upload became the ingestion path. In October 2026 a one-off import was added: a user signs in with Google and picks files, which then go through the same pipeline as uploads. Picked files are not kept in sync afterwards (issue #102).
+
+On 17 November 2026, once the core workflow and the evaluation were done, automatic sync was added (PR #131). An admin designates one folder as the source of truth and a daily time in their time zone. The index worker then imports files added to the folder or its subfolders, re-imports edited files and removes files deleted from it; files already there when the folder is picked are skipped until edited. Nothing is deleted unless the whole folder tree was listed. Seeing files nobody picked needs the wider `drive.readonly` scope, which only that admin grants, so Drive refresh tokens are now stored encrypted. Without internet the sync waits, and a due run starts once the server is back online.
 
 ### Invitations instead of admin-created accounts
 

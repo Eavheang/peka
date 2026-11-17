@@ -34,6 +34,8 @@ check-env:
 
 setup: .env check-env
 	docker compose -f compose.yaml -f compose.dev.yaml up -d --build postgres embeddings reranker
+	# Migrations run in the service image, so it must have the current requirements.txt first.
+	docker compose -f compose.yaml -f compose.dev.yaml build service index-worker
 	$(MAKE) migrate
 	docker compose -f compose.yaml -f compose.dev.yaml up -d --build service index-worker
 	docker compose -f compose.yaml -f compose.dev.yaml run --rm webclient bun install --frozen-lockfile

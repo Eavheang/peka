@@ -52,7 +52,7 @@ Activity on `main`, counted from git on 17 November 2026:
 | October | Audit log (2 October), theme selection, Google Drive import (6 October), chat regenerate (7 October), evaluation scripts and the 70-file evaluation (21 to 28 October), first final report (30 October) | Commits, PRs #73 to #93 |
 | 7 November | Chat queue, prompt budget, refusal, reranker, original-text indexing; OKF withdrawn; final evaluation re-run | Issues #95 to #101, PRs #105 to #108 |
 | 9 to 12 November | Citation matching, security fixes (image exfiltration, exposed ports), re-indexing that keeps old citations, the 50-document evaluation and its fixes | Issues #115 to #125, PRs #112 to #128 |
-| 17 November | Offline and deployment tests; documentation aligned with the thesis | This folder |
+| 17 November | Offline and deployment tests; documentation aligned with the thesis; daily Google Drive folder sync | This folder, PR #131 |
 | 20 November | Thesis submission | |
 | 26 November | Final presentation and live demonstration | |
 
@@ -86,12 +86,12 @@ The risk register from Review 2, with the final status.
 |----|------|--------|------------|--------------|
 | R-01 | Local model output unstable or slow on commodity hardware | High | JSON repair and retry; chat queue; prompt budget; provider configurable | Mitigated: 20 of 20 answered under load; first token 4.9 s median |
 | R-02 | The full upload, index and search pipeline not tested end to end | Medium | Real-database search tests; system evaluation runs | Mitigated by the system runs; not automated in CI |
-| R-03 | Scope creep (Drive sync, extra features) | Medium | Drive sync deferred; features frozen for the thesis | Controlled: Drive import only; sync is future work |
+| R-03 | Scope creep (Drive sync, extra features) | Medium | Drive sync deferred; features frozen for the thesis | Controlled: one-off import in October; folder sync added on 17 November, after the evaluation, with its own tests |
 | R-04 | Time before 7 November with thesis writing | Medium | Weekly plan; documentation split between the students | Evaluation and fixes ran to 12 November |
 | R-05 | One student's work under-represented in commit counts | Medium | Pull requests, review comments and design work recorded | Addressed in the thesis contribution record, which is not part of this repository |
 | R-06 | The demonstration depends on local containers and the model | High | Rehearsal on the demo machine; screenshots and a recording as fallback | Open until the final presentation |
 
-Earlier risks from the proposal: insufficient hardware (closed: the quantized model runs on a 6 GB GPU), Google Drive API complexity (closed by deferring sync), poor parsing of complex PDFs (partly mitigated: tables and headings handled; scanned PDFs out of scope), and dependency conflicts (mitigated: no orchestration framework, pinned images, CI).
+Earlier risks from the proposal: insufficient hardware (closed: the quantized model runs on a 6 GB GPU), Google Drive API complexity (closed: sync was deferred until the core worked, then built on 17 November), poor parsing of complex PDFs (partly mitigated: tables and headings handled; scanned PDFs out of scope), and dependency conflicts (mitigated: no orchestration framework, pinned images, CI).
 
 ## Data and ethics
 

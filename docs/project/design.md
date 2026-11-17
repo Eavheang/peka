@@ -45,9 +45,9 @@ flowchart LR
 | Component | Responsibility |
 |-----------|----------------|
 | nginx proxy | Single entry point; `/` to the web client, `/api/` to the service; long timeouts for streamed answers |
-| webclient | Sign-in, invitations, chat, knowledge library, account settings, admin users, audit log and provider settings |
-| service | Authentication and roles, files, Google Drive import, search, chat, audit log, provider settings |
-| index-worker | Claims indexing jobs, extracts text, chunks, embeds and activates a new chunk set |
+| webclient | Sign-in, invitations, chat, knowledge library, account settings, admin users, audit log, provider settings and Google Drive folder sync |
+| service | Authentication and roles, files, Google Drive import and folder sync settings, search, chat, audit log, provider settings |
+| index-worker | Claims indexing jobs, extracts text, chunks, embeds and activates a new chunk set; runs the daily Google Drive folder sync when it is due |
 | postgres | Users, invitations, files, jobs, chunk sets, chunks with 384-dimension vectors, conversations, messages, audit events, settings |
 | embeddings | Turns chunks and questions into vectors |
 | reranker | Scores the 20 best candidates against the question |
@@ -88,6 +88,9 @@ erDiagram
     users ||--o{ conversations : "owner_id"
     users ||--o{ audit_events : "actor_id"
     users ||--o| google_drive_connections : "user_id"
+    users ||--o| google_drive_sync : "user_id"
+    google_drive_sync ||--o{ google_drive_synced_files : "sync_id"
+    files |o--o{ google_drive_synced_files : "file_id"
     files ||--|| index_jobs : "file_id"
     files ||--o{ chunk_sets : "file_id"
     files ||--o{ knowledge_chunks : "file_id"
@@ -168,7 +171,20 @@ erDiagram
     }
     google_drive_connections {
         uuid user_id PK,FK
-        text refresh_token
+        text refresh_token "encrypted"
+    }
+    google_drive_sync {
+        smallint id PK "always 1"
+        uuid user_id FK
+        text folder_id
+        text timezone
+        time sync_time
+        date last_run_on
+    }
+    google_drive_synced_files {
+        text drive_file_id PK
+        uuid file_id FK
+        text modified_time
     }
     provider_settings {
         smallint id PK "always 1"
@@ -176,7 +192,7 @@ erDiagram
     }
 ```
 
-*Figure: Entity-relationship diagram (11 tables, migrations 002 to 024). Timestamps are left out.*
+*Figure: Entity-relationship diagram (13 tables, migrations 002 to 025). Timestamps are left out.*
 
 Constraints that carry business rules:
 
@@ -325,7 +341,7 @@ All endpoints are listed in the [API reference](../service/api-reference.md). Th
 |-------|--------|---------|
 | Authentication, users, invitations | `/auth` | All users; user management is admin-only |
 | Files | `/files` | All users; confidential uploads and access levels are admin-only |
-| Google Drive import | `/integrations/google` | All users |
+| Google Drive import and folder sync | `/integrations/google` | All users; folder sync (`/integrations/google/sync`) is admin-only |
 | Search | `/search` | All users |
 | Chat | `/chat` | All users; conversations are owner-only |
 | Audit log | `/admin/audit-events` | Admin |
