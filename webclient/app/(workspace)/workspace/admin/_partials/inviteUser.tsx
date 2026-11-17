@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { InvitationResponse, UserRole } from "@/interface/auth";
+import { useServerStatus } from "@/services/status";
 import { useInviteUser } from "@/services/user";
 
 type InviteUserValues = { email: string; role: UserRole };
@@ -28,6 +29,7 @@ type InviteUserProps = {
 
 export default function InviteUser({ open, onOpenChange, onInvited }: InviteUserProps) {
   const inviteUser = useInviteUser();
+  const { offline } = useServerStatus();
   const {
     control,
     register,
@@ -67,7 +69,9 @@ export default function InviteUser({ open, onOpenChange, onInvited }: InviteUser
             Invite user
           </DialogTitle>
           <DialogDescription className="mt-2 text-sm leading-6 text-panel-foreground/70">
-            They receive a link to choose their own password and are signed in automatically.
+            {offline
+              ? "PEKA is offline, so no email goes out. You get a link to send them yourself."
+              : "They receive a link to choose their own password and are signed in automatically."}
           </DialogDescription>
         </div>
         <form

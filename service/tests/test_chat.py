@@ -35,6 +35,8 @@ def _empty_knowledge_base(monkeypatch) -> None:
     monkeypatch.setattr(chat_service, "_needs_documents", lambda *args: False)
     # No reranker in tests: uncited answers stay uncited unless a test scores them.
     monkeypatch.setattr(chat_service, "rerank_scores", lambda query, texts: None)
+    # Web search counts as set up (Exa key, internet); tests that use it patch perform_web_search.
+    monkeypatch.setattr(chat_service, "web_search_available", lambda: True)
 
 
 def _override_admin() -> None:

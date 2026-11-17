@@ -12,6 +12,7 @@ import {
   useSaveProviderSettings,
   useTestProvider,
 } from "@/services/providerSettings";
+import { useServerStatus } from "@/services/status";
 import { getStoredToken } from "@/utils/auth-storage";
 
 export default function ProviderSettingsPage() {
@@ -28,6 +29,7 @@ export default function ProviderSettingsPage() {
   const settings = useProviderSettings();
   const save = useSaveProviderSettings();
   const test = useTestProvider();
+  const { offline } = useServerStatus();
   const providerSettings = settings.data;
 
   useEffect(() => setToken(getStoredToken("peka_access_token") ?? ""), []);
@@ -202,7 +204,15 @@ export default function ProviderSettingsPage() {
                 type="button"
                 variant="outline"
                 disabled={test.isPending}
-                onClick={() => void testConnection("exa")}
+                aria-disabled={offline || undefined}
+                onClick={() =>
+                  offline
+                    ? toast.add({
+                        title: "Exa needs internet. PEKA is offline, so the test can’t reach it.",
+                        type: "warning",
+                      })
+                    : void testConnection("exa")
+                }
               >
                 Test Exa connection
               </Button>

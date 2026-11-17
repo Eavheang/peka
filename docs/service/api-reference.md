@@ -18,6 +18,7 @@ Roles: `admin` | `senior` | `staff`.
 | Method | Path | Auth | Response |
 |--------|------|------|----------|
 | `GET` | `/health` | none | `{ "status": "ok" }` |
+| `GET` | `/status` | bearer | `{ "online": bool, "configured": { "web_search": bool, "google_drive": bool, "email": bool } }`. `configured` says what an admin has set up; each feature also needs `online` |
 
 ---
 
@@ -44,7 +45,7 @@ Roles: `admin` | `senior` | `staff`.
 
 **TokenResponse:** `access_token`, `refresh_token`, `token_type`, `expires_in`  
 **UserResponse:** `id`, `email`, `display_name`, `role`, `is_active`  
-**InvitationResponse:** `id`, `email`, `role`, `expires_at`, `created_at`, `invite_url`, `email_sent`. `invite_url` is returned only when an invitation is created or resent (only a hash is stored); `email_sent` is `false` when SMTP is unconfigured or sending failed, so the admin can copy the link instead.
+**InvitationResponse:** `id`, `email`, `role`, `expires_at`, `created_at`, `invite_url`, `email_sent`, `email_error`. `invite_url` is returned only when an invitation is created or resent (only a hash is stored); `email_sent` is `false` when SMTP is unconfigured, the server is offline, or sending failed, so the admin can copy the link instead. `email_error` says which: `not_configured`, `offline` or `failed` (`null` when sent).
 
 ---
 

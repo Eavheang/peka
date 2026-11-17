@@ -2,6 +2,7 @@ import jwt
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import RedirectResponse
 
+from app import connectivity
 from app.auth.routes import authenticated
 from app.config import settings
 from app.files.schemas import FileResponse
@@ -20,7 +21,12 @@ from app.google_drive.service import (
 router = APIRouter(prefix="/integrations/google", tags=["google-drive"])
 
 
-@router.get("/connect", response_model=ConnectResponse)
+def _require_internet() -> None:
+    if not connectivity.is_online():
+        raise HTTPException(status_code=503, detail="Google Drive needs an internet connection. PEKA is offline.")
+
+
+@router.get("/connect", response_model=ConnectResponse, dependencies=[Depends(_require_internet)])
 def connect(user: dict = Depends(authenticated)) -> dict:
     try:
         return {"url": authorization_url(user["id"])}
@@ -40,7 +46,7 @@ def callback(code: str | None = None, state: str | None = None) -> RedirectRespo
     return RedirectResponse(f"{settings.app_base_url}/workspace/knowledge?google_drive={result}")
 
 
-@router.get("/picker", response_model=PickerConfig)
+@router.get("/picker", response_model=PickerConfig, dependencies=[Depends(_require_internet)])
 def get_picker_config(user: dict = Depends(authenticated)) -> dict:
     try:
         return picker_config(user["id"])
@@ -52,7 +58,7 @@ def get_picker_config(user: dict = Depends(authenticated)) -> dict:
         raise HTTPException(status_code=502, detail=str(error)) from None
 
 
-@router.post("/files", response_model=list[FileResponse], status_code=status.HTTP_201_CREATED)
+@router.post("/files", response_model=list[FileResponse], status_code=status.HTTP_201_CREATED, dependencies=[Depends(_require_internet)])
 def import_drive_files(payload: DriveImportRequest, user: dict = Depends(authenticated)) -> list[dict]:
     if user["role"] != "admin" and any(file.access_level == "confidential" for file in payload.files):
         raise HTTPException(status_code=403, detail="Only admins can upload confidential files")

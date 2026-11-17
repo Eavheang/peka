@@ -27,8 +27,9 @@ Health: `GET /health` → `{"status":"ok"}`
 ```text
 service/
 ├── app/
-│   ├── main.py                 # FastAPI app, lifespan, /health
+│   ├── main.py                 # FastAPI app, lifespan, /health, /status
 │   ├── config.py               # Settings from env
+│   ├── connectivity.py         # is_online(): cached internet probe
 │   ├── database.py             # Base, get_connection()
 │   ├── workspace_settings.py   # Admin provider settings router
 │   ├── auth/                   # login, users, JWT

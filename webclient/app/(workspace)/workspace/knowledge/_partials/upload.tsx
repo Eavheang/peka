@@ -26,6 +26,7 @@ import type { AccessLevel } from "@/interface/files";
 import { useUploadFiles } from "@/services/files";
 import { pickGoogleDriveFiles, useImportDriveFiles } from "@/services/google-drive";
 import { useGetCurrentUser } from "@/services/auth";
+import { useServerStatus } from "@/services/status";
 import { getApiErrorMessage } from "@/utils/api-error";
 import { getStoredToken } from "@/utils/auth-storage";
 import { toast } from "@/components/ui/toast";
@@ -78,6 +79,8 @@ export function Upload() {
   const driveImport = useImportDriveFiles();
   const isUploading = upload.isPending || driveImport.isPending;
   const user = useGetCurrentUser(getStoredToken("peka_access_token") ?? "");
+  const { offline, configured } = useServerStatus();
+  const driveConfigured = configured?.google_drive ?? false;
   const canSetConfidential = user.data?.role === "admin";
 
   useEffect(() => {
@@ -185,6 +188,14 @@ export function Upload() {
   }
 
   async function chooseFromDrive() {
+    if (offline) {
+      toast.add({
+        title:
+          "Google Drive needs internet. PEKA is offline, so upload files from your computer instead.",
+        type: "warning",
+      });
+      return;
+    }
     setUploadError("");
     setIsPickingDrive(true);
 
@@ -326,10 +337,14 @@ export function Upload() {
             </div>
 
             <p className="mt-1.5 text-sm text-copy">
-              Drag and drop anywhere in this box, or pick a source.
+              {driveConfigured
+                ? "Drag and drop anywhere in this box, or pick a source."
+                : "Drag and drop anywhere in this box, or browse your computer."}
             </p>
 
-            <div className="mt-6 grid w-full max-w-lg gap-3 sm:grid-cols-2">
+            <div
+              className={`mt-6 grid w-full gap-3 ${driveConfigured ? "max-w-lg sm:grid-cols-2" : "max-w-xs"}`}
+            >
               {/* The computer card has no handler: its click bubbles to the box, which opens the file dialog. */}
               {[
                 {
@@ -338,27 +353,37 @@ export function Upload() {
                   icon: <Laptop size={18} />,
                   iconClass: "bg-primary text-primary-foreground",
                 },
-                {
-                  title: "Google Drive",
-                  hint: isPickingDrive ? "Opening picker…" : "Import from Drive",
-                  icon: isPickingDrive ? (
-                    <Loader2 className="animate-spin" size={18} />
-                  ) : (
-                    <HardDrive size={18} />
-                  ),
-                  iconClass: "bg-secondary text-foreground",
-                  disabled: isPickingDrive,
-                  onClick: (event: MouseEvent) => {
-                    event.stopPropagation();
-                    void chooseFromDrive();
-                  },
-                },
-              ].map(({ title, hint, icon, iconClass, disabled, onClick }) => (
+                ...(driveConfigured
+                  ? [
+                      {
+                        title: "Google Drive",
+                        hint: offline
+                          ? "Needs internet"
+                          : isPickingDrive
+                            ? "Opening picker…"
+                            : "Import from Drive",
+                        icon: isPickingDrive ? (
+                          <Loader2 className="animate-spin" size={18} />
+                        ) : (
+                          <HardDrive size={18} />
+                        ),
+                        iconClass: "bg-secondary text-foreground",
+                        disabled: isPickingDrive,
+                        unavailable: offline,
+                        onClick: (event: MouseEvent) => {
+                          event.stopPropagation();
+                          void chooseFromDrive();
+                        },
+                      },
+                    ]
+                  : []),
+              ].map(({ title, hint, icon, iconClass, disabled, unavailable, onClick }) => (
                 <button
                   key={title}
                   type="button"
                   disabled={disabled}
-                  className="flex items-center gap-3 rounded-xl border border-border bg-background p-3 text-left transition-colors hover:border-primary/50 hover:bg-secondary/40 disabled:pointer-events-none disabled:opacity-50"
+                  aria-disabled={unavailable || undefined}
+                  className="flex items-center gap-3 rounded-xl border border-border bg-background p-3 text-left transition-colors hover:border-primary/50 hover:bg-secondary/40 disabled:pointer-events-none disabled:opacity-50 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:hover:border-border aria-disabled:hover:bg-background"
                   onClick={onClick}
                 >
                   <span
@@ -438,20 +463,23 @@ export function Upload() {
                   Add files
                 </Button>
 
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={isUploading || isPickingDrive}
-                  onClick={() => void chooseFromDrive()}
-                >
-                  {isPickingDrive ? (
-                    <Loader2 className="animate-spin" size={15} />
-                  ) : (
-                    <HardDrive size={15} />
-                  )}
-                  Google Drive
-                </Button>
+                {driveConfigured && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={isUploading || isPickingDrive}
+                    aria-disabled={offline || undefined}
+                    onClick={() => void chooseFromDrive()}
+                  >
+                    {isPickingDrive ? (
+                      <Loader2 className="animate-spin" size={15} />
+                    ) : (
+                      <HardDrive size={15} />
+                    )}
+                    Google Drive
+                  </Button>
+                )}
               </div>
             </div>
 

@@ -3,6 +3,7 @@ import smtplib
 from email.message import EmailMessage
 from html import escape
 
+from app import connectivity
 from app.config import settings
 
 logger = logging.getLogger(__name__)
@@ -69,7 +70,7 @@ def _invitation_html(invite_url: str, expire_days: int, role: str) -> str:
 
 def send_invitation(to: str, invite_url: str, expire_days: int, role: str) -> bool:
     """Email an invitation link. Returns False, never raises, so the invite survives a mail outage."""
-    if not mail_configured():
+    if not mail_configured() or not connectivity.is_online():
         return False
     message = EmailMessage()
     message["Subject"] = "You're invited to PEKA"

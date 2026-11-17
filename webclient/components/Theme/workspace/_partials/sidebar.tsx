@@ -16,6 +16,7 @@ import { useDeleteConversation, useListConversations } from "@/services/chat";
 import { endSession, getStoredToken } from "@/utils/auth-storage";
 import { ROUTE, Routes } from "@/variables/routes";
 import { ConversationHistory } from "./conversationHistory";
+import { OfflineBadge } from "./offlineBadge";
 import { ProfileMenu } from "./profileMenu";
 
 export function WorkspaceSidebar({
@@ -90,6 +91,9 @@ export function WorkspaceSidebar({
               <Image src="/peka.svg" alt="" aria-hidden="true" width={21} height={21} />
               peka
             </Link>
+          )}
+          {!collapsed && (
+            <OfflineBadge className="mr-auto ml-3 border-white/15 bg-transparent text-white/70" />
           )}
           <button
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}

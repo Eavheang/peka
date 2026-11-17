@@ -3,7 +3,8 @@ from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 from uuid import UUID
 
-from app.auth.mailer import send_invitation
+from app import connectivity
+from app.auth.mailer import mail_configured, send_invitation
 from app.auth.repository import auth_repository, invitation_repository
 from app.auth.security import dummy_password_hash, hash_password, verify_password
 from app.config import settings
@@ -59,7 +60,13 @@ def _deliver(invitation: dict, token: str, base_url: str | None) -> dict:
     email_sent = send_invitation(
         invitation["email"], invite_url, settings.invitation_expire_days, invitation["role"]
     )
-    return {**invitation, "invite_url": invite_url, "email_sent": email_sent}
+    email_error = (
+        None if email_sent
+        else "not_configured" if not mail_configured()
+        else "offline" if not connectivity.is_online()
+        else "failed"
+    )
+    return {**invitation, "invite_url": invite_url, "email_sent": email_sent, "email_error": email_error}
 
 
 def invite_user(email: str, role: str, invited_by: UUID, base_url: str | None = None) -> dict:
