@@ -25,7 +25,7 @@ services:
     restart: unless-stopped
 
   proxy:
-    image: nginx:alpine
+    image: nginx:1.31.10-alpine
     depends_on:
       - webclient
       - service
