@@ -39,7 +39,7 @@ make prod-down # tear down the prod-style stack
 | `index-worker` | same service image | — | `python -m app.engine.indexing.worker` |
 | `embeddings` | TEI `cpu-1.9` | (internal 80) | BGE-small embeddings |
 | `reranker` | TEI `cpu-1.9` | (internal 80) | Cross-encoder that reranks search hits, on CPU |
-| `proxy` | `nginx:alpine` | `${WEBCLIENT_PORT:-3000}` (only prod publish) | Public entry |
+| `proxy` | `nginx:1.31.10-alpine` | `${WEBCLIENT_PORT:-3000}` (only prod publish) | Public entry |
 | `llama` | llama.cpp CUDA (profile `llama`) | `127.0.0.1:8080` | Optional local LLM |
 
 Shared volume `file_storage` is mounted at `/app/storage` for `service` and `index-worker`.

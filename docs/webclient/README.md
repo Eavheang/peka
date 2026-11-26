@@ -8,7 +8,7 @@ App metadata title: **PEKA** — description: **PEKA - Private Enterprise Knowle
 
 | Layer | Package | Version (package.json) |
 |-------|---------|------------------------|
-| Framework | `next` | 16.2.10 |
+| Framework | `next` | 16.4.6 |
 | UI | `react` / `react-dom` | 19.2.4 |
 | Server state | `@tanstack/react-query` | ^5.102.4 |
 | HTTP | `axios` | ^1.19.0 |

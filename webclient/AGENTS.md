@@ -8,7 +8,7 @@
 
 ## Structure
 
-- This is a single Next.js 16.2.10 App Router app. Routes and root layout live in `app/`; `app/layout.tsx` is the sole global CSS import and font boundary.
+- This is a single Next.js 16.4.6 App Router app. Routes and root layout live in `app/`; `app/layout.tsx` is the sole global CSS import and font boundary.
 - Tailwind CSS v4 is wired through `postcss.config.mjs`; keep global CSS in `app/globals.css` and use the `@/*` TypeScript alias for project imports.
 - Keep server components as the default. Add `'use client'` only to the smallest module needing browser APIs, state, effects, or event handlers; never expose secrets or server-only code to client modules.
 - Keep route entry files thin. When shared UI or route-local modules are introduced, follow `.agents/architecture.md` and `.agents/component.md` for placement and naming.
@@ -27,4 +27,4 @@ Read matching `.agents/*.md` guidance before working in these areas:
 
 ## Next.js
 
-Next.js 16.2.10 has breaking changes from older versions. Before changing framework APIs or conventions, check relevant guidance under `node_modules/next/dist/docs/` when available and heed deprecation notices.
+Next.js 16.4.6 has breaking changes from older versions. Before changing framework APIs or conventions, check relevant guidance under `node_modules/next/dist/docs/` when available and heed deprecation notices.

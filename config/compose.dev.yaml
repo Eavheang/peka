@@ -14,7 +14,7 @@ services:
     command: bun run dev --hostname 0.0.0.0
 
   proxy:
-    image: nginx:alpine
+    image: nginx:1.31.10-alpine
     depends_on:
       - webclient
       - service
